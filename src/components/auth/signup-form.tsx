@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Logo } from "../logo"
 
 const formSchema = z.object({
@@ -26,9 +25,6 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: "Password must be at least 8 characters.",
   }),
-  accountType: z.enum(["user", "merchant"], {
-    required_error: "You need to select an account type.",
-  }),
 })
 
 export function SignupForm() {
@@ -37,13 +33,12 @@ export function SignupForm() {
     defaultValues: {
       email: "",
       password: "",
-      accountType: "user",
     },
   })
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values)
-    // Here you would handle the signup logic
+    // Here you would handle the signup logic, all new users are 'user' type by default
   }
 
   return (
@@ -53,7 +48,7 @@ export function SignupForm() {
           <Logo />
         </div>
         <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
-        <CardDescription>Join our community to start buying and selling.</CardDescription>
+        <CardDescription>Join our community to start exploring.</CardDescription>
       </CardHeader>
       <CardContent>
         <Button variant="outline" className="w-full mb-4">
@@ -93,40 +88,6 @@ export function SignupForm() {
                   <FormLabel>Password</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="********" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="accountType"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>I am a...</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="user" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          User
-                        </FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="merchant" />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          Merchant
-                        </FormLabel>
-                      </FormItem>
-                    </RadioGroup>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
