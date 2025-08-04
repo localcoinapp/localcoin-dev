@@ -66,6 +66,9 @@ export function SignupForm() {
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      client_id: '929108967513-r1lbdu2vap4dufm94e4jant4ah9tn2d6.apps.googleusercontent.com',
+    });
     try {
       await signInWithPopup(auth, provider);
       toast({ title: "Success", description: "You have been signed up with Google." });
