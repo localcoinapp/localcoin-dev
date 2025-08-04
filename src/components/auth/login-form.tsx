@@ -78,6 +78,9 @@ export function LoginForm() {
 
   const handleAppleSignIn = async () => {
     const provider = new OAuthProvider('apple.com');
+    provider.setCustomParameters({
+      locale: 'en'
+    });
     try {
       await signInWithPopup(auth, provider);
       toast({ title: "Success", description: "You have been logged in with Apple." });
