@@ -18,9 +18,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  env: {
-    
-  }
 };
 
 export default nextConfig;

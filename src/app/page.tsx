@@ -15,7 +15,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Merchant } from '@/types';
 import MerchantCard from '@/components/merchant-card';
-import MapView from '@/components/map-view';
+import dynamic from 'next/dynamic';
+
+const MapView = dynamic(() => import('@/components/map-view'), { 
+  ssr: false 
+});
 
 const merchants: Merchant[] = [
   {
@@ -122,13 +126,7 @@ export default function MarketplacePage() {
         </TabsContent>
         <TabsContent value="map">
           <div className="h-[600px] w-full rounded-lg overflow-hidden shadow-lg border">
-            {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? (
-              <MapView merchants={merchants} />
-            ) : (
-              <div className="flex items-center justify-center h-full bg-muted">
-                <p className="text-muted-foreground">Google Maps API key is missing.</p>
-              </div>
-            )}
+            <MapView merchants={merchants} />
           </div>
         </TabsContent>
       </Tabs>
