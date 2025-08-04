@@ -17,7 +17,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"PT Sans"', 'sans-serif'],
+        body: ['"Open Sans"', 'sans-serif'],
         headline: ['"Bitter"', 'serif'],
         code: ['monospace'],
       },
