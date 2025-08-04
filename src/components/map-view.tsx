@@ -70,43 +70,6 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
                 const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: customIcon })
                     .addTo(mapRef.current!);
                 
-                const popupContent = document.createElement('div');
-                popupContent.style.width = '256px';
-
-                // This is a bit of a workaround to render a React component inside a Leaflet popup
-                const cardHtml = renderToStaticMarkup(
-                    <Card className="flex flex-col overflow-hidden">
-                        <CardHeader className="p-0">
-                            <div className="relative h-48 w-full">
-                                <Image
-                                    src={merchant.imageUrl}
-                                    alt={merchant.name}
-                                    layout="fill"
-                                    objectFit="cover"
-                                    data-ai-hint={merchant.aiHint}
-                                />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-4 flex-grow">
-                            <Badge variant="secondary" className="mb-2">{merchant.category}</Badge>
-                            <CardTitle className="text-xl font-bold font-headline">{merchant.name}</CardTitle>
-                            <CardDescription className="mt-2 text-sm text-muted-foreground">{merchant.description}</CardDescription>
-                        </CardContent>
-                        <CardFooter className="p-4 bg-muted/50 flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                                <span className="font-bold text-lg">{merchant.rating}</span>
-                            </div>
-                            <Button size="sm" asChild>
-                                <Link href={`/chat/${merchant.id}`}>
-                                    <MessageSquare className="mr-2 h-4 w-4" />
-                                    Chat
-                                </Link>
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                );
-                
                 // We can't use the MerchantCard directly because it uses next/image and next/link which needs the React context.
                 // A simplified version is created here for the popup.
                 const popupNode = document.createElement('div');
@@ -136,18 +99,5 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
 
     return <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />;
 };
-
-// Dummy components to avoid breaking the renderToStaticMarkup call
-const Card = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const CardHeader = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const CardContent = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const CardFooter = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const CardTitle = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const CardDescription = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const Badge = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>
-const Star = ({ className }: { className?: string }) => <svg className={className} />;
-const MessageSquare = ({ className }: { className?: string }) => <svg className={className} />;
-const Image = (props: any) => <img {...props} />;
-
 
 export default MapView;
