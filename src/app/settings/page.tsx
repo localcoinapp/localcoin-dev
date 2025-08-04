@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
-import { useTheme } from "@/components/theme-provider"
+import { useTheme } from "next-themes"
 
 const settingsFormSchema = z.object({
   theme: z.enum(["light", "dark"], {
@@ -60,7 +60,7 @@ export default function SettingsPage() {
     })
     
     React.useEffect(() => {
-        form.setValue("theme", theme);
+        form.setValue("theme", theme || "light");
     }, [theme, form]);
 
 
