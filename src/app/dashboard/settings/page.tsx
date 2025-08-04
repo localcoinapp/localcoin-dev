@@ -23,10 +23,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Camera } from "lucide-react"
+import { countries } from "@/data/countries"
 
 const storeSettingsSchema = z.object({
     companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+    country: z.string().min(1, { message: "Please select a country." }),
     address: z.string().min(10, { message: "Please enter a valid address." }),
     contactEmail: z.string().email({ message: "Please enter a valid email address." }),
     phone: z.string().min(10, { message: "Please enter a valid phone number." }),
@@ -42,6 +45,7 @@ type StoreSettingsValues = z.infer<typeof storeSettingsSchema>
 // This would be fetched from your database
 const currentSettings: StoreSettingsValues = {
     companyName: "SunnySide Cafe",
+    country: "DE",
     address: "123 Main St, Anytown, USA",
     contactEmail: "contact@sunnyside.com",
     phone: "(555) 123-4567",
@@ -128,7 +132,29 @@ export default function StoreSettingsPage() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FormField
+                <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your country" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {countries.map((country) => (
+                              <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
                     control={form.control}
                     name="address"
                     render={({ field }) => (
@@ -141,20 +167,23 @@ export default function StoreSettingsPage() {
                       </FormItem>
                     )}
                   />
-                <FormField
-                  control={form.control}
-                  name="taxNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tax ID / VAT Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your business tax number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="taxNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tax ID / VAT Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your business tax number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField

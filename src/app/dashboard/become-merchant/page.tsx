@@ -23,10 +23,13 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Activity, CheckCircle } from "lucide-react"
+import { countries } from "@/data/countries"
 
 const formSchema = z.object({
   companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+  country: z.string().min(1, { message: "Please select a country." }),
   address: z.string().min(10, { message: "Please enter a valid address." }),
   contactEmail: z.string().email({ message: "Please enter a valid email address." }),
   phone: z.string().min(10, { message: "Please enter a valid phone number." }),
@@ -43,6 +46,7 @@ export default function BecomeMerchantPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       companyName: "",
+      country: "",
       address: "",
       contactEmail: "",
       phone: "",
@@ -84,6 +88,28 @@ export default function BecomeMerchantPage() {
                         <FormControl>
                           <Input placeholder="SunnySide Cafe" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your country" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {countries.map((country) => (
+                                <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         <FormMessage />
                       </FormItem>
                     )}

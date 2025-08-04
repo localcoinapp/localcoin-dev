@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Logo } from "../logo"
+import { countries } from "@/data/countries"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -25,6 +27,7 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: "Password must be at least 8 characters.",
   }),
+  country: z.string().min(1, { message: "Please select a country." }),
 })
 
 export function SignupForm() {
@@ -33,6 +36,7 @@ export function SignupForm() {
     defaultValues: {
       email: "",
       password: "",
+      country: "",
     },
   })
 
@@ -93,6 +97,28 @@ export function SignupForm() {
                 </FormItem>
               )}
             />
+             <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your country" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <Button type="submit" className="w-full">Create Account</Button>
           </form>
         </Form>

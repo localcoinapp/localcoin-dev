@@ -20,9 +20,17 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Camera } from "lucide-react"
+import { countries } from "@/data/countries"
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -30,6 +38,7 @@ const profileFormSchema = z.object({
   }),
   email: z.string().email(),
   bio: z.string().max(160).optional(),
+  country: z.string().min(1, { message: "Please select a country." }),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -39,6 +48,7 @@ const defaultValues: Partial<ProfileFormValues> = {
   name: "Current User",
   email: "user@example.com",
   bio: "I'm a user of this awesome platform!",
+  country: "US",
 }
 
 export default function ProfilePage() {
@@ -96,6 +106,28 @@ export default function ProfilePage() {
                     <FormControl>
                       <Input placeholder="Your Name" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your country" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     <FormMessage />
                   </FormItem>
                 )}

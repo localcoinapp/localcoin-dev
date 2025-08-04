@@ -15,15 +15,25 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
+import { countries } from "@/data/countries"
 
 interface RampDialogProps {
   type: 'buy' | 'sell';
   children: React.ReactNode;
 }
 
+// In a real app, this would come from the logged-in user's profile
+const userCountryCode = 'DE'; 
+
+const getCurrencyForCountry = (countryCode: string) => {
+    const country = countries.find(c => c.code === countryCode);
+    return country ? { code: country.currency, symbol: country.currencySymbol } : { code: 'USD', symbol: '$' };
+}
+
 export function RampDialog({ type, children }: RampDialogProps) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState('');
+    const currency = getCurrencyForCountry(userCountryCode);
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -31,7 +41,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
     }
     
     const handleSubmit = () => {
-        console.log(`${type} ${amount} worth of ${type === 'buy' ? siteConfig.token.symbol : 'USD'}`);
+        console.log(`${type} ${amount} worth of ${type === 'buy' ? siteConfig.token.symbol : currency.code}`);
         setOpen(false);
         setAmount('');
     }
@@ -47,13 +57,13 @@ export function RampDialog({ type, children }: RampDialogProps) {
         <DialogHeader>
           <DialogTitle className="capitalize">{type} {siteConfig.token.name}</DialogTitle>
           <DialogDescription>
-            {isBuy ? `Enter the amount of ${siteConfig.token.symbol} you want to purchase.` : 'Enter the amount of LCL you want to sell for USD.'}
+            {isBuy ? `Enter the amount of ${currency.code} you want to spend.` : `Enter the amount of ${siteConfig.token.symbol} you want to sell.`}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amount" className="text-right">
-                   {isBuy ? siteConfig.token.symbol : 'USD'}
+                   {isBuy ? currency.code : siteConfig.token.symbol}
                 </Label>
                 <Input
                     id="amount"
@@ -65,7 +75,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
                 />
             </div>
             <div className="text-center text-muted-foreground text-sm">
-                {isBuy ? `You will pay ${amount || '0.00'} USD` : `You will receive ${amount || '0.00'} ${siteConfig.token.symbol}`}
+                {isBuy ? `You will receive ~${amount || '0.00'} ${siteConfig.token.symbol}` : `You will receive ~${amount || '0.00'} ${currency.code}`}
             </div>
         </div>
         <DialogFooter>
