@@ -6,10 +6,9 @@ import { getAuth } from 'firebase/auth';
 const firebaseConfig = {
   "projectId": "localcoin-marketplace",
   "appId": "1:929108967513:web:ddc99e36b6338aefc4b148",
-  "storageBucket": "localcoin-marketplace.firebasestorage.app",
+  "storageBucket": "localcoin-marketplace.appspot.com",
   "apiKey": "AIzaSyDuU4uvBrYnyI6f6wk4n4hSCltJuJIYitg",
   "authDomain": "localcoin-marketplace.firebaseapp.com",
-  "measurementId": "",
   "messagingSenderId": "929108967513"
 };
 
