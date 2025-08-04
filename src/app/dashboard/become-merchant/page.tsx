@@ -40,7 +40,16 @@ const formSchema = z.object({
   website: z.string().url().optional().or(z.literal('')),
   instagram: z.string().optional(),
   description: z.string().min(20, { message: "Description must be at least 20 characters." }),
-})
+}).refine(data => {
+    if (data.country === 'US') {
+        const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
+        return usPhoneRegex.test(data.phone);
+    }
+    return true;
+}, {
+    message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
+    path: ["phone"],
+});
 
 
 export default function BecomeMerchantPage() {
@@ -63,6 +72,8 @@ export default function BecomeMerchantPage() {
       description: "",
     },
   })
+
+  const selectedCountry = form.watch("country");
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     console.log("Application submitted for review:", values);
@@ -215,7 +226,9 @@ export default function BecomeMerchantPage() {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="+49 (123) 456-7890" {...field} />
+                            <Input 
+                               placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "+49 (123) 456-7890"} 
+                               {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

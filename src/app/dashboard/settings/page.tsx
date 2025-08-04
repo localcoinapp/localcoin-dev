@@ -42,7 +42,16 @@ const storeSettingsSchema = z.object({
     description: z.string().min(20, { message: "Description must be at least 20 characters." }),
     taxNumber: z.string().optional(),
     logo: z.any().optional(),
-})
+}).refine(data => {
+    if (data.country === 'US') {
+        const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
+        return usPhoneRegex.test(data.phone);
+    }
+    return true;
+}, {
+    message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
+    path: ["phone"],
+});
 
 type StoreSettingsValues = z.infer<typeof storeSettingsSchema>
 
@@ -69,6 +78,8 @@ export default function StoreSettingsPage() {
     resolver: zodResolver(storeSettingsSchema),
     defaultValues: currentSettings,
   })
+
+  const selectedCountry = form.watch("country");
 
   const onSubmit = (values: StoreSettingsValues) => {
     console.log("Store settings updated:", values);
@@ -269,7 +280,9 @@ export default function StoreSettingsPage() {
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} />
+                        <Input 
+                            placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "+1 (555) 123-4567"}
+                            {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
