@@ -62,14 +62,12 @@ export function LoginForm() {
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({
-      client_id: '929108967513-r1lbdu2vap4dufm94e4jant4ah9tn2d6.apps.googleusercontent.com',
-    });
     try {
       await signInWithPopup(auth, provider);
       toast({ title: "Success", description: "You have been logged in with Google." });
       router.push('/');
-    } catch (error: any) {
+    } catch (error: any)
+     {
       console.error("Google Sign-In Error:", error);
       toast({
         variant: "destructive",
