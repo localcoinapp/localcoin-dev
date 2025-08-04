@@ -22,9 +22,9 @@ interface RedeemDialogProps {
 }
 
 export function RedeemDialog({ cartItem, children }: RedeemDialogProps) {
-  const handleRedeem = () => {
-    // In a real app, this would trigger a backend process to finalize the transaction.
-    console.log(`Redeeming item ${cartItem.id} for ${cartItem.item.price} ${siteConfig.token.symbol}`);
+  const handleApproveToRedeem = () => {
+    // In a real app, this would update the cart item's status and notify the merchant.
+    console.log(`User approved to redeem item ${cartItem.id}. Waiting for merchant confirmation.`);
   }
 
   return (
@@ -51,7 +51,7 @@ export function RedeemDialog({ cartItem, children }: RedeemDialogProps) {
         </div>
         <AlertDialogFooter className="mt-4">
           <AlertDialogCancel>Close</AlertDialogCancel>
-          <AlertDialogAction onClick={handleRedeem}>Mark as Redeemed</AlertDialogAction>
+          <AlertDialogAction onClick={handleApproveToRedeem}>Approve to Redeem</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

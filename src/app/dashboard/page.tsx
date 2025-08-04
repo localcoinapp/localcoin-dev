@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings, Check, X, Clock } from "lucide-react"
+import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings, Check, X, Clock, CheckCircle } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { merchants } from "@/data/merchants"
 import { cn } from "@/lib/utils"
@@ -39,18 +39,37 @@ const initialOrders = [
     { id: 'ord2', user: 'Maria Garcia', item: 'Day Pass', price: 20.00, status: 'pending' },
 ];
 
+const initialApproved = [
+    { id: 'ord3', user: 'Chen Wei', item: '3-Course Menu', price: 55.00, status: 'approved' }
+];
+
+
 export default function DashboardPage() {
-  const [isMerchant, setIsMerchant] = useState(true); // Default to merchant view for this page
+  const [isMerchant, setIsMerchant] = useState(true);
   const [orders, setOrders] = useState(initialOrders);
+  const [approved, setApproved] = useState(initialApproved);
 
   const handleOrderStatus = (orderId: string, status: 'approved' | 'denied') => {
-    // In a real app, this would update the backend. Here, we just filter the UI.
+    const orderToProcess = orders.find(o => o.id === orderId);
+    if (!orderToProcess) return;
+
     setOrders(orders.filter(order => order.id !== orderId));
-    console.log(`Order ${orderId} has been ${status}.`);
+    
+    if (status === 'approved') {
+        setApproved([...approved, { ...orderToProcess, status: 'approved' }]);
+        console.log(`Order ${orderId} has been approved.`);
+    } else {
+        console.log(`Order ${orderId} has been denied.`);
+    }
   };
+  
+  const handleRedemption = (orderId: string) => {
+    console.log(`Merchant confirms redemption for order ${orderId}. Payment is now being processed.`);
+    setApproved(approved.filter(order => order.id !== orderId));
+    // Here you would trigger the final transaction logic.
+  }
 
   if (!isMerchant) {
-    // This part is for non-merchants, directing them to apply.
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <Card className="w-full max-w-lg text-center">
@@ -172,6 +191,42 @@ export default function DashboardPage() {
                     <p className="text-muted-foreground text-center p-4">No pending orders.</p>
                 )}
             </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Approved Redemptions</CardTitle>
+                    <CardDescription>Confirm redemptions after the user approves it from their end.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {approved.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {approved.map((order) => (
+                                    <TableRow key={order.id}>
+                                        <TableCell>{order.user}</TableCell>
+                                        <TableCell>{order.item}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button size="sm" variant="outline" disabled>
+                                                <CheckCircle className="mr-2 h-4 w-4"/>
+                                                Confirm Redemption
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                       <p className="text-muted-foreground text-center p-4">No redemptions to confirm.</p>
+                    )}
+                </CardContent>
             </Card>
 
             <Card>
