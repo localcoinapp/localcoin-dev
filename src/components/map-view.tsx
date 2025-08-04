@@ -5,7 +5,7 @@ import React, { useEffect, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import type { Merchant } from "@/types";
-import { MapPin, User as UserIcon } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { renderToStaticMarkup } from 'react-dom/server';
 
 interface MapViewProps {
@@ -25,7 +25,9 @@ const merchantIcon = new L.Icon({
 
 // Custom icon for the user
 const userIconHtml = renderToStaticMarkup(
-    <MapPin className="h-10 w-10 text-accent drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
+    <div className="text-accent">
+        <MapPin className="h-10 w-10 text-accent drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
+    </div>
 );
 const userIcon = new L.Icon({
     iconUrl: `data:image/svg+xml;base64,${btoa(userIconHtml)}`,
@@ -55,8 +57,10 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
                     const userPosition: L.LatLngExpression = [position.coords.latitude, position.coords.longitude];
-                    mapRef.current?.setView(userPosition, 15);
-                    L.marker(userPosition, { icon: userIcon }).addTo(mapRef.current!);
+                    if (mapRef.current) {
+                        mapRef.current.setView(userPosition, 15);
+                        L.marker(userPosition, { icon: userIcon }).addTo(mapRef.current);
+                    }
                 }, (error) => {
                     console.warn("Could not get user location, defaulting to Berlin.", error.message)
                 });
@@ -115,4 +119,3 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
 };
 
 export default MapView;
-
