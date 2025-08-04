@@ -23,25 +23,20 @@ interface RampDialogProps {
 
 export function RampDialog({ type, children }: RampDialogProps) {
     const [open, setOpen] = useState(false);
-    const [lclAmount, setLclAmount] = useState('');
-    const [usdAmount, setUsdAmount] = useState('');
+    const [amount, setAmount] = useState('');
 
-    const handleLclChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        setLclAmount(value);
-        setUsdAmount(value); // Assuming 1 LCL = 1 USD
-    }
-    
-    const handleUsdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setUsdAmount(value);
-        setLclAmount(value);
+        setAmount(value);
     }
     
     const handleSubmit = () => {
-        console.log(`${type} ${lclAmount} ${siteConfig.token.symbol} for ${usdAmount} USD`);
+        console.log(`${type} ${amount} worth of ${type === 'buy' ? siteConfig.token.symbol : 'USD'}`);
         setOpen(false);
+        setAmount('');
     }
+
+    const isBuy = type === 'buy';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -52,39 +47,29 @@ export function RampDialog({ type, children }: RampDialogProps) {
         <DialogHeader>
           <DialogTitle className="capitalize">{type} {siteConfig.token.name}</DialogTitle>
           <DialogDescription>
-            {type === 'buy' ? 'Purchase LCL to use in the marketplace.' : 'Sell your LCL for USD.'}
+            {isBuy ? `Enter the amount of ${siteConfig.token.symbol} you want to purchase.` : 'Enter the amount of LCL you want to sell for USD.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="lcl-amount" className="text-right">
-                    {siteConfig.token.symbol}
+                <Label htmlFor="amount" className="text-right">
+                   {isBuy ? siteConfig.token.symbol : 'USD'}
                 </Label>
                 <Input
-                    id="lcl-amount"
-                    value={lclAmount}
-                    onChange={handleLclChange}
+                    id="amount"
+                    value={amount}
+                    onChange={handleAmountChange}
                     className="col-span-3"
                     type="number"
                     placeholder="0.00"
                 />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="usd-amount" className="text-right">
-                    USD
-                </Label>
-                <Input
-                    id="usd-amount"
-                    value={usdAmount}
-                    onChange={handleUsdChange}
-                    className="col-span-3"
-                    type="number"
-                    placeholder="0.00"
-                />
+            <div className="text-center text-muted-foreground text-sm">
+                {isBuy ? `You will pay ${amount || '0.00'} USD` : `You will receive ${amount || '0.00'} ${siteConfig.token.symbol}`}
             </div>
         </div>
         <DialogFooter>
-          <Button type="submit" onClick={handleSubmit} className="capitalize">{type}</Button>
+          <Button type="submit" onClick={handleSubmit} disabled={!amount || parseFloat(amount) <= 0} className="capitalize">{type}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

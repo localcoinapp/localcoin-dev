@@ -40,8 +40,8 @@ export default function WalletPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-            <Card className="lg:col-span-1">
+        <div className="grid gap-6 md:grid-cols-2 mb-8">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -67,7 +67,7 @@ export default function WalletPage() {
                   </div>
               </CardContent>
             </Card>
-            <Card className="lg:col-span-2">
+            <Card>
                 <CardHeader>
                     <CardTitle>Become a Merchant</CardTitle>
                     <CardDescription>Start selling your own services on the marketplace.</CardDescription>
