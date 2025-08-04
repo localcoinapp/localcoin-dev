@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -58,33 +59,45 @@ export function AppHeader() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <Link href="/profile">Profile</Link>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <Link href="/wallet">Wallet</Link>
+                  <DropdownMenuItem asChild>
+                    <Link href="/wallet">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      <span>Wallet</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    <Link href="/chat">Messages</Link>
+                  <DropdownMenuItem asChild>
+                    <Link href="/chat">
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      <span>Messages</span>
+                    </Link>
                   </DropdownMenuItem>
                   {isMerchant && (
-                    <DropdownMenuItem>
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
-                      <Link href="/dashboard">Dashboard</Link>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </Link>
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <Link href="/login">Log out</Link>
+                <DropdownMenuItem asChild>
+                  <Link href="/login">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
