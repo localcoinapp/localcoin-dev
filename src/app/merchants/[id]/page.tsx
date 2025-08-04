@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils';
 
 
 export default function MerchantProfilePage({ params }: { params: { id: string } }) {
-  const merchant = merchants.find(m => m.id === params.id);
+  const { id } = params;
+  const merchant = merchants.find(m => m.id === id);
 
   if (!merchant) {
     notFound();
