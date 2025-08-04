@@ -8,9 +8,7 @@ import type { Merchant } from "@/types";
 import { MapPin } from "lucide-react";
 import ReactDOMServer from 'react-dom/server';
 import { renderToStaticMarkup } from 'react-dom/server';
-import MerchantCard from './merchant-card';
-import { Button } from './ui/button';
-import Link from 'next/link';
+import { Card, CardContent, CardHeader } from './ui/card';
 
 interface MapViewProps {
   merchants: Merchant[];
@@ -34,7 +32,6 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
     const defaultPosition: L.LatLngExpression = [34.052235, -118.243683]; // Default to LA
 
     useEffect(() => {
-        // Initialize map only if the container exists and map is not already initialized.
         if (mapContainerRef.current && !mapRef.current) {
             mapRef.current = L.map(mapContainerRef.current, {
                 center: defaultPosition,
@@ -45,35 +42,36 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(mapRef.current);
+            
+            // Adjust z-index of popup pane
+            const popupPane = mapRef.current.getPane('popupPane');
+            if (popupPane) {
+                popupPane.style.zIndex = '60';
+            }
         }
 
-        // Cleanup function to run when component unmounts
         return () => {
             if (mapRef.current) {
                 mapRef.current.remove();
                 mapRef.current = null;
             }
         };
-    }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
+    }, []); 
 
     useEffect(() => {
         if (mapRef.current) {
-            // Clear existing markers
             mapRef.current.eachLayer((layer) => {
                 if (layer instanceof L.Marker) {
                     mapRef.current?.removeLayer(layer);
                 }
             });
 
-            // Add new markers
             merchants.forEach((merchant) => {
                 const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: customIcon })
                     .addTo(mapRef.current!);
                 
-                // We can't use the MerchantCard directly because it uses next/image and next/link which needs the React context.
-                // A simplified version is created here for the popup.
                 const popupNode = document.createElement('div');
-                popupNode.innerHTML = ReactDOMServer.renderToString(
+                popupNode.innerHTML = renderToStaticMarkup(
                     <div className="w-64">
                         <div className="relative h-32 w-full mb-2 rounded-t-lg overflow-hidden">
                             <img src={merchant.imageUrl} alt={merchant.name} className="h-full w-full object-cover" data-ai-hint={merchant.aiHint} />
@@ -97,7 +95,7 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
         }
     }, [merchants]);
 
-    return <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />;
+    return <div ref={mapContainerRef} className="z-0" style={{ height: '100%', width: '100%' }} />;
 };
 
 export default MapView;
