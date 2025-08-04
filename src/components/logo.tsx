@@ -1,3 +1,6 @@
+
+'use client'
+
 import { siteConfig } from "@/config/site";
 import { Wallet } from "lucide-react";
 
