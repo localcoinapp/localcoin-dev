@@ -140,21 +140,7 @@ export default function BecomeMerchantPage() {
         />
       );
     }
-    return (
-      <FormField
-        control={form.control}
-        name="state"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>State / Province</FormLabel>
-            <FormControl>
-              <Input placeholder="Your state or province" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    );
+    return null;
   }
 
   return (
