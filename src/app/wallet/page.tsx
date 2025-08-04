@@ -1,8 +1,6 @@
 
 'use client'
 
-import { useState } from "react";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -20,8 +18,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { DollarSign, ArrowRight } from "lucide-react"
+import { DollarSign, ArrowRight, ArrowDown, ArrowUp } from "lucide-react"
 import { siteConfig } from "@/config/site"
+import { RampDialog } from "@/components/wallet/ramp-dialog"
+import Link from "next/link"
 
 const transactions = [
   { id: "1", date: "2023-10-26", amount: -50, status: "Completed", description: "Coffee purchase" },
@@ -42,16 +42,30 @@ export default function WalletPage() {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
             <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">450.00 {siteConfig.token.symbol}</div>
-                <p className="text-xs text-muted-foreground">
-                ~ $450.00 USD
-                </p>
-            </CardContent>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-3xl font-bold">450.00 {siteConfig.token.symbol}</div>
+                  <p className="text-xs text-muted-foreground">
+                  ~ $450.00 USD
+                  </p>
+                  <div className="flex gap-2 mt-4">
+                    <RampDialog type="buy">
+                      <Button>
+                        <ArrowUp className="mr-2 h-4 w-4" />
+                        Buy
+                      </Button>
+                    </RampDialog>
+                     <RampDialog type="sell">
+                      <Button variant="secondary">
+                        <ArrowDown className="mr-2 h-4 w-4" />
+                        Sell
+                      </Button>
+                    </RampDialog>
+                  </div>
+              </CardContent>
             </Card>
             <Card className="lg:col-span-2">
                 <CardHeader>
@@ -88,7 +102,7 @@ export default function WalletPage() {
                   <TableRow key={tx.id}>
                     <TableCell>{tx.description}</TableCell>
                     <TableCell className={tx.amount > 0 ? "text-green-600" : "text-red-600"}>
-                      {tx.amount.toFixed(2)} {siteConfig.token.symbol}
+                      {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)} {siteConfig.token.symbol}
                     </TableCell>
                     <TableCell>
                       <Badge variant={tx.status === "Completed" ? "default" : "secondary"}>
