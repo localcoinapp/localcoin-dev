@@ -122,7 +122,13 @@ export default function MarketplacePage() {
         </TabsContent>
         <TabsContent value="map">
           <div className="h-[600px] w-full rounded-lg overflow-hidden shadow-lg border">
-            <MapView merchants={merchants} />
+            {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+              <MapView merchants={merchants} />
+            ) : (
+              <div className="flex items-center justify-center h-full bg-muted">
+                <p className="text-muted-foreground">Google Maps API key is missing.</p>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

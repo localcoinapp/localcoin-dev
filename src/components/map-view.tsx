@@ -19,7 +19,7 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
   const defaultPosition = { lat: 34.052235, lng: -118.243683 }; // Default to LA
   
   return (
-    <APIProvider apiKey={process.env.GOOGLE_MAPS_API_KEY!}>
+    <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
       <Map
         defaultCenter={defaultPosition}
         defaultZoom={13}
