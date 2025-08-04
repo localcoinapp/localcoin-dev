@@ -26,6 +26,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Activity, CheckCircle } from "lucide-react"
 import { countries } from "@/data/countries"
+import { states } from "@/data/states"
+import { provinces } from "@/data/provinces"
 
 const formSchema = z.object({
   companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
@@ -83,6 +85,76 @@ export default function BecomeMerchantPage() {
     setTimeout(() => {
         setApplicationStatus('approved');
     }, 3000);
+  }
+
+  const renderStateField = () => {
+    if (selectedCountry === 'US') {
+      return (
+        <FormField
+          control={form.control}
+          name="state"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>State</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a state" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {states.map((state) => (
+                    <SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      );
+    }
+    if (selectedCountry === 'CA') {
+      return (
+        <FormField
+          control={form.control}
+          name="state"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Province</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a province" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {provinces.map((province) => (
+                    <SelectItem key={province.code} value={province.code}>{province.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      );
+    }
+    return (
+      <FormField
+        control={form.control}
+        name="state"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>State / Province</FormLabel>
+            <FormControl>
+              <Input placeholder="Your state or province" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    );
   }
 
   return (
@@ -177,19 +249,7 @@ export default function BecomeMerchantPage() {
                         </FormItem>
                       )}
                     />
-                     <FormField
-                      control={form.control}
-                      name="state"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>State / Province</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Berlin" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                     {renderStateField()}
                      <FormField
                       control={form.control}
                       name="zipCode"
