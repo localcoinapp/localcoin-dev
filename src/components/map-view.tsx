@@ -7,12 +7,12 @@ import L from 'leaflet';
 import type { Merchant } from "@/types";
 import { MapPin } from "lucide-react";
 import { renderToStaticMarkup } from 'react-dom/server';
-import MerchantCard from './merchant-card'; // We'll render the whole card for styling consistency
 
 interface MapViewProps {
   merchants: Merchant[];
 }
 
+// Custom icon using Lucide
 const customIconHtml = renderToStaticMarkup(
     <MapPin className="h-8 w-8 text-primary drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
 );
@@ -22,7 +22,6 @@ const customIcon = new L.Icon({
     iconSize: [32, 32],
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
-    className: 'leaflet-marker-icon'
 });
 
 
@@ -35,7 +34,7 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
         if (mapContainerRef.current && !mapRef.current) {
             mapRef.current = L.map(mapContainerRef.current, {
                 center: defaultPosition,
-                zoom: 13,
+                zoom: 15,
                 scrollWheelZoom: true,
             });
 
