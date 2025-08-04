@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Filter, List, MapPin, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MerchantCard from '@/components/merchant-card';
 import dynamic from 'next/dynamic';
-import { merchants } from '@/data/merchants';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Merchant } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { seedDatabase } from '@/lib/seed';
+import { useToast } from '@/hooks/use-toast';
 
 const MapView = dynamic(() => import('@/components/map-view'), { 
   ssr: false 
@@ -25,6 +30,49 @@ const categories = ['All', 'Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events',
 
 export default function MarketplacePage() {
   const [activeTab, setActiveTab] = useState('list');
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const { toast } = useToast();
+
+  const fetchMerchants = async () => {
+    try {
+      const merchantsCollection = collection(db, 'merchants');
+      const merchantSnapshot = await getDocs(merchantsCollection);
+      const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
+      setMerchants(merchantList);
+    } catch (error) {
+      console.error("Error fetching merchants: ", error);
+      // Handle error fetching data, e.g. show a toast notification
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMerchants();
+  }, []);
+
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await seedDatabase();
+      toast({
+        title: "Success",
+        description: "Database has been seeded with initial data.",
+      });
+      await fetchMerchants(); // Re-fetch merchants to update the UI
+    } catch (error) {
+      console.error("Error seeding database: ", error);
+      toast({
+        variant: "destructive",
+        title: "Seeding Failed",
+        description: "Could not seed the database. Check console for errors.",
+      })
+    } finally {
+      setIsSeeding(false);
+    }
+  };
   
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -75,15 +123,31 @@ export default function MarketplacePage() {
         </div>
         
         <TabsContent value="list">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {merchants.map((merchant) => (
-              <MerchantCard key={merchant.id} merchant={merchant} />
-            ))}
-          </div>
+          {loading ? (
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <Skeleton className="h-80 w-full" />
+              <Skeleton className="h-80 w-full" />
+              <Skeleton className="h-80 w-full" />
+              <Skeleton className="h-80 w-full" />
+            </div>
+          ) : merchants.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {merchants.map((merchant) => (
+                <MerchantCard key={merchant.id} merchant={merchant} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">Your database is empty. Click the button to add some sample data.</p>
+              <Button onClick={handleSeed} disabled={isSeeding}>
+                {isSeeding ? 'Seeding...' : 'Seed Database'}
+              </Button>
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="map">
           <div className="h-[600px] w-full rounded-lg overflow-hidden shadow-lg border">
-            <MapView merchants={merchants} />
+            {loading ? <Skeleton className="h-full w-full" /> : <MapView merchants={merchants} />}
           </div>
         </TabsContent>
       </Tabs>

@@ -1,6 +1,7 @@
 
 'use client'
 
+import { useState, useEffect } from 'react';
 import { Star, MessageSquare, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,18 +11,64 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { notFound, useParams } from 'next/navigation';
 import { siteConfig } from '@/config/site';
-import { merchants } from '@/data/merchants';
 import { cn } from '@/lib/utils';
-import { useToast } from "@/hooks/use-toast"
-
+import { useToast } from "@/hooks/use-toast";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Merchant, MerchantItem } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function MerchantProfilePage() {
   const params = useParams();
   const id = params.id as string;
-  const merchant = merchants.find(m => m.id === id);
+  const [merchant, setMerchant] = useState<Merchant | null>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchMerchant = async () => {
+      try {
+        const merchantDocRef = doc(db, 'merchants', id);
+        const merchantDoc = await getDoc(merchantDocRef);
+
+        if (merchantDoc.exists()) {
+          setMerchant({ id: merchantDoc.id, ...merchantDoc.data() } as Merchant);
+        } else {
+          notFound();
+        }
+      } catch (error) {
+        console.error("Error fetching merchant: ", error);
+        // Handle error, maybe redirect or show a message
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMerchant();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <Card className="overflow-hidden shadow-2xl">
+          <Skeleton className="h-64 w-full" />
+          <CardContent className="p-6">
+            <Skeleton className="h-8 w-1/3 mb-4" />
+            <Skeleton className="h-12 w-2/3 mb-4" />
+            <div className="mt-8">
+              <Skeleton className="h-10 w-1/4 mb-4" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!merchant) {
+    // This will be caught by notFound() in the fetch logic, but as a fallback:
     notFound();
   }
   
@@ -82,7 +129,7 @@ export default function MerchantProfilePage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {merchant.items.map((item) => (
+                        {(merchant.items || []).map((item: MerchantItem) => (
                         <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground')}>
                             <TableCell className="font-medium">{item.name}</TableCell>
                              <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
