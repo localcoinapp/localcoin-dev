@@ -12,34 +12,39 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ArrowLeft, Send } from 'lucide-react'
-import type { Chat, Message, User } from '@/types'
+import type { Message } from '@/types'
 import { ChatBubble } from '@/components/chat/chat-bubble'
 import Link from 'next/link';
+import { useAuth } from '@/hooks/use-auth';
 
-const me: User = { id: '0', name: 'Me', avatar: 'https://placehold.co/100x100' };
-const otherUser: User = { id: '1', name: 'SunnySide Cafe', avatar: 'https://placehold.co/100x100' };
+const otherUser = { id: '1', name: 'SunnySide Cafe', avatar: 'https://placehold.co/100x100' };
 
 const initialMessages: Message[] = [
-  { id: '1', text: 'Hello! I would like to know if you have gluten-free options.', createdAt: '10:00 AM', sender: me },
+  { id: '1', text: 'Hello! I would like to know if you have gluten-free options.', createdAt: '10:00 AM', sender: { id: '0', name: 'Me', avatar: 'https://placehold.co/100x100' } },
   { id: '2', text: 'Hola! Sí, tenemos varias opciones sin gluten. ¿Qué te gustaría saber?', createdAt: '10:01 AM', sender: otherUser },
-  { id: '3', text: 'Great! Do you have a gluten-free version of your pancakes?', createdAt: '10:02 AM', sender: me },
+  { id: '3', text: 'Great! Do you have a gluten-free version of your pancakes?', createdAt: '10:02 AM', sender: { id: '0', name: 'Me', avatar: 'https://placehold.co/100x100' } },
   { id: '4', text: 'Sí, claro. Nuestras tortitas de trigo sarraceno son sin gluten y muy populares.', createdAt: '10:03 AM', sender: otherUser },
 ];
 
 
 export default function ChatPage({ params }: { params: { id: string } }) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [newMessage, setNewMessage] = useState('');
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim() === '') return;
+    if (newMessage.trim() === '' || !user) return;
 
     const message: Message = {
       id: (messages.length + 1).toString(),
       text: newMessage,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      sender: me,
+      sender: {
+        id: user.id,
+        name: user.name || 'Me',
+        avatar: user.avatar || 'https://placehold.co/100x100'
+      },
     }
     setMessages([...messages, message]);
     setNewMessage('');
@@ -67,7 +72,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
         <ScrollArea className="h-[calc(100vh-16rem)] p-4">
           <div className="space-y-4">
             {messages.map((message) => (
-              <ChatBubble key={message.id} message={message} isMe={message.sender.id === me.id} />
+              <ChatBubble key={message.id} message={message} isMe={message.sender.id === user?.id} />
             ))}
           </div>
         </ScrollArea>

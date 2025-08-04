@@ -24,6 +24,7 @@ import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings, Ch
 import { siteConfig } from "@/config/site"
 import { merchants } from "@/data/merchants"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/hooks/use-auth"
 
 const transactions = [
   { id: "1", date: "2023-10-26", amount: -50, status: "Completed", description: "Coffee purchase" },
@@ -43,9 +44,8 @@ const initialApproved = [
     { id: 'ord3', user: 'Chen Wei', item: '3-Course Menu', price: 55.00, status: 'approved' }
 ];
 
-
 export default function DashboardPage() {
-  const [isMerchant, setIsMerchant] = useState(true);
+  const { user } = useAuth();
   const [orders, setOrders] = useState(initialOrders);
   const [approved, setApproved] = useState(initialApproved);
 
@@ -68,8 +68,10 @@ export default function DashboardPage() {
     setApproved(approved.filter(order => order.id !== orderId));
     // Here you would trigger the final transaction logic.
   }
+  
+  const isMerchantOrAdmin = user?.role === 'merchant' || user?.role === 'admin';
 
-  if (!isMerchant) {
+  if (!isMerchantOrAdmin) {
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <Card className="w-full max-w-lg text-center">

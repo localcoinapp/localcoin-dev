@@ -31,23 +31,28 @@ export type Merchant = {
   items: MerchantItem[]
 }
 
+export type UserRole = 'admin' | 'merchant' | 'user';
+
 export type User = {
-  id: string
-  name: string
-  avatar: string
-}
+  id: string;
+  name: string | null;
+  email: string | null;
+  avatar: string | null;
+  role: UserRole;
+};
+
 
 export type Message = {
   id: string
   text: string
   createdAt: string
-  sender: User
+  sender: Pick<User, 'id' | 'name' | 'avatar'>
   translatedText?: string
 }
 
 export type Chat = {
   id: string
-  otherUser: User
+  otherUser: Pick<User, 'id' | 'name' | 'avatar'>
   messages: Message[]
 }
 

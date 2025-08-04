@@ -37,8 +37,8 @@ export function ChatBubble({ message, isMe }: ChatBubbleProps) {
     <div className={cn("flex items-end gap-2", isMe ? "justify-end" : "justify-start")}>
       {!isMe && (
         <Avatar className="h-8 w-8">
-          <AvatarImage src={message.sender.avatar} />
-          <AvatarFallback>{message.sender.name.charAt(0)}</AvatarFallback>
+          <AvatarImage src={message.sender.avatar || undefined} />
+          <AvatarFallback>{message.sender.name?.charAt(0)}</AvatarFallback>
         </Avatar>
       )}
       <div
@@ -78,10 +78,10 @@ export function ChatBubble({ message, isMe }: ChatBubbleProps) {
           {message.createdAt}
         </p>
       </div>
-      {isMe && (
+      {isMe && message.sender.avatar && (
         <Avatar className="h-8 w-8">
-          <AvatarImage src={message.sender.avatar} />
-          <AvatarFallback>{message.sender.name.charAt(0)}</AvatarFallback>
+          <AvatarImage src={message.sender.avatar || undefined} />
+          <AvatarFallback>{message.sender.name?.charAt(0)}</AvatarFallback>
         </Avatar>
       )}
     </div>
