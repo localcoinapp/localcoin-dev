@@ -1,0 +1,226 @@
+
+'use client'
+
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Camera } from "lucide-react"
+
+const storeSettingsSchema = z.object({
+    companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+    address: z.string().min(10, { message: "Please enter a valid address." }),
+    contactEmail: z.string().email({ message: "Please enter a valid email address." }),
+    phone: z.string().min(10, { message: "Please enter a valid phone number." }),
+    website: z.string().url().optional().or(z.literal('')),
+    instagram: z.string().optional(),
+    description: z.string().min(20, { message: "Description must be at least 20 characters." }),
+    taxNumber: z.string().optional(),
+    logo: z.any().optional(),
+})
+
+type StoreSettingsValues = z.infer<typeof storeSettingsSchema>
+
+// This would be fetched from your database
+const currentSettings: StoreSettingsValues = {
+    companyName: "SunnySide Cafe",
+    address: "123 Main St, Anytown, USA",
+    contactEmail: "contact@sunnyside.com",
+    phone: "(555) 123-4567",
+    website: "https://sunnyside.com",
+    instagram: "@sunnysidecafe",
+    description: "The best sunny side up eggs in town. We also serve artisanal coffee and fresh pastries.",
+    taxNumber: "123-456-789"
+}
+
+
+export default function StoreSettingsPage() {
+  const form = useForm<StoreSettingsValues>({
+    resolver: zodResolver(storeSettingsSchema),
+    defaultValues: currentSettings,
+  })
+
+  const onSubmit = (values: StoreSettingsValues) => {
+    console.log("Store settings updated:", values);
+    // Here you would handle updating the store information in your backend.
+  }
+
+  return (
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+      <Card className="w-full max-w-3xl text-left shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-3xl font-headline text-center">Store Settings</CardTitle>
+          <CardDescription className="text-center">
+            Manage your public store information.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="flex items-center space-x-6">
+                <div className="relative">
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src="https://placehold.co/100x100" alt="Store logo" />
+                    <AvatarFallback>SC</AvatarFallback>
+                  </Avatar>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="absolute bottom-0 right-0 rounded-full"
+                  >
+                    <Camera className="h-4 w-4" />
+                    <span className="sr-only">Change logo</span>
+                  </Button>
+                </div>
+                <div className="flex-grow">
+                  <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your Company" {...field} className="text-2xl font-bold" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe your business and what you offer."
+                        className="resize-none"
+                        rows={5}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123 Main St, Anytown, USA" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                <FormField
+                  control={form.control}
+                  name="taxNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tax ID / VAT Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your business tax number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="contactEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="contact@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="(555) 123-4567" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                  control={form.control}
+                  name="website"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Website</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="instagram"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Instagram</FormLabel>
+                      <FormControl>
+                        <Input placeholder="@yourhandle" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="text-right pt-4">
+                <Button type="submit" size="lg">Save Changes</Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight } from "lucide-react"
+import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings } from "lucide-react"
 import { siteConfig } from "@/config/site"
 
 const transactions = [
@@ -67,10 +67,18 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold font-headline">Merchant Dashboard</h1>
           <p className="text-muted-foreground">Manage your store, wallet, and listings.</p>
         </div>
-        <Button className="mt-4 sm:mt-0">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add New Listing
-        </Button>
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add New Listing
+          </Button>
+          <Link href="/dashboard/settings" passHref>
+            <Button variant="outline">
+              <Settings className="mr-2 h-4 w-4" />
+              Store Settings
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
