@@ -53,12 +53,13 @@ export default function BecomeMerchantPage() {
   })
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log("Application submitted:", values);
+    console.log("Application submitted for review:", values);
     setApplicationStatus('pending');
-    // Simulate an async KYC process
+    // In a real application, you would send this data to your backend for manual review.
+    // We'll simulate the review process with a timeout.
     setTimeout(() => {
         setApplicationStatus('approved');
-    }, 2000);
+    }, 3000);
   }
 
   return (
@@ -180,17 +181,17 @@ export default function BecomeMerchantPage() {
               </Form>
           )}
           {applicationStatus === 'pending' && (
-              <div className="flex flex-col items-center text-center">
+              <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px]">
                   <Activity className="h-16 w-16 mx-auto text-primary mb-4 animate-spin"/>
-                  <p className="text-lg font-semibold">Application Under Review</p>
-                  <p className="text-muted-foreground">Thank you for submitting your application. We are currently reviewing it and this usually takes a moment.</p>
+                  <p className="text-xl font-semibold">Application Under Review</p>
+                  <p className="text-muted-foreground mt-2">Thank you for submitting. We are currently reviewing your application and this may take a few days.</p>
               </div>
           )}
           {applicationStatus === 'approved' && (
-              <div className="flex flex-col items-center text-center">
+              <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px]">
                   <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4"/>
-                  <p className="text-lg font-semibold">Congratulations! You're Approved!</p>
-                  <p className="text-muted-foreground">Your merchant application has been approved. You can now access the full merchant dashboard to list your services.</p>
+                  <p className="text-xl font-semibold">Congratulations! You're Approved!</p>
+                  <p className="text-muted-foreground mt-2">Your merchant application has been approved. You can now access the full merchant dashboard to list your services.</p>
               </div>
           )}
         </CardContent>
