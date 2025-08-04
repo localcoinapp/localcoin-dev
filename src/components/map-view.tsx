@@ -6,9 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import type { Merchant } from "@/types";
 import { MapPin } from "lucide-react";
-import ReactDOMServer from 'react-dom/server';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Card, CardContent, CardHeader } from './ui/card';
 
 interface MapViewProps {
   merchants: Merchant[];
@@ -43,7 +41,11 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(mapRef.current);
             
-            // Adjust z-index of popup pane
+            // Adjust z-index of map panes
+            const markerPane = mapRef.current.getPane('markerPane');
+            if (markerPane) {
+                markerPane.style.zIndex = '50';
+            }
             const popupPane = mapRef.current.getPane('popupPane');
             if (popupPane) {
                 popupPane.style.zIndex = '60';
