@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon } from "lucide-react"
+import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { Logo } from "@/components/logo"
 import { MainNav } from "./main-nav"
@@ -25,6 +25,7 @@ import { MobileNav } from "./mobile-nav"
 
 export function AppHeader() {
   const [mounted, setMounted] = React.useState(false);
+  const [isMerchant, setIsMerchant] = React.useState(true); // Simulate merchant status
 
   React.useEffect(() => {
     setMounted(true);
@@ -69,6 +70,12 @@ export function AppHeader() {
                     <MessageCircle className="mr-2 h-4 w-4" />
                     <Link href="/chat">Messages</Link>
                   </DropdownMenuItem>
+                  {isMerchant && (
+                    <DropdownMenuItem>
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      <Link href="/dashboard">Dashboard</Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
