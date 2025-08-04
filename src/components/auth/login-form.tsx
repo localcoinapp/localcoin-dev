@@ -71,7 +71,7 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Google Sign-In Failed",
-        description: error.message || "An unexpected error occurred.",
+        description: error.message || "An unexpected error occurred. Please ensure Google Sign-In is enabled in your Firebase console and a project support email is set.",
       });
     }
   }
