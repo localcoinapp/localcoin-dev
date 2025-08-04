@@ -15,27 +15,29 @@ interface MainNavProps {
 export function MainNav({ items }: MainNavProps) {
   const pathname = usePathname()
 
+  if (!items?.length) {
+    return null
+  }
+
   return (
     <div className="hidden md:flex gap-6 md:gap-10 md:ml-10">
-      {items?.length ? (
-        <nav className="hidden gap-6 md:flex">
-          {items?.map(
-            (item, index) =>
-              item.href && (
-                <Link
-                  key={index}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center text-lg font-medium transition-colors hover:text-primary/80 sm:text-sm",
-                    pathname === item.href ? "text-primary" : "text-foreground/60"
-                  )}
-                >
-                  {item.title}
-                </Link>
-              )
-          )}
-        </nav>
-      ) : null}
+      <nav className="hidden gap-6 md:flex">
+        {items?.map(
+          (item, index) =>
+            item.href && (
+              <Link
+                key={index}
+                href={item.href}
+                className={cn(
+                  "flex items-center text-lg font-medium transition-colors hover:text-primary/80 sm:text-sm",
+                  pathname === item.href ? "text-primary" : "text-foreground/60"
+                )}
+              >
+                {item.title}
+              </Link>
+            )
+        )}
+      </nav>
     </div>
   )
 }
