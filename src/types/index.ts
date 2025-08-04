@@ -11,6 +11,8 @@ export type MerchantItem = {
   id: string
   name: string
   price: number
+  quantity: number
+  category: string
 }
 
 export type Merchant = {

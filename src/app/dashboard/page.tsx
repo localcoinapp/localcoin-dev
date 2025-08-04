@@ -22,6 +22,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings } from "lucide-react"
 import { siteConfig } from "@/config/site"
+import { merchants } from "@/data/merchants"
+import { cn } from "@/lib/utils"
 
 const transactions = [
   { id: "1", date: "2023-10-26", amount: -50, status: "Completed", description: "Coffee purchase" },
@@ -30,11 +32,7 @@ const transactions = [
   { id: "4", date: "2023-10-23", amount: -75, status: "Completed", description: "Excursion service" },
 ];
 
-const listings = [
-  { id: "1", name: "Artisanal Coffee", price: 5, category: "Cafe" },
-  { id: "2", name: "Luxury Suite", price: 250, category: "Hotel" },
-  { id: "3", name: "Day Pass", price: 20, category: "Coworking" },
-];
+const listings = merchants.flatMap(m => m.items); // Assuming a single merchant for simplicity, or aggregate all
 
 export default function DashboardPage() {
   const [isMerchant, setIsMerchant] = useState(true); // Default to merchant view for this page
@@ -68,10 +66,12 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">Manage your store, wallet, and listings.</p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add New Listing
-          </Button>
+          <Link href="/dashboard/add-listing" passHref>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add New Listing
+            </Button>
+          </Link>
           <Link href="/dashboard/settings" passHref>
             <Button variant="outline">
               <Settings className="mr-2 h-4 w-4" />
@@ -166,14 +166,22 @@ export default function DashboardPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Stock</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {listings.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground')}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
+                    <TableCell>
+                      {item.quantity > 0 ? (
+                        <span>{item.quantity} in stock</span>
+                      ) : (
+                        <Badge variant="destructive">Sold Out</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{item.price.toFixed(2)} {siteConfig.token.symbol}</TableCell>
                   </TableRow>
                 ))}
