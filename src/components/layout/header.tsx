@@ -1,6 +1,7 @@
 'use client'
 
 import Link from "next/link"
+import * as React from "react"
 import {
   Avatar,
   AvatarFallback,
@@ -23,10 +24,16 @@ import { MainNav } from "./main-nav"
 import { MobileNav } from "./mobile-nav"
 
 export function AppHeader() {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card">
       <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
-        <Logo />
+        <Logo name={mounted ? siteConfig.name : ''} />
         <MainNav items={siteConfig.mainNav} />
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
