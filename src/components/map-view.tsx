@@ -23,10 +23,9 @@ const merchantIcon = new L.Icon({
     popupAnchor: [0, -32],
 });
 
-// Custom icon for the user using a stable data URI
-const userIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--accent))" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
+// Custom icon for the user using the provided image
 const userIcon = new L.Icon({
-    iconUrl: `data:image/svg+xml;base64,${btoa(userIconSvg)}`,
+    iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAIACAMQAAADk+sOAAABFFBMVEUAAAD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgD/kgAAAAAsVdPsAAAAWnRSTlMAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyEiJCUnKCkqKywtLi8xMjM1OTs8PT5AQUJERUZHSElMTk9QUVJTVFVWV1hZWltcXV5fYWJkZmdocXR7f4CChYaHiMnS4uXq7u/5+/3O2eJaAAAFiElEQVR42uzQgQAAAADAUA4w9FdaeA8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAID9+xEAAPsKAAAAAAAAAAAAAADA9QMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYAwAAAAAAAAAAAAAAgHUDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAGQEAAAAAAAAAAAAAAEC7AQAAAAAAAAAAAAAAAAAAAAAAxjYAAAAAAAAAAAAAAMC6AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAEAAAAAAAAAAAAAAAArBsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJgRAAAAAAAAAAAAAACAdgMAAAAAAAAAAAAAAAAAAAAAAIyZBQAAAAAAAAAAAACAdiQAAAAAAAAAAAAAAAAAAAAAAGMGAAAAAAAAAAAAAIC1AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgBEAAAAAAAAAAAAAAICsBQAAAAAAAAAAAACAdAMAADAMBgMAADAeBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADCGBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAsBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAMBgMAADAcBgMAADAsBgMAADAcBgMAADAMBgma733=wAAAABJRU5ErkJggg==',
     iconSize: [40, 40],
     iconAnchor: [20, 40],
     popupAnchor: [0, -40],
@@ -76,7 +75,7 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
         if (mapRef.current) {
             // Clear existing markers to prevent duplicates on re-render
              mapRef.current.eachLayer((layer) => {
-                if (layer instanceof L.Marker && layer.getIcon() !== userIcon) {
+                if (layer instanceof L.Marker && layer.getIcon().options.iconUrl !== userIcon.options.iconUrl) {
                    mapRef.current?.removeLayer(layer);
                 }
             });
@@ -87,7 +86,6 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
                     .addTo(mapRef.current!);
                 
                 const popupNode = document.createElement('div');
-                // Using standard img tag with classes for styling to avoid React-specific prop errors
                 popupNode.innerHTML = renderToStaticMarkup(
                      <div className="w-64">
                         <div className="relative h-32 w-full mb-2 rounded-t-lg overflow-hidden">
