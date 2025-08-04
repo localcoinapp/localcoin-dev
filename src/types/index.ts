@@ -1,4 +1,5 @@
 
+
 export type NavItem = {
   title: string
   href: string
@@ -48,4 +49,14 @@ export type Chat = {
   id: string
   otherUser: User
   messages: Message[]
+}
+
+export type CartItem = {
+    id: string;
+    item: MerchantItem;
+    merchantId: string;
+    merchantName: string;
+    status: 'pending' | 'approved' | 'denied' | 'redeemed' | 'canceled';
+    requestedAt: string;
+    confirmationCode?: string;
 }

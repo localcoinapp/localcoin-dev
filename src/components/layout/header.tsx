@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard } from "lucide-react"
+import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard, ShoppingCart } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { Logo } from "@/components/logo"
 import { MainNav } from "./main-nav"
@@ -39,6 +39,12 @@ export function AppHeader() {
         <MainNav items={siteConfig.mainNav} />
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
+            <Link href="/cart">
+              <Button variant="ghost" size="icon">
+                <ShoppingCart className="h-5 w-5" />
+                <span className="sr-only">My Cart</span>
+              </Button>
+            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -69,6 +75,12 @@ export function AppHeader() {
                     <Link href="/wallet">
                       <CreditCard className="mr-2 h-4 w-4" />
                       <span>Wallet</span>
+                    </Link>
+                  </DropdownMenuItem>
+                   <DropdownMenuItem asChild>
+                    <Link href="/cart">
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      <span>My Cart</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>

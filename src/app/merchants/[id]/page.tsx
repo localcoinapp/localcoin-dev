@@ -1,7 +1,7 @@
 
 'use client'
 
-import { Star, MessageSquare } from 'lucide-react';
+import { Star, MessageSquare, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,26 @@ import { notFound, useParams } from 'next/navigation';
 import { siteConfig } from '@/config/site';
 import { merchants } from '@/data/merchants';
 import { cn } from '@/lib/utils';
+import { useToast } from "@/hooks/use-toast"
 
 
 export default function MerchantProfilePage() {
   const params = useParams();
   const id = params.id as string;
   const merchant = merchants.find(m => m.id === id);
+  const { toast } = useToast();
 
   if (!merchant) {
     notFound();
+  }
+  
+  const handleAddToCart = (item: any) => {
+    // This is a placeholder. In a real app, this would add the item to the user's cart in the database.
+    console.log(`Added ${item.name} to cart`);
+    toast({
+      title: "Added to Cart",
+      description: `${item.name} has been added to your cart. The merchant will review your request.`,
+    })
   }
 
   return (
@@ -66,17 +77,22 @@ export default function MerchantProfilePage() {
                         <TableRow>
                         <TableHead>Item</TableHead>
                         <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {merchant.items.map((item) => (
-                        <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground line-through')}>
+                        <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground')}>
                             <TableCell className="font-medium">{item.name}</TableCell>
                              <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
+                            <TableCell>{item.price.toFixed(2)} {siteConfig.token.symbol}</TableCell>
                             <TableCell className="text-right">
                                 {item.quantity > 0 ? (
-                                    <span>{item.price.toFixed(2)} {siteConfig.token.symbol}</span>
+                                    <Button size="sm" onClick={() => handleAddToCart(item)}>
+                                        <ShoppingCart className="mr-2 h-4 w-4" />
+                                        Add to Cart
+                                    </Button>
                                 ) : (
                                     <Badge variant="destructive">Sold Out</Badge>
                                 )}

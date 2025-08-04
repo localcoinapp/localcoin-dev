@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings } from "lucide-react"
+import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings, Check, X, Clock } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { merchants } from "@/data/merchants"
 import { cn } from "@/lib/utils"
@@ -32,10 +32,22 @@ const transactions = [
   { id: "4", date: "2023-10-23", amount: -75, status: "Completed", description: "Excursion service" },
 ];
 
-const listings = merchants.flatMap(m => m.items); // Assuming a single merchant for simplicity, or aggregate all
+const listings = merchants.flatMap(m => m.items);
+
+const initialOrders = [
+    { id: 'ord1', user: 'Alex Smith', item: 'Espresso', price: 2.50, status: 'pending' },
+    { id: 'ord2', user: 'Maria Garcia', item: 'Day Pass', price: 20.00, status: 'pending' },
+];
 
 export default function DashboardPage() {
   const [isMerchant, setIsMerchant] = useState(true); // Default to merchant view for this page
+  const [orders, setOrders] = useState(initialOrders);
+
+  const handleOrderStatus = (orderId: string, status: 'approved' | 'denied') => {
+    // In a real app, this would update the backend. Here, we just filter the UI.
+    setOrders(orders.filter(order => order.id !== orderId));
+    console.log(`Order ${orderId} has been ${status}.`);
+  };
 
   if (!isMerchant) {
     // This part is for non-merchants, directing them to apply.
@@ -108,54 +120,96 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+5 sales</div>
+            <div className="text-2xl font-bold">{orders.length}</div>
             <p className="text-xs text-muted-foreground">
-              in the last 24 hours
+              New requests to approve
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>An overview of your recent wallet activity.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>{tx.description}</TableCell>
-                    <TableCell className={tx.amount > 0 ? "text-green-600" : "text-red-600"}>
-                      {tx.amount.toFixed(2)} {siteConfig.token.symbol}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={tx.status === "Completed" ? "default" : "secondary"}>
-                        {tx.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{tx.date}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        <Card>
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 grid gap-8">
+            <Card>
+            <CardHeader>
+                <CardTitle>Incoming Orders</CardTitle>
+                <CardDescription>Review and approve new requests from customers.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {orders.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Item</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {orders.map((order) => (
+                            <TableRow key={order.id}>
+                                <TableCell>{order.user}</TableCell>
+                                <TableCell>{order.item}</TableCell>
+                                <TableCell>{order.price.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleOrderStatus(order.id, 'approved')}>
+                                        <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => handleOrderStatus(order.id, 'denied')}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <p className="text-muted-foreground text-center p-4">No pending orders.</p>
+                )}
+            </CardContent>
+            </Card>
+
+            <Card>
+            <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>An overview of your recent wallet activity.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Date</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {transactions.map((tx) => (
+                    <TableRow key={tx.id}>
+                        <TableCell>{tx.description}</TableCell>
+                        <TableCell className={tx.amount > 0 ? "text-green-600" : "text-red-600"}>
+                        {tx.amount.toFixed(2)} {siteConfig.token.symbol}
+                        </TableCell>
+                        <TableCell>
+                        <Badge variant={tx.status === "Completed" ? "default" : "secondary"}>
+                            {tx.status}
+                        </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{tx.date}</TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            </CardContent>
+            </Card>
+        </div>
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Your Listings</CardTitle>
             <CardDescription>Manage your items and services.</CardDescription>
@@ -165,7 +219,6 @@ export default function DashboardPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead className="text-right">Price</TableHead>
                 </TableRow>
@@ -174,10 +227,9 @@ export default function DashboardPage() {
                 {listings.map((item) => (
                   <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground')}>
                     <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
                     <TableCell>
                       {item.quantity > 0 ? (
-                        <span>{item.quantity} in stock</span>
+                        <span>{item.quantity}</span>
                       ) : (
                         <Badge variant="destructive">Sold Out</Badge>
                       )}
