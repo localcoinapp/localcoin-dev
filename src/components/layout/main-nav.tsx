@@ -14,7 +14,7 @@ export function MainNav({ items }: MainNavProps) {
   const pathname = usePathname()
 
   return (
-    <div className="hidden md:flex gap-6 md:gap-10 ml-10">
+    <div className="hidden md:flex gap-6 md:gap-10 md:ml-10">
       {items?.length ? (
         <nav className="hidden gap-6 md:flex">
           {items?.map(
