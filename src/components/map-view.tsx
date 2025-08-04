@@ -5,23 +5,34 @@ import React, { useEffect, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import type { Merchant } from "@/types";
-import { MapPin } from "lucide-react";
+import { MapPin, User as UserIcon } from "lucide-react";
 import { renderToStaticMarkup } from 'react-dom/server';
 
 interface MapViewProps {
   merchants: Merchant[];
 }
 
-// Custom icon using Lucide
-const customIconHtml = renderToStaticMarkup(
+// Custom icon for merchants
+const merchantIconHtml = renderToStaticMarkup(
     <MapPin className="h-8 w-8 text-primary drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
 );
-
-const customIcon = new L.Icon({
-    iconUrl: `data:image/svg+xml;base64,${btoa(customIconHtml)}`,
+const merchantIcon = new L.Icon({
+    iconUrl: `data:image/svg+xml;base64,${btoa(merchantIconHtml)}`,
     iconSize: [32, 32],
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
+});
+
+// Custom icon for the user
+const userIconHtml = renderToStaticMarkup(
+    <div className="h-6 w-6 rounded-full bg-blue-500 border-2 border-white shadow-lg flex items-center justify-center">
+        <UserIcon className="h-4 w-4 text-white" />
+    </div>
+);
+const userIcon = new L.Icon({
+    iconUrl: `data:image/svg+xml;base64,${btoa(userIconHtml)}`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
 });
 
 
@@ -41,6 +52,17 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(mapRef.current);
+
+            // Geolocate user
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const userPosition: L.LatLngExpression = [position.coords.latitude, position.coords.longitude];
+                    mapRef.current?.setView(userPosition, 15);
+                    L.marker(userPosition, { icon: userIcon }).addTo(mapRef.current!);
+                }, (error) => {
+                    console.warn("Could not get user location, defaulting to Berlin.", error.message)
+                });
+            }
         }
 
         return () => {
@@ -53,21 +75,22 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
 
     useEffect(() => {
         if (mapRef.current) {
-            // Clear existing markers
-            mapRef.current.eachLayer((layer) => {
-                if (layer instanceof L.Marker) {
-                    mapRef.current?.removeLayer(layer);
+            // Clear existing markers to prevent duplicates on re-render
+             mapRef.current.eachLayer((layer) => {
+                if (layer instanceof L.Marker && layer.options.icon !== userIcon) {
+                   mapRef.current?.removeLayer(layer);
                 }
             });
 
-            // Add new markers
+            // Add new markers for merchants
             merchants.forEach((merchant) => {
-                const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: customIcon })
+                const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: merchantIcon })
                     .addTo(mapRef.current!);
                 
                 const popupNode = document.createElement('div');
+                // Using standard img tag with classes for styling to avoid React-specific prop errors
                 popupNode.innerHTML = renderToStaticMarkup(
-                    <div className="w-64">
+                     <div className="w-64">
                         <div className="relative h-32 w-full mb-2 rounded-t-lg overflow-hidden">
                             <img src={merchant.imageUrl} alt={merchant.name} className="h-full w-full object-cover" data-ai-hint={merchant.aiHint} />
                         </div>
@@ -94,3 +117,4 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
 };
 
 export default MapView;
+
