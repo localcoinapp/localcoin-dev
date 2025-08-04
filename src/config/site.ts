@@ -4,20 +4,7 @@ export type SiteConfig = typeof siteConfig
 export const siteConfig = {
   name: "LocalCoin",
   description: "A crypto wallet and marketplace for local communities.",
-  mainNav: [
-    {
-      title: "Marketplace",
-      href: "/",
-    },
-    {
-      title: "Chat",
-      href: "/chat",
-    },
-    {
-      title: "Dashboard",
-      href: "/dashboard",
-    },
-  ],
+  mainNav: [],
   links: {
     // Add any external links here
   },
