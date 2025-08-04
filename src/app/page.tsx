@@ -125,7 +125,7 @@ export default function MarketplacePage() {
           </div>
         </TabsContent>
         <TabsContent value="map">
-          <div className="h-[600px] w-full rounded-lg overflow-hidden shadow-lg border">
+          <div key={activeTab} className="h-[600px] w-full rounded-lg overflow-hidden shadow-lg border">
             <MapView merchants={merchants} />
           </div>
         </TabsContent>
