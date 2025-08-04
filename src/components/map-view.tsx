@@ -7,12 +7,12 @@ import L from 'leaflet';
 import type { Merchant } from "@/types";
 import { MapPin } from "lucide-react";
 import { renderToStaticMarkup } from 'react-dom/server';
+import Link from 'next/link';
 
 interface MapViewProps {
   merchants: Merchant[];
 }
 
-// Custom icon for merchants
 const merchantIconHtml = renderToStaticMarkup(
     <MapPin className="h-8 w-8 text-primary drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
 );
@@ -23,9 +23,7 @@ const merchantIcon = new L.Icon({
     popupAnchor: [0, -32],
 });
 
-// Custom icon for the user
 const userIconHtml = renderToStaticMarkup(
-    // Using a different color and slightly larger size to make it stand out
     <MapPin className="h-10 w-10 text-accent drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
 );
 const userIcon = new L.Icon({
@@ -35,11 +33,10 @@ const userIcon = new L.Icon({
     popupAnchor: [0, -40],
 });
 
-
 const MapView: React.FC<MapViewProps> = ({ merchants }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
-    const defaultPosition: L.LatLngExpression = [52.515, 13.454]; // Default to Friedrichshain, Berlin
+    const defaultPosition: L.LatLngExpression = [52.515, 13.454];
 
     useEffect(() => {
         if (mapContainerRef.current && !mapRef.current) {
@@ -52,14 +49,14 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(mapRef.current);
-
-            // Geolocate user
+            
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
                     const userPosition: L.LatLngExpression = [position.coords.latitude, position.coords.longitude];
                     if (mapRef.current) {
                         mapRef.current.setView(userPosition, 15);
-                        L.marker(userPosition, { icon: userIcon }).addTo(mapRef.current);
+                        L.marker(userPosition, { icon: userIcon }).addTo(mapRef.current)
+                            .bindPopup("You are here!");
                     }
                 }, (error) => {
                     console.warn("Could not get user location, defaulting to Berlin.", error.message)
@@ -73,18 +70,16 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
                 mapRef.current = null;
             }
         };
-    }, []); 
+    }, []);
 
     useEffect(() => {
         if (mapRef.current) {
-            // Clear existing markers to prevent duplicates on re-render
              mapRef.current.eachLayer((layer) => {
                 if (layer instanceof L.Marker && layer.getIcon().options.iconUrl !== userIcon.options.iconUrl) {
                    mapRef.current?.removeLayer(layer);
                 }
             });
 
-            // Add new markers for merchants
             merchants.forEach((merchant) => {
                 const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: merchantIcon })
                     .addTo(mapRef.current!);
@@ -104,7 +99,7 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path></svg>
                                     <span className="font-bold">{merchant.rating}</span>
                                 </div>
-                                <a href={`/chat/${merchant.id}`} className="text-sm text-primary hover:underline">Chat</a>
+                                <a href={`/merchants/${merchant.id}`} className="text-sm text-primary hover:underline">View Profile</a>
                            </div>
                         </div>
                     </div>

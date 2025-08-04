@@ -1,3 +1,4 @@
+
 export type NavItem = {
   title: string
   href: string
@@ -5,6 +6,12 @@ export type NavItem = {
 }
 
 export type MainNavItem = NavItem
+
+export type MerchantItem = {
+  id: string
+  name: string
+  price: number
+}
 
 export type Merchant = {
   id: string
@@ -18,6 +25,7 @@ export type Merchant = {
     lng: number
   }
   description: string
+  items: MerchantItem[]
 }
 
 export type User = {
