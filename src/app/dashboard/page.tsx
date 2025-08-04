@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState } from "react";
@@ -43,8 +44,8 @@ export default function DashboardPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-headline">User Dashboard</h1>
-            <p className="text-muted-foreground">Manage your wallet and activity.</p>
+            <h1 className="text-3xl font-bold font-headline">My Wallet</h1>
+            <p className="text-muted-foreground">Manage your balance and transaction history.</p>
           </div>
         </div>
 
@@ -156,7 +157,7 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
+          </Header>
           <CardContent>
             <div className="text-2xl font-bold">+5 sales</div>
             <p className="text-xs text-muted-foreground">
