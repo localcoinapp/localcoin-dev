@@ -8,14 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import { siteConfig } from '@/config/site';
 import { merchants } from '@/data/merchants';
 import { cn } from '@/lib/utils';
 
 
-export default function MerchantProfilePage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function MerchantProfilePage() {
+  const params = useParams();
+  const id = params.id as string;
   const merchant = merchants.find(m => m.id === id);
 
   if (!merchant) {
