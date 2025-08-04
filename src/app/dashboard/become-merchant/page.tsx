@@ -92,41 +92,44 @@ export default function BecomeMerchantPage() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Country</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Country</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select your country" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {countries.map((country) => (
+                                  <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select your country" />
-                              </SelectTrigger>
+                              <Input placeholder="Street, City, Postal Code" {...field} />
                             </FormControl>
-                            <SelectContent>
-                              {countries.map((country) => (
-                                <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="123 Main St, Anytown, USA" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
+                 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={form.control}
@@ -148,7 +151,7 @@ export default function BecomeMerchantPage() {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="(555) 123-4567" {...field} />
+                            <Input placeholder="+1 (555) 123-4567" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

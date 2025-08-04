@@ -46,13 +46,13 @@ type StoreSettingsValues = z.infer<typeof storeSettingsSchema>
 const currentSettings: StoreSettingsValues = {
     companyName: "SunnySide Cafe",
     country: "DE",
-    address: "123 Main St, Anytown, USA",
+    address: "Sonnenallee 223, 12059 Berlin",
     contactEmail: "contact@sunnyside.com",
-    phone: "(555) 123-4567",
+    phone: "+49 30 12345678",
     website: "https://sunnyside.com",
     instagram: "@sunnysidecafe",
     description: "The best sunny side up eggs in town. We also serve artisanal coffee and fresh pastries.",
-    taxNumber: "123-456-789"
+    taxNumber: "DE123456789"
 }
 
 
@@ -161,7 +161,7 @@ export default function StoreSettingsPage() {
                       <FormItem>
                         <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Input placeholder="123 Main St, Anytown, USA" {...field} />
+                          <Input placeholder="Street, City, Postal Code" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -206,7 +206,7 @@ export default function StoreSettingsPage() {
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="(555) 123-4567" {...field} />
+                        <Input placeholder="+1 (555) 123-4567" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
