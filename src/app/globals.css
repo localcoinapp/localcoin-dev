@@ -4,11 +4,11 @@
 
 @layer base {
   :root {
-    --background: 39 100% 97%; /* #fff8ed */
+    --background: 45 85% 91%; /* #fcefd2 */
     --foreground: 30 14% 25%; /* #4d4133 */
-    --card: 40 100% 97%; /* #fff9f0 */
+    --card: 39 100% 96%; /* #fff8ed */
     --card-foreground: 30 14% 25%;
-    --popover: 40 100% 97%; /* #fff9f0 */
+    --popover: 39 100% 96%; /* #fff8ed */
     --popover-foreground: 30 14% 25%;
     --gold: 45 85% 50%;
     --primary: var(--gold);
