@@ -68,7 +68,7 @@ export default function MarketplacePage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-headline font-bold text-primary">Discover Local Services</h1>
+        <h1 className="text-4xl font-headline font-bold">Discover Local Services</h1>
         <p className="text-muted-foreground mt-2">
           Explore and connect with merchants in your area.
         </p>
