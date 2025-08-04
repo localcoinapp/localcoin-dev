@@ -25,43 +25,43 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 const merchants: Merchant[] = [
   {
     id: '1',
-    name: 'SunnySide Cafe',
+    name: 'Kaffee Klatsch',
     category: 'Cafe',
-    rating: 4.5,
+    rating: 4.7,
     imageUrl: 'https://placehold.co/600x400',
-    aiHint: 'cafe interior',
-    position: { lat: 34.052235, lng: -118.243683 },
-    description: 'Cozy cafe with artisanal coffee and pastries.'
+    aiHint: 'berlin cafe',
+    position: { lat: 52.516, lng: 13.452 },
+    description: 'Artsy cafe with direct-trade coffee and vegan cakes.'
   },
   {
     id: '2',
-    name: 'The Grand Hotel',
+    name: 'Hotel an der Spree',
     category: 'Hotel',
     rating: 4.8,
     imageUrl: 'https://placehold.co/600x400',
-    aiHint: 'hotel lobby',
-    position: { lat: 34.053230, lng: -118.245680 },
-    description: 'Luxurious hotel with stunning city views.'
+    aiHint: 'modern hotel',
+    position: { lat: 52.514, lng: 13.456 },
+    description: 'Stylish hotel with a beautiful view of the Spree river.'
   },
   {
     id: '3',
-    name: 'Tech Cowork Space',
+    name: 'Friedrichshain Coworking',
     category: 'Coworking',
-    rating: 4.7,
+    rating: 4.9,
     imageUrl: 'https://placehold.co/600x400',
     aiHint: 'coworking space',
-    position: { lat: 34.051230, lng: -118.244680 },
-    description: 'Modern coworking space with high-speed internet.'
+    position: { lat: 52.517, lng: 13.458 },
+    description: 'Creative coworking space with 24/7 access.'
   },
   {
     id: '4',
-    name: 'Seaside Restaurant',
+    name: 'Restaurant Spindler',
     category: 'Restaurant',
     rating: 4.6,
     imageUrl: 'https://placehold.co/600x400',
-    aiHint: 'restaurant ocean',
-    position: { lat: 34.049230, lng: -118.242680 },
-    description: 'Fresh seafood with a view of the ocean.'
+    aiHint: 'fine dining',
+    position: { lat: 52.513, lng: 13.451 },
+    description: 'Modern European cuisine in a restored industrial building.'
   },
 ];
 

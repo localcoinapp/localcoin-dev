@@ -28,7 +28,7 @@ const customIcon = new L.Icon({
 const MapView: React.FC<MapViewProps> = ({ merchants }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
-    const defaultPosition: L.LatLngExpression = [34.052235, -118.243683]; // Default to LA
+    const defaultPosition: L.LatLngExpression = [52.515, 13.454]; // Default to Friedrichshain, Berlin
 
     useEffect(() => {
         if (mapContainerRef.current && !mapRef.current) {
@@ -65,7 +65,6 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
                 const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: customIcon })
                     .addTo(mapRef.current!);
                 
-                // This is a bit of a workaround to render a React component inside a Leaflet popup
                 const popupNode = document.createElement('div');
                 popupNode.innerHTML = renderToStaticMarkup(
                     <div className="w-64">
