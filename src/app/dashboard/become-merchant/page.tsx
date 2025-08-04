@@ -227,7 +227,7 @@ export default function BecomeMerchantPage() {
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
                             <Input 
-                               placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "+49 (123) 456-7890"} 
+                               placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "Your phone number"} 
                                {...field} />
                           </FormControl>
                           <FormMessage />

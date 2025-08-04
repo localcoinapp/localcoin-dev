@@ -281,7 +281,7 @@ export default function StoreSettingsPage() {
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
                         <Input 
-                            placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "+1 (555) 123-4567"}
+                            placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "Your phone number"}
                             {...field} />
                       </FormControl>
                       <FormMessage />
