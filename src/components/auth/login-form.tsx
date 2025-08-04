@@ -1,9 +1,13 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Logo } from "../logo"
+import { useToast } from "@/hooks/use-toast"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -29,6 +34,9 @@ const formSchema = z.object({
 })
 
 export function LoginForm() {
+  const router = useRouter();
+  const { toast } = useToast();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -37,9 +45,35 @@ export function LoginForm() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
-    // Here you would handle the login logic
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      toast({ title: "Success", description: "You have been logged in." });
+      router.push('/');
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: error.message || "An unexpected error occurred.",
+      });
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      toast({ title: "Success", description: "You have been logged in with Google." });
+      router.push('/');
+    } catch (error: any) {
+      console.error("Google Sign-In Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Google Sign-In Failed",
+        description: error.message || "An unexpected error occurred.",
+      });
+    }
   }
 
   return (
@@ -52,7 +86,7 @@ export function LoginForm() {
         <CardDescription>Sign in to access your wallet and the marketplace.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button variant="outline" className="w-full mb-4">
+        <Button variant="outline" className="w-full mb-4" onClick={handleGoogleSignIn}>
           <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 62.3l-68.6 68.6c-20.5-19.4-48-31.5-79.3-31.5-62.3 0-113.5 51.6-113.5 114.9s51.2 114.9 113.5 114.9c72.3 0 96.9-46.3 102.5-69.1H248v-85.3h236.1c2.3 12.7 3.9 26.9 3.9 41.4z"></path></svg>
           Sign in with Google
         </Button>
