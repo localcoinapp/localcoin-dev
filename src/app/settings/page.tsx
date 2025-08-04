@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
+import { useTheme } from "@/components/theme-provider"
 
 const settingsFormSchema = z.object({
   theme: z.enum(["light", "dark"], {
@@ -40,7 +41,6 @@ type SettingsFormValues = z.infer<typeof settingsFormSchema>
 
 // This can be fetched from a user's settings in a database.
 const defaultValues: Partial<SettingsFormValues> = {
-  theme: "light",
   notifications: {
     email: true,
     inApp: true,
@@ -49,20 +49,23 @@ const defaultValues: Partial<SettingsFormValues> = {
 
 export default function SettingsPage() {
     const { toast } = useToast()
+    const { theme, setTheme } = useTheme()
 
     const form = useForm<SettingsFormValues>({
         resolver: zodResolver(settingsFormSchema),
-        defaultValues,
+        defaultValues: {
+            ...defaultValues,
+            theme: theme,
+        },
     })
-
-    const theme = form.watch("theme");
-
+    
     React.useEffect(() => {
-        document.documentElement.classList.remove("light", "dark");
-        document.documentElement.classList.add(theme);
-    }, [theme]);
+        form.setValue("theme", theme);
+    }, [theme, form]);
+
 
     function onSubmit(data: SettingsFormValues) {
+        setTheme(data.theme);
         toast({
             title: "Settings Saved",
             description: "Your preferences have been updated.",
@@ -94,7 +97,7 @@ export default function SettingsPage() {
                                     <FormControl>
                                         <RadioGroup
                                             onValueChange={field.onChange}
-                                            defaultValue={field.value}
+                                            value={field.value}
                                             className="flex flex-col space-y-1"
                                         >
                                             <FormItem className="flex items-center space-x-3 space-y-0">
