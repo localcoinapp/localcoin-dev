@@ -15,11 +15,10 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
     <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       <CardHeader className="p-0">
         <div className="relative h-48 w-full">
-          <Image
+          <img
             src={merchant.imageUrl}
             alt={merchant.name}
-            layout="fill"
-            objectFit="cover"
+            className="h-full w-full object-cover"
             data-ai-hint={merchant.aiHint}
           />
         </div>

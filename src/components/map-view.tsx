@@ -7,6 +7,7 @@ import L from 'leaflet';
 import type { Merchant } from "@/types";
 import { MapPin } from "lucide-react";
 import { renderToStaticMarkup } from 'react-dom/server';
+import MerchantCard from './merchant-card'; // We'll render the whole card for styling consistency
 
 interface MapViewProps {
   merchants: Merchant[];
@@ -21,6 +22,7 @@ const customIcon = new L.Icon({
     iconSize: [32, 32],
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
+    className: 'leaflet-marker-icon'
 });
 
 
@@ -40,16 +42,6 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(mapRef.current);
-            
-            // Adjust z-index of map panes
-            const markerPane = mapRef.current.getPane('markerPane');
-            if (markerPane) {
-                markerPane.style.zIndex = '50';
-            }
-            const popupPane = mapRef.current.getPane('popupPane');
-            if (popupPane) {
-                popupPane.style.zIndex = '60';
-            }
         }
 
         return () => {
@@ -62,16 +54,19 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
 
     useEffect(() => {
         if (mapRef.current) {
+            // Clear existing markers
             mapRef.current.eachLayer((layer) => {
                 if (layer instanceof L.Marker) {
                     mapRef.current?.removeLayer(layer);
                 }
             });
 
+            // Add new markers
             merchants.forEach((merchant) => {
                 const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: customIcon })
                     .addTo(mapRef.current!);
                 
+                // This is a bit of a workaround to render a React component inside a Leaflet popup
                 const popupNode = document.createElement('div');
                 popupNode.innerHTML = renderToStaticMarkup(
                     <div className="w-64">
@@ -97,7 +92,7 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
         }
     }, [merchants]);
 
-    return <div ref={mapContainerRef} className="z-0" style={{ height: '100%', width: '100%' }} />;
+    return <div ref={mapContainerRef} className="z-10" style={{ height: '100%', width: '100%' }} />;
 };
 
 export default MapView;
