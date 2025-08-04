@@ -25,14 +25,12 @@ const merchantIcon = new L.Icon({
 
 // Custom icon for the user
 const userIconHtml = renderToStaticMarkup(
-    <div className="h-6 w-6 rounded-full bg-blue-500 border-2 border-white shadow-lg flex items-center justify-center">
-        <UserIcon className="h-4 w-4 text-white" />
-    </div>
+    <MapPin className="h-10 w-10 text-accent drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
 );
 const userIcon = new L.Icon({
     iconUrl: `data:image/svg+xml;base64,${btoa(userIconHtml)}`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
 });
 
 
