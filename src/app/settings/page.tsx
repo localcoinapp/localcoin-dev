@@ -1,6 +1,7 @@
 
 'use client'
 
+import * as React from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -53,6 +54,13 @@ export default function SettingsPage() {
         resolver: zodResolver(settingsFormSchema),
         defaultValues,
     })
+
+    const theme = form.watch("theme");
+
+    React.useEffect(() => {
+        document.documentElement.classList.remove("light", "dark");
+        document.documentElement.classList.add(theme);
+    }, [theme]);
 
     function onSubmit(data: SettingsFormValues) {
         toast({
