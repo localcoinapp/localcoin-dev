@@ -30,7 +30,11 @@ import { countries } from "@/data/countries"
 const formSchema = z.object({
   companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
   country: z.string().min(1, { message: "Please select a country." }),
-  address: z.string().min(10, { message: "Please enter a valid address." }),
+  street: z.string().min(3, { message: "Please enter a street name." }),
+  houseNumber: z.string().min(1, { message: "Please enter a house number." }),
+  city: z.string().min(2, { message: "Please enter a city." }),
+  state: z.string().optional(),
+  zipCode: z.string().min(3, { message: "Please enter a ZIP or postal code." }),
   contactEmail: z.string().email({ message: "Please enter a valid email address." }),
   phone: z.string().min(10, { message: "Please enter a valid phone number." }),
   website: z.string().url().optional().or(z.literal('')),
@@ -47,7 +51,11 @@ export default function BecomeMerchantPage() {
     defaultValues: {
       companyName: "",
       country: "",
-      address: "",
+      street: "",
+      houseNumber: "",
+      city: "",
+      state: "",
+      zipCode: "",
       contactEmail: "",
       phone: "",
       website: "",
@@ -92,42 +100,98 @@ export default function BecomeMerchantPage() {
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your country" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {countries.map((country) => (
+                                <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <FormField
                       control={form.control}
-                      name="country"
+                      name="street"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Country</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select your country" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {countries.map((country) => (
-                                  <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Street</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Sonnenallee" {...field} />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                      <FormField
-                        control={form.control}
-                        name="address"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Address</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Street, City, Postal Code" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      control={form.control}
+                      name="houseNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>House No.</FormLabel>
+                          <FormControl>
+                            <Input placeholder="223" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Berlin" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State / Province</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Berlin" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={form.control}
+                      name="zipCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ZIP / Postal Code</FormLabel>
+                          <FormControl>
+                            <Input placeholder="12059" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -151,7 +215,7 @@ export default function BecomeMerchantPage() {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="+1 (555) 123-4567" {...field} />
+                            <Input placeholder="+49 (123) 456-7890" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
