@@ -1,3 +1,4 @@
+
 'use client'
 
 import * as React from "react"
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
+  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { Menu, Wallet } from "lucide-react"
@@ -33,6 +35,7 @@ export function MobileNav() {
           <Wallet className="mr-2 h-6 w-6 text-primary" />
           <span className="font-bold">{siteConfig.name}</span>
         </Link>
+        <SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
         <div className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6">
           <div className="flex flex-col space-y-3">
             {siteConfig.mainNav.map(
