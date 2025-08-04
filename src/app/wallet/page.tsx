@@ -18,9 +18,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { DollarSign, ArrowRight, ArrowDown, ArrowUp } from "lucide-react"
+import { DollarSign, ArrowRight, ArrowDown, ArrowUp, LifeBuoy } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { RampDialog } from "@/components/wallet/ramp-dialog"
+import { RefundDialog } from "@/components/wallet/refund-dialog"
 import Link from "next/link"
 
 const transactions = [
@@ -58,12 +59,12 @@ export default function WalletPage() {
                         Buy
                       </Button>
                     </RampDialog>
-                     <RampDialog type="sell">
-                      <Button variant="secondary">
-                        <ArrowDown className="mr-2 h-4 w-4" />
-                        Sell
-                      </Button>
-                    </RampDialog>
+                     <RefundDialog>
+                        <Button variant="secondary">
+                            <LifeBuoy className="mr-2 h-4 w-4" />
+                            Request a Refund
+                        </Button>
+                     </RefundDialog>
                   </div>
               </CardContent>
             </Card>

@@ -18,7 +18,7 @@ import { siteConfig } from "@/config/site"
 import { countries } from "@/data/countries"
 
 interface RampDialogProps {
-  type: 'buy' | 'sell';
+  type: 'buy';
   children: React.ReactNode;
 }
 
@@ -41,12 +41,10 @@ export function RampDialog({ type, children }: RampDialogProps) {
     }
     
     const handleSubmit = () => {
-        console.log(`${type} ${amount} worth of ${type === 'buy' ? siteConfig.token.symbol : currency.code}`);
+        console.log(`${type} ${amount} worth of ${siteConfig.token.symbol}`);
         setOpen(false);
         setAmount('');
     }
-
-    const isBuy = type === 'buy';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -57,13 +55,13 @@ export function RampDialog({ type, children }: RampDialogProps) {
         <DialogHeader>
           <DialogTitle className="capitalize">{type} {siteConfig.token.name}</DialogTitle>
           <DialogDescription>
-            {isBuy ? `Enter the amount of ${currency.code} you want to spend.` : `Enter the amount of ${siteConfig.token.symbol} you want to sell.`}
+            Enter the amount of {currency.code} you want to spend.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amount" className="text-right">
-                   {isBuy ? currency.code : siteConfig.token.symbol}
+                   {currency.code}
                 </Label>
                 <Input
                     id="amount"
@@ -75,7 +73,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
                 />
             </div>
             <div className="text-center text-muted-foreground text-sm">
-                {isBuy ? `You will receive ~${amount || '0.00'} ${siteConfig.token.symbol}` : `You will receive ~${amount || '0.00'} ${currency.code}`}
+                You will receive ~{amount || '0.00'} {siteConfig.token.symbol}
             </div>
         </div>
         <DialogFooter>
