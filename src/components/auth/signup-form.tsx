@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
+import { createUserWithEmailAndPassword, signInWithRedirect, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 
 import { Button } from "@/components/ui/button"
@@ -67,7 +67,7 @@ export function SignupForm() {
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
       toast({ title: "Success", description: "You have been signed up with Google." });
       router.push('/');
     } catch (error: any)
@@ -84,7 +84,7 @@ export function SignupForm() {
   const handleAppleSignIn = async () => {
     const provider = new OAuthProvider('apple.com');
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
       toast({ title: "Success", description: "You have been logged in with Apple." });
       router.push('/');
     } catch (error: any) {
