@@ -1,8 +1,9 @@
 
-import { db } from './firebase';
+import { db } from '@/lib/firebase';
 import { collection, addDoc, setDoc, doc } from 'firebase/firestore';
+import { NextResponse } from 'next/server';
 
-export async function seedDatabase() {
+export async function GET() {
   try {
     // Seed users
     const users = [
@@ -41,8 +42,9 @@ export async function seedDatabase() {
     const docRef = await addDoc(collection(db, 'merchants'), merchant);
     console.log('Merchant seeded with ID: ', docRef.id);
 
-    console.log('Database seeding completed successfully.');
+    return NextResponse.json({ message: 'Database seeded successfully.' });
   } catch (error) {
     console.error('Error seeding database: ', error);
+    return NextResponse.json({ error: 'Error seeding database.' }, { status: 500 });
   }
 }

@@ -55,7 +55,7 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: error.message || "An unexpected error occurred.",
+        description: `Error: ${error.code} - ${error.message}`,
       });
     }
   }
@@ -72,16 +72,13 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Google Sign-In Failed",
-        description: error.message || "An unexpected error occurred. Please ensure Google Sign-In is enabled in your Firebase console and a project support email is set.",
+        description: `Error: ${error.code} - ${error.message}`,
       });
     }
   }
 
   const handleAppleSignIn = async () => {
     const provider = new OAuthProvider('apple.com');
-    provider.setCustomParameters({
-      locale: 'en'
-    });
     try {
       await signInWithPopup(auth, provider);
       toast({ title: "Success", description: "You have been logged in with Apple." });
@@ -91,7 +88,7 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Apple Sign-In Failed",
-        description: error.message || "An unexpected error occurred.",
+        description: `Error: ${error.code} - ${error.message}`,
       });
     }
   }
