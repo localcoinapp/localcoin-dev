@@ -6,8 +6,10 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword, signInWithRedirect, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { createUserWithEmailAndPassword, signInWithRedirect, GoogleAuthProvider, OAuthProvider, getRedirectResult, onAuthStateChanged } from "firebase/auth"
+import { auth, db } from "@/lib/firebase"
+import { setDoc, doc, getDoc, query, where, collection, getDocs } from "firebase/firestore"
+import React from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -48,10 +50,75 @@ export function SignupForm() {
     },
   })
 
+  React.useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", user.email));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          const existingUserDoc = querySnapshot.docs[0];
+          await setDoc(existingUserDoc.ref, {
+            uid: user.uid,
+          }, { merge: true });
+        } else {
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            await setDoc(userDocRef, {
+              email: user.email,
+              role: 'user',
+            }, { merge: true });
+          }
+        }
+        router.push('/');
+      }
+    });
+
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          toast({ title: "Success", description: "Your account has been created." });
+        }
+      } catch (error: any) {
+        console.error("Redirect Result Error:", error);
+        toast({
+          variant: "destructive",
+          title: "Sign-in Failed",
+          description: `Error: ${error.code} - ${error.message}`,
+        });
+      }
+    };
+    handleRedirectResult();
+
+    return () => unsubscribe();
+  }, [router, toast]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
-      // In a real app, you'd also save the country to the user's profile in your database.
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", values.email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const user = userCredential.user;
+        const existingUserDoc = querySnapshot.docs[0];
+        await setDoc(existingUserDoc.ref, {
+          uid: user.uid,
+          country: values.country,
+        }, { merge: true });
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const user = userCredential.user;
+        await setDoc(doc(db, "users", user.uid), {
+          email: values.email,
+          country: values.country,
+          role: 'user',
+        });
+      }
       toast({ title: "Success", description: "Your account has been created." });
       router.push('/');
     } catch (error: any) {
@@ -104,7 +171,7 @@ export function SignupForm() {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+          <Button variant="outline" className="w-full" onClick={.handleGoogleSignIn}>
             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 62.3l-68.6 68.6c-20.5-19.4-48-31.5-79.3-31.5-62.3 0-113.5 51.6-113.5 114.9s51.2 114.9 113.5 114.9c72.3 0 96.9-46.3 102.5-69.1H248v-85.3h236.1c2.3 12.7 3.9 26.9 3.9 41.4z"></path></svg>
             Sign up with Google
           </Button>
@@ -114,7 +181,7 @@ export function SignupForm() {
           </Button>
         </div>
         <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
+          <div className="absolute inset-0 flex items-.center">
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">

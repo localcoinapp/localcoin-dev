@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -20,55 +20,47 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings, Check, X, Clock, CheckCircle } from "lucide-react"
+import { PlusCircle, DollarSign, Activity, ShoppingBag, ArrowRight, Settings, Check, X, Clock, CheckCircle, Edit, Trash2 } from "lucide-react"
 import { siteConfig } from "@/config/site"
-import { merchants } from "@/data/merchants"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
-
-const transactions = [
-  { id: "1", date: "2023-10-26", amount: -50, status: "Completed", description: "Coffee purchase" },
-  { id: "2", date: "2023-10-25", amount: 200, status: "Received", description: "From friend" },
-  { id: "3", date: "2023-10-24", amount: -120, status: "Completed", description: "Hotel Booking" },
-  { id: "4", date: "2023-10-23", amount: -75, status: "Completed", description: "Excursion service" },
-];
-
-const listings = merchants.flatMap(m => m.items);
-
-const initialOrders = [
-    { id: 'ord1', user: 'Alex Smith', item: 'Espresso', price: 2.50, status: 'pending' },
-    { id: 'ord2', user: 'Maria Garcia', item: 'Day Pass', price: 20.00, status: 'pending' },
-];
-
-const initialApproved = [
-    { id: 'ord3', user: 'Chen Wei', item: '3-Course Menu', price: 55.00, status: 'approved' }
-];
+import { db } from "@/lib/firebase"
+import { doc, onSnapshot, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore"
+import { Switch } from "@/components/ui/switch"
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState(initialOrders);
-  const [approved, setApproved] = useState(initialApproved);
+  const [merchantData, setMerchantData] = useState<any>(null);
 
-  const handleOrderStatus = (orderId: string, status: 'approved' | 'denied') => {
-    const orderToProcess = orders.find(o => o.id === orderId);
-    if (!orderToProcess) return;
-
-    setOrders(orders.filter(order => order.id !== orderId));
-    
-    if (status === 'approved') {
-        setApproved([...approved, { ...orderToProcess, status: 'approved' }]);
-        console.log(`Order ${orderId} has been approved.`);
-    } else {
-        console.log(`Order ${orderId} has been denied.`);
+  useEffect(() => {
+    if (user && (user.role === 'merchant' || user.role === 'admin') && user.merchantId) {
+      const merchantDocRef = doc(db, 'merchants', user.merchantId);
+      const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
+        if (doc.exists()) {
+          setMerchantData(doc.data());
+        }
+      });
+      return () => unsubscribe();
     }
+  }, [user]);
+
+  const handleListingStatusChange = async (listingId: string, currentStatus: boolean) => {
+    if (!user || !user.merchantId) return;
+    const listingRef = doc(db, 'merchants', user.merchantId);
+    const listingToUpdate = merchantData.yourListings.find((l: any) => l.id === listingId);
+    if (!listingToUpdate) return;
+
+    const updatedListing = { ...listingToUpdate, active: !currentStatus };
+
+    await updateDoc(listingRef, {
+      yourListings: arrayRemove(listingToUpdate)
+    });
+
+    await updateDoc(listingRef, {
+      yourListings: arrayUnion(updatedListing)
+    });
   };
-  
-  const handleRedemption = (orderId: string) => {
-    console.log(`Merchant confirms redemption for order ${orderId}. Payment is now being processed.`);
-    setApproved(approved.filter(order => order.id !== orderId));
-    // Here you would trigger the final transaction logic.
-  }
-  
+
   const isMerchantOrAdmin = user?.role === 'merchant' || user?.role === 'admin';
 
   if (!isMerchantOrAdmin) {
@@ -89,6 +81,10 @@ export default function DashboardPage() {
         </Card>
       </div>
     );
+  }
+
+  if (!merchantData) {
+    return <div>Loading...</div>;
   }
 
   return (
@@ -121,9 +117,9 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,250.75 {siteConfig.token.symbol}</div>
+            <div className="text-2xl font-bold">{merchantData.merchantWalletBalance.toFixed(2)} {siteConfig.token.symbol}</div>
             <p className="text-xs text-muted-foreground">
-              ~ $1,250.75 USD
+              ~ ${merchantData.merchantWalletBalance.toFixed(2)} USD
             </p>
           </CardContent>
         </Card>
@@ -133,7 +129,7 @@ export default function DashboardPage() {
             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{listings.length}</div>
+            <div className="text-2xl font-bold">{merchantData.totalListings}</div>
             <p className="text-xs text-muted-foreground">
               Active items and services
             </p>
@@ -145,7 +141,7 @@ export default function DashboardPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
+            <div className="text-2xl font-bold">{merchantData.pendingOrders}</div>
             <p className="text-xs text-muted-foreground">
               New requests to approve
             </p>
@@ -161,7 +157,7 @@ export default function DashboardPage() {
                 <CardDescription>Review and approve new requests from customers.</CardDescription>
             </CardHeader>
             <CardContent>
-                {orders.length > 0 ? (
+                {merchantData.incomingOrders.length > 0 ? (
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -172,16 +168,16 @@ export default function DashboardPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {orders.map((order) => (
+                            {merchantData.incomingOrders.map((order: any) => (
                             <TableRow key={order.id}>
                                 <TableCell>{order.user}</TableCell>
                                 <TableCell>{order.item}</TableCell>
                                 <TableCell>{order.price.toFixed(2)} {siteConfig.token.symbol}</TableCell>
                                 <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" onClick={() => handleOrderStatus(order.id, 'approved')}>
+                                    <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700">
                                         <Check className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => handleOrderStatus(order.id, 'denied')}>
+                                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700">
                                         <X className="h-4 w-4" />
                                     </Button>
                                 </TableCell>
@@ -201,7 +197,7 @@ export default function DashboardPage() {
                     <CardDescription>Confirm redemptions after the user approves it from their end.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {approved.length > 0 ? (
+                    {merchantData.approvedRedemptions.length > 0 ? (
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -211,7 +207,7 @@ export default function DashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {approved.map((order) => (
+                                {merchantData.approvedRedemptions.map((order: any) => (
                                     <TableRow key={order.id}>
                                         <TableCell>{order.user}</TableCell>
                                         <TableCell>{order.item}</TableCell>
@@ -247,7 +243,7 @@ export default function DashboardPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {transactions.map((tx) => (
+                    {merchantData.recentTransactions.map((tx: any) => (
                     <TableRow key={tx.id}>
                         <TableCell>{tx.description}</TableCell>
                         <TableCell className={tx.amount > 0 ? "text-green-600" : "text-red-600"}>
@@ -276,22 +272,28 @@ export default function DashboardPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listings.map((item) => (
-                  <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground')}>
+                {merchantData.yourListings.map((item: any) => (
+                  <TableRow key={item.id} className={cn(!item.active && 'text-muted-foreground')}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>
-                      {item.quantity > 0 ? (
-                        <span>{item.quantity}</span>
-                      ) : (
-                        <Badge variant="destructive">Sold Out</Badge>
-                      )}
+                      <Switch
+                        checked={item.active}
+                        onCheckedChange={() => handleListingStatusChange(item.id, item.active)}
+                      />
                     </TableCell>
-                    <TableCell className="text-right">{item.price.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

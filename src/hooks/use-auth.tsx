@@ -3,10 +3,11 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import type { User, UserRole } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, usePathname } from 'next/navigation';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -38,26 +39,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         const role = assignRole(firebaseUser);
-        setUser({
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName,
-          email: firebaseUser.email,
-          avatar: firebaseUser.photoURL,
-          role: role,
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        
+        const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            setUser({
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName,
+              email: firebaseUser.email,
+              avatar: firebaseUser.photoURL,
+              role: role,
+              ...doc.data(),
+            });
+          } else {
+            setUser({
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName,
+              email: firebaseUser.email,
+              avatar: firebaseUser.photoURL,
+              role: role,
+            });
+          }
+          setLoading(false);
         });
+
+        return () => unsubscribeSnapshot();
       } else {
         setUser(null);
         if (protectedRoutes.includes(pathname)) {
           router.push('/login');
         }
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, [router, pathname]);
 
   return (

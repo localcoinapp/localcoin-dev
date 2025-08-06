@@ -28,6 +28,11 @@ import { Camera } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
+import { useAuth } from "@/hooks/use-auth"
+import { db } from "@/lib/firebase"
+import { doc, onSnapshot, updateDoc } from "firebase/firestore"
+import { useEffect, useState } from "react"
+import { useToast } from "@/hooks/use-toast"
 
 const storeSettingsSchema = z.object({
     companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
@@ -57,35 +62,49 @@ const storeSettingsSchema = z.object({
 
 type StoreSettingsValues = z.infer<typeof storeSettingsSchema>
 
-// This would be fetched from your database
-const currentSettings: StoreSettingsValues = {
-    companyName: "SunnySide Cafe",
-    country: "DE",
-    street: "Sonnenallee",
-    houseNumber: "223",
-    city: "Berlin",
-    state: "Berlin",
-    zipCode: "12059",
-    contactEmail: "contact@sunnyside.com",
-    phone: "+49 30 12345678",
-    website: "https://sunnyside.com",
-    instagram: "@sunnysidecafe",
-    description: "The best sunny side up eggs in town. We also serve artisanal coffee and fresh pastries.",
-    taxNumber: "DE123456789"
-}
-
-
 export default function StoreSettingsPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [merchantData, setMerchantData] = useState<any>(null);
+  
   const form = useForm<StoreSettingsValues>({
     resolver: zodResolver(storeSettingsSchema),
-    defaultValues: currentSettings,
+    defaultValues: {},
   })
+
+  useEffect(() => {
+    if (user && user.merchantId) {
+      const merchantDocRef = doc(db, 'merchants', user.merchantId);
+      const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          setMerchantData(data);
+          form.reset(data);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [user, form]);
 
   const selectedCountry = form.watch("country");
 
-  const onSubmit = (values: StoreSettingsValues) => {
-    console.log("Store settings updated:", values);
-    // Here you would handle updating the store information in your backend.
+  const onSubmit = async (values: StoreSettingsValues) => {
+    if (!user || !user.merchantId) return;
+    const merchantDocRef = doc(db, 'merchants', user.merchantId);
+    try {
+      await updateDoc(merchantDocRef, values);
+      toast({
+        title: "Success",
+        description: "Your store settings have been updated.",
+      });
+    } catch (error) {
+      console.error("Error updating store settings:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "There was an error updating your store settings.",
+      });
+    }
   }
 
   const renderStateField = () => {
@@ -144,6 +163,10 @@ export default function StoreSettingsPage() {
     return null;
   }
 
+  if (!merchantData) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-3xl text-left shadow-lg">
@@ -159,8 +182,8 @@ export default function StoreSettingsPage() {
               <div className="flex items-center space-x-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src="https://placehold.co/100x100" alt="Store logo" />
-                    <AvatarFallback>SC</AvatarFallback>
+                    <AvatarImage src={merchantData.logo || "https://placehold.co/100x100"} alt="Store logo" />
+                    <AvatarFallback>{merchantData.companyName?.[0] || "S"}</AvatarFallback>
                   </Avatar>
                   <Button
                     type="button"

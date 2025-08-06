@@ -1,5 +1,4 @@
 
-
 export type NavItem = {
   title: string
   href: string
@@ -39,6 +38,16 @@ export type User = {
   email: string | null;
   avatar: string | null;
   role: UserRole;
+  bio?: string;
+  country?: string;
+  address?: {
+    street?: string;
+    houseNumber?: string;
+    postcode?: string;
+  };
+  state?: string;
+  province?: string;
+  merchantId?: string;
 };
 
 

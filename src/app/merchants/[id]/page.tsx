@@ -13,10 +13,11 @@ import { notFound, useParams } from 'next/navigation';
 import { siteConfig } from '@/config/site';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Merchant, MerchantItem } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import MapView from '@/components/map-view';
 
 export default function MerchantProfilePage() {
   const params = useParams();
@@ -28,25 +29,17 @@ export default function MerchantProfilePage() {
   useEffect(() => {
     if (!id) return;
 
-    const fetchMerchant = async () => {
-      try {
-        const merchantDocRef = doc(db, 'merchants', id);
-        const merchantDoc = await getDoc(merchantDocRef);
-
-        if (merchantDoc.exists()) {
-          setMerchant({ id: merchantDoc.id, ...merchantDoc.data() } as Merchant);
-        } else {
-          notFound();
-        }
-      } catch (error) {
-        console.error("Error fetching merchant: ", error);
-        // Handle error, maybe redirect or show a message
-      } finally {
-        setLoading(false);
+    const merchantDocRef = doc(db, 'merchants', id);
+    const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
+      if (doc.exists()) {
+        setMerchant({ id: doc.id, ...doc.data() } as Merchant);
+      } else {
+        notFound();
       }
-    };
+      setLoading(false);
+    });
 
-    fetchMerchant();
+    return () => unsubscribe();
   }, [id]);
 
   if (loading) {
@@ -149,6 +142,13 @@ export default function MerchantProfilePage() {
                     </TableBody>
                 </Table>
             </Card>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold font-headline mb-4">Location</h2>
+            <div className="aspect-video">
+              <MapView merchants={[merchant]} />
+            </div>
           </div>
         </CardContent>
       </Card>

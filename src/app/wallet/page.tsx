@@ -15,8 +15,12 @@ import { RampDialog } from "@/components/wallet/ramp-dialog"
 import { RefundDialog } from "@/components/wallet/refund-dialog"
 import Link from "next/link"
 import { PurchaseHistory } from "@/components/purchase-history"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function WalletPage() {
+    const { user } = useAuth();
+    const walletBalance = user?.walletBalance || 0;
+
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -33,9 +37,9 @@ export default function WalletPage() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                  <div className="text-3xl font-bold">0.00 {siteConfig.token.symbol}</div>
+                  <div className="text-3xl font-bold">{walletBalance.toFixed(2)} {siteConfig.token.symbol}</div>
                   <p className="text-xs text-muted-foreground">
-                  ~ $0.00 USD
+                  ~ ${walletBalance.toFixed(2)} USD
                   </p>
                   <div className="flex gap-2 mt-4">
                     <RampDialog type="buy">
