@@ -80,7 +80,7 @@ export default function MerchantProfilePage() {
           <div className="relative h-64 w-full">
             <Image
               src={merchant.imageUrl}
-              alt={merchant.name}
+              alt={merchant.companyName}
               fill
               className="object-cover"
               data-ai-hint={merchant.aiHint}
@@ -91,7 +91,7 @@ export default function MerchantProfilePage() {
           <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
             <div>
               <Badge variant="secondary" className="mb-2">{merchant.category}</Badge>
-              <CardTitle className="text-4xl font-bold font-headline">{merchant.name}</CardTitle>
+              <CardTitle className="text-4xl font-bold font-headline">{merchant.companyName}</CardTitle>
               <CardDescription className="mt-2 text-lg">{merchant.description}</CardDescription>
             </div>
             <div className="flex-shrink-0 flex flex-col items-start md:items-end gap-2">
