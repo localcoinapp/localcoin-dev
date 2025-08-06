@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Filter, List, MapPin, Search } from 'lucide-react';
+import { Filter, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,9 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MerchantCard from '@/components/merchant-card';
-import dynamic from 'next/dynamic';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Merchant } from '@/types';
@@ -22,14 +20,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { seedDatabase } from '@/lib/seed';
 import { useToast } from '@/hooks/use-toast';
 
-const MapView = dynamic(() => import('@/components/map-view'), { 
-  ssr: false 
-});
-
 const categories = ['All', 'Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events', 'Activities'];
 
 export default function MarketplacePage() {
-  const [activeTab, setActiveTab] = useState('list');
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -117,49 +110,29 @@ export default function MarketplacePage() {
         </div>
       </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex justify-center mb-6">
-          <TabsList>
-            <TabsTrigger value="list" className="gap-2">
-              <List className="h-4 w-4" />
-              List View
-            </TabsTrigger>
-            <TabsTrigger value="map" className="gap-2">
-              <MapPin className="h-4 w-4" />
-              Map View
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        
-        <TabsContent value="list">
-          {loading ? (
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <Skeleton className="h-80 w-full" />
-              <Skeleton className="h-80 w-full" />
-              <Skeleton className="h-80 w-full" />
-              <Skeleton className="h-80 w-full" />
-            </div>
-          ) : merchants.length > 0 ? (
+      <div>
+        {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {merchants.map((merchant) => (
-                <MerchantCard key={merchant.id} merchant={merchant} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">Your database is empty. Click the button to add some sample data.</p>
-              <Button onClick={handleSeed} disabled={isSeeding}>
-                {isSeeding ? 'Seeding...' : 'Seed Database'}
-              </Button>
-            </div>
-          )}
-        </TabsContent>
-        <TabsContent value="map">
-          <div className="h-[600px] w-full rounded-lg overflow-hidden shadow-lg border">
-            {loading ? <Skeleton className="h-full w-full" /> : <MapView merchants={merchants} />}
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
           </div>
-        </TabsContent>
-      </Tabs>
+        ) : merchants.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {merchants.map((merchant) => (
+              <MerchantCard key={merchant.id} merchant={merchant} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground mb-4">Your database is empty. Click the button to add some sample data.</p>
+            <Button onClick={handleSeed} disabled={isSeeding}>
+              {isSeeding ? 'Seeding...' : 'Seed Database'}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

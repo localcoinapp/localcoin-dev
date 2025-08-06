@@ -17,7 +17,6 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Merchant, MerchantItem } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import MapView from '@/components/map-view';
 
 export default function MerchantProfilePage() {
   const params = useParams();
@@ -142,13 +141,6 @@ export default function MerchantProfilePage() {
                     </TableBody>
                 </Table>
             </Card>
-          </div>
-
-          <div className="mt-8">
-            <h2 className="text-2xl font-bold font-headline mb-4">Location</h2>
-            <div className="aspect-video">
-              <MapView merchants={[merchant]} />
-            </div>
           </div>
         </CardContent>
       </Card>
