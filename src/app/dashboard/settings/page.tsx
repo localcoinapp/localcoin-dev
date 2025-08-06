@@ -35,7 +35,7 @@ import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 
 const storeSettingsSchema = z.object({
-    companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+    name: z.string().min(2, { message: "Company name must be at least 2 characters." }),
     country: z.string().min(1, { message: "Please select a country." }),
     street: z.string().min(3, { message: "Please enter a street name." }),
     houseNumber: z.string().min(1, { message: "Please enter a house number." }),

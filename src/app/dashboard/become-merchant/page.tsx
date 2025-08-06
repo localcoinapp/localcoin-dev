@@ -30,7 +30,6 @@ import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
 
 const formSchema = z.object({
-  companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
   country: z.string().min(1, { message: "Please select a country." }),
   street: z.string().min(3, { message: "Please enter a street name." }),
   houseNumber: z.string().min(1, { message: "Please enter a house number." }),
@@ -60,7 +59,6 @@ export default function BecomeMerchantPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      companyName: "",
       country: "",
       street: "",
       houseNumber: "",
@@ -156,19 +154,6 @@ export default function BecomeMerchantPage() {
           {applicationStatus === 'idle' && (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="companyName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="SunnySide Cafe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="country"
