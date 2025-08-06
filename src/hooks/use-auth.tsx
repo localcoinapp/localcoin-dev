@@ -1,12 +1,12 @@
 
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser, getRedirectResult } from 'firebase/auth';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import type { User, UserRole } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -29,33 +29,15 @@ const assignRole = (firebaseUser: FirebaseUser): UserRole => {
   }
 };
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+const protectedRoutes = ['/wallet', '/dashboard', '/chat', '/profile', '/settings'];
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          toast({
-            title: "Login Successful",
-            description: `Welcome back, ${result.user.displayName || result.user.email}!`,
-          });
-        }
-      } catch (error: any) {
-        console.error("Authentication redirect error:", error);
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "There was a problem signing you in.",
-        });
-      }
-    };
-
-    checkRedirectResult();
-
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         const role = assignRole(firebaseUser);
@@ -68,26 +50,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       } else {
         setUser(null);
+        if (protectedRoutes.includes(pathname)) {
+          router.push('/login');
+        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [router, pathname]);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>
       {loading ? (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <Skeleton className="h-16 w-full mb-8" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <Skeleton className="h-80 w-full" />
-                <Skeleton className="h-80 w-full" />
-                <Skeleton className="h-80 w-full" />
-                <Skeleton className="h-80 w-full" />
-            </div>
+          <Skeleton className="h-16 w-full mb-8" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
         </div>
-      ) : children}
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

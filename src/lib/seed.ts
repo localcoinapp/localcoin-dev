@@ -36,6 +36,15 @@ export async function seedDatabase() {
       name: 'Katari Farms',
       owner: 'some-unique-id-3', // Corresponds to katarifarms22@gmail.com
       items: [],
+      position: {
+        lat: 52.517,
+        lng: 13.453,
+      },
+      address: 'Kietzer Weg 10, 10365 Berlin',
+      imageUrl: '/placeholder.svg', // Add a placeholder image
+      category: 'Farm',
+      description: 'Fresh organic produce.',
+      rating: 4.5,
     };
 
     const docRef = await addDoc(collection(db, 'merchants'), merchant);

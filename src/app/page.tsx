@@ -35,23 +35,27 @@ export default function MarketplacePage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const { toast } = useToast();
 
-  const fetchMerchants = async () => {
-    try {
-      const merchantsCollection = collection(db, 'merchants');
-      const merchantSnapshot = await getDocs(merchantsCollection);
-      const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
-      setMerchants(merchantList);
-    } catch (error) {
-      console.error("Error fetching merchants: ", error);
-      // Handle error fetching data, e.g. show a toast notification
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchMerchants = async () => {
+      try {
+        const merchantsCollection = collection(db, 'merchants');
+        const merchantSnapshot = await getDocs(merchantsCollection);
+        const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
+        
+        if (merchantList.length === 0 && !isSeeding) {
+          handleSeed();
+        } else {
+          setMerchants(merchantList);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error fetching merchants: ", error);
+        setLoading(false);
+      }
+    };
+
     fetchMerchants();
-  }, []);
+  }, [isSeeding]);
 
   const handleSeed = async () => {
     setIsSeeding(true);
@@ -61,7 +65,11 @@ export default function MarketplacePage() {
         title: "Success",
         description: "Database has been seeded with initial data.",
       });
-      await fetchMerchants(); // Re-fetch merchants to update the UI
+      // Re-fetch merchants to update the UI
+      const merchantsCollection = collection(db, 'merchants');
+      const merchantSnapshot = await getDocs(merchantsCollection);
+      const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
+      setMerchants(merchantList);
     } catch (error) {
       console.error("Error seeding database: ", error);
       toast({
@@ -71,6 +79,7 @@ export default function MarketplacePage() {
       })
     } finally {
       setIsSeeding(false);
+      setLoading(false);
     }
   };
   

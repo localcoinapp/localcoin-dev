@@ -64,8 +64,6 @@ export function LoginForm() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithRedirect(auth, provider);
-      toast({ title: "Success", description: "You have been logged in with Google." });
-      router.push('/');
     } catch (error: any)
      {
       console.error("Google Sign-In Error:", error);
@@ -81,8 +79,6 @@ export function LoginForm() {
     const provider = new OAuthProvider('apple.com');
     try {
       await signInWithRedirect(auth, provider);
-      toast({ title: "Success", description: "You have been logged in with Apple." });
-      router.push('/');
     } catch (error: any) {
       console.error("Apple Sign-In Error:", error);
       toast({

@@ -81,30 +81,32 @@ const MapView: React.FC<MapViewProps> = ({ merchants }) => {
             });
 
             merchants.forEach((merchant) => {
-                const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: merchantIcon })
-                    .addTo(mapRef.current!);
-                
-                const popupNode = document.createElement('div');
-                popupNode.innerHTML = renderToStaticMarkup(
-                     <div className="w-64">
-                        <div className="relative h-32 w-full mb-2 rounded-t-lg overflow-hidden">
-                            <img src={merchant.imageUrl} alt={merchant.name} className="h-full w-full object-cover" data-ai-hint={merchant.aiHint} />
+                if (merchant.position && typeof merchant.position.lat === 'number' && typeof merchant.position.lng === 'number') {
+                    const marker = L.marker([merchant.position.lat, merchant.position.lng], { icon: merchantIcon })
+                        .addTo(mapRef.current!);
+                    
+                    const popupNode = document.createElement('div');
+                    popupNode.innerHTML = renderToStaticMarkup(
+                         <div className="w-64">
+                            <div className="relative h-32 w-full mb-2 rounded-t-lg overflow-hidden">
+                                <img src={merchant.imageUrl || ''} alt={merchant.name} className="h-full w-full object-cover" data-ai-hint={merchant.aiHint} />
+                            </div>
+                            <div className="p-2">
+                               <p className="text-xs text-muted-foreground">{merchant.category}</p>
+                               <h3 className="font-bold font-headline text-lg">{merchant.name}</h3>
+                               <p className="text-sm mt-1">{merchant.description}</p>
+                               <div className="flex items-center justify-between mt-2">
+                                    <div className="flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path></svg>
+                                        <span className="font-bold">{merchant.rating}</span>
+                                    </div>
+                                    <a href={`/merchants/${merchant.id}`} className="text-sm text-primary hover:underline">View Profile</a>
+                               </div>
+                            </div>
                         </div>
-                        <div className="p-2">
-                           <p className="text-xs text-muted-foreground">{merchant.category}</p>
-                           <h3 className="font-bold font-headline text-lg">{merchant.name}</h3>
-                           <p className="text-sm mt-1">{merchant.description}</p>
-                           <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path></svg>
-                                    <span className="font-bold">{merchant.rating}</span>
-                                </div>
-                                <a href={`/merchants/${merchant.id}`} className="text-sm text-primary hover:underline">View Profile</a>
-                           </div>
-                        </div>
-                    </div>
-                );
-                marker.bindPopup(popupNode);
+                    );
+                    marker.bindPopup(popupNode);
+                }
             });
         }
     }, [merchants]);
