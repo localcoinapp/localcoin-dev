@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Filter, Search } from 'lucide-react';
+import { Filter, Search, List, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,6 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import MerchantCard from '@/components/merchant-card';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -19,6 +25,7 @@ import type { Merchant } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDatabase } from '@/lib/seed';
 import { useToast } from '@/hooks/use-toast';
+import MapView from '@/components/map-view';
 
 const categories = ['All', 'Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events', 'Activities'];
 
@@ -85,54 +92,67 @@ export default function MarketplacePage() {
         </p>
       </div>
 
-      <div className="bg-card p-4 rounded-lg shadow-md mb-8 sticky top-20 z-10">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input placeholder="Search services, items, or merchants..." className="pl-10" />
+      <Tabs defaultValue="list">
+        <div className="bg-card p-4 rounded-lg shadow-md mb-8 sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="w-full sm:w-auto flex-grow flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input placeholder="Search services, items, or merchants..." className="pl-10" />
+            </div>
+            <div className="flex gap-4">
+              <Select defaultValue="All">
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button className="bg-accent hover:bg-accent/90">
+                Search
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-4">
-            <Select defaultValue="All">
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button className="bg-accent hover:bg-accent/90">
-              Search
-            </Button>
-          </div>
+           <TabsList className="grid w-full sm:w-auto sm:grid-cols-2">
+              <TabsTrigger value="list"><List className="mr-2" />List View</TabsTrigger>
+              <TabsTrigger value="map"><Map className="mr-2" />Map View</TabsTrigger>
+            </TabsList>
         </div>
-      </div>
-      
-      <div>
-        {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <Skeleton className="h-80 w-full" />
-            <Skeleton className="h-80 w-full" />
-            <Skeleton className="h-80 w-full" />
-            <Skeleton className="h-80 w-full" />
-          </div>
-        ) : merchants.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {merchants.map((merchant) => (
-              <MerchantCard key={merchant.id} merchant={merchant} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground mb-4">Your database is empty. Click the button to add some sample data.</p>
-            <Button onClick={handleSeed} disabled={isSeeding}>
-              {isSeeding ? 'Seeding...' : 'Seed Database'}
-            </Button>
-          </div>
-        )}
-      </div>
+        
+        <TabsContent value="list">
+            {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <Skeleton className="h-80 w-full" />
+                <Skeleton className="h-80 w-full" />
+                <Skeleton className="h-80 w-full" />
+                <Skeleton className="h-80 w-full" />
+              </div>
+            ) : merchants.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {merchants.map((merchant) => (
+                  <MerchantCard key={merchant.id} merchant={merchant} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">Your database is empty. Click the button to add some sample data.</p>
+                <Button onClick={handleSeed} disabled={isSeeding}>
+                  {isSeeding ? 'Seeding...' : 'Seed Database'}
+                </Button>
+              </div>
+            )}
+        </TabsContent>
+        <TabsContent value="map">
+          {loading ? (
+            <Skeleton className="h-[600px] w-full" />
+          ) : (
+            <MapView merchants={merchants} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
