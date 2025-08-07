@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -31,7 +30,11 @@ export default function MerchantProfilePage() {
     const merchantDocRef = doc(db, 'merchants', id);
     const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
       if (doc.exists()) {
-        setMerchant({ id: doc.id, ...doc.data() } as Merchant);
+        setMerchant({
+          id: doc.id,
+          ...doc.data(),
+          listings: doc.data()?.listings || [] // Use 'listings' field
+        } as Merchant);
       } else {
         notFound();
       }
@@ -63,7 +66,7 @@ export default function MerchantProfilePage() {
     // This will be caught by notFound() in the fetch logic, but as a fallback:
     notFound();
   }
-  
+
   const handleAddToCart = (item: any) => {
     // This is a placeholder. In a real app, this would add the item to the user's cart in the database.
     console.log(`Added ${item.name} to cart`);
@@ -75,16 +78,22 @@ export default function MerchantProfilePage() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <Card className="overflow-hidden shadow-2xl">
+      <Card className="overflow-hidden shadow-lg">
         <CardHeader className="p-0">
           <div className="relative h-64 w-full">
-            <Image
-              src={merchant.imageUrl}
-              alt={merchant.companyName}
-              fill
-              className="object-cover"
-              data-ai-hint={merchant.aiHint}
-            />
+            {merchant.imageUrl ? (
+               <Image
+                 src={merchant.imageUrl}
+                 alt={merchant.companyName}
+                 fill
+                 className="object-cover"
+                 data-ai-hint={merchant.aiHint}
+               />
+            ) : (
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
+                No Image Available
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-6">
@@ -107,7 +116,7 @@ export default function MerchantProfilePage() {
               </Link>
             </div>
           </div>
-          
+
           <div className="mt-8">
             <h2 className="text-2xl font-bold font-headline mb-4">Offerings</h2>
             <Card>
@@ -121,8 +130,8 @@ export default function MerchantProfilePage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {(merchant.items || []).map((item: MerchantItem) => (
-                        <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground')}>
+                        {(merchant.listings || []).filter(item => item.active).map((item: MerchantItem) => (
+                        <TableRow key={item.id} className={cn(item.quantity === 0 && 'text-muted-foreground', !item.active && 'hidden')}>
                             <TableCell className="font-medium">{item.name}</TableCell>
                              <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
                             <TableCell>{item.price.toFixed(2)} {siteConfig.token.symbol}</TableCell>

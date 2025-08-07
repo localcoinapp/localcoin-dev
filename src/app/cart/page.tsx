@@ -1,81 +1,105 @@
+'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/components/ui/tabs"
-import { merchants } from "@/data/merchants"
-import type { CartItem, MerchantItem } from "@/types"
-import { CartItemCard } from "@/components/cart/cart-item"
+} from "@/components/ui/tabs";
+// Remove this import as merchants data will not be used for hardcoded items
+// import { merchants } from "@/data/merchants";
+// Remove this import as it's for the hardcoded items
+// import type { CartItem, MerchantItem } from "@/types";
+import { CartItemCard } from "@/components/cart/cart-item"; // Assuming CartItemCard can handle the new order object structure
 
-const kaffeeKlatsch = merchants.find(m => m.id === '1')!;
-const coworking = merchants.find(m => m.id === '3')!;
-const restaurant = merchants.find(m => m.id === '4')!;
+import { useAuth } from "@/hooks/use-auth"; // Import useAuth
+import { db } from "@/lib/firebase"; // Import db
+import { doc, onSnapshot } from "firebase/firestore"; // Import doc and onSnapshot
 
-const cartItems: CartItem[] = [
-  {
-    id: 'cart1',
-    item: kaffeeKlatsch.items.find(i => i.id === 'i2') as MerchantItem,
-    merchantId: kaffeeKlatsch.id,
-    merchantName: kaffeeKlatsch.name,
-    status: 'pending',
-    requestedAt: '2024-07-30T10:00:00Z',
-  },
-  {
-    id: 'cart2',
-    item: coworking.items.find(i => i.id === 'i7') as MerchantItem,
-    merchantId: coworking.id,
-    merchantName: coworking.name,
-    status: 'approved',
-    requestedAt: '2024-07-29T15:30:00Z',
-    confirmationCode: 'CWRK-8432'
-  },
-  {
-    id: 'cart3',
-    item: restaurant.items.find(i => i.id === 'i10') as MerchantItem,
-    merchantId: restaurant.id,
-    merchantName: restaurant.name,
-    status: 'approved',
-    requestedAt: '2024-07-29T12:00:00Z',
-    confirmationCode: 'REST-5467'
-  },
-  {
-    id: 'cart4',
-    item: restaurant.items.find(i => i.id === 'i11') as MerchantItem,
-    merchantId: restaurant.id,
-    merchantName: restaurant.name,
-    status: 'denied',
-    requestedAt: '2024-07-28T19:00:00Z',
-  },
-  {
-    id: 'cart5',
-    item: kaffeeKlatsch.items.find(i => i.id === 'i3') as MerchantItem,
-    merchantId: kaffeeKlatsch.id,
-    merchantName: kaffeeKlatsch.name,
-    status: 'redeemed',
-    requestedAt: '2024-07-27T14:20:00Z',
-  },
-  {
-    id: 'cart6',
-    item: coworking.items.find(i => i.id === 'i8') as MerchantItem,
-    merchantId: coworking.id,
-    merchantName: coworking.name,
-    status: 'canceled',
-    requestedAt: '2024-07-26T11:00:00Z',
-  }
-];
+// Remove all hardcoded cartItems data
+// const kaffeeKlatsch = merchants.find(m => m.id === '1')!;
+// const coworking = merchants.find(m => m.id === '3')!;
+// const restaurant = merchants.find(m => m.id === '4')!;
+// const cartItems: CartItem[] = [ ... ]; // Remove this entire block
+
+interface Order {
+  orderId: string; // Assuming orderId will be stored here
+  title: string;
+  price: number;
+  quantity: number;
+  merchantId: string;
+  merchantName: string;
+  redeemCode: string | null;
+  status: 'pending_approval' | 'ready_to_redeem' | 'rejected' | 'cancelled' | 'completed';
+  // Add other fields as needed, like timestamps
+}
+
 
 export default function CartPage() {
-  const pending = cartItems.filter(item => item.status === 'pending');
-  const approved = cartItems.filter(item => item.status === 'approved');
-  const history = cartItems.filter(item => ['redeemed', 'denied', 'canceled'].includes(item.status));
+  const { user } = useAuth(); // Get the current user
+  const [cartItems, setCartItems] = useState<Order[]>([]); // State to hold real cart items from the database
+  const [isLoading, setIsLoading] = useState(true); // Loading state
+
+
+  useEffect(() => {
+    if (user) {
+      if (user.uid) { // Add check for user.uid
+      const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data();
+           // Check if 'cart' array exists and is an array, otherwise default to empty array
+          setCartItems((userData?.cart as Order[] || []).filter(item => item !== null && item !== undefined)); // Ensure null/undefined items are filtered out
+        } else {
+          setCartItems([]); // Set cart to empty if user document doesn't exist (shouldn't happen if logged in)
+        }
+        setIsLoading(false); // Set loading to false after initial data fetch
+      }, (error) => {
+        console.error("Error fetching user cart:", error);
+        setCartItems([]); // Set cart to empty on error
+        setIsLoading(false); // Set loading to false on error
+      });
+       return () => unsubscribe(); // Clean up the subscription
+      } else {
+         setCartItems([]); // Clear cart if user exists but uid is not available
+         setIsLoading(false); // Set loading to false
+      }
+      return () => unsubscribe(); // Clean up the subscription
+    } else {
+      setCartItems([]); // Clear cart if user is not logged in
+      setIsLoading(false); // Set loading to false if user is not logged in
+    }
+  }, [user]); // Re-run effect if user changes
+
+
+  // Filter items based on status
+  const pending = cartItems.filter(item => item.status === 'pending_approval');
+  const approved = cartItems.filter(item => item.status === 'ready_to_redeem');
+  const history = cartItems.filter(item => ['rejected', 'cancelled', 'completed'].includes(item.status));
+
+
+  if (!user) {
+      return (
+         <div className="container mx-auto p-4 sm:p-6 lg:p-8 text-center">
+            <p>Please log in to view your cart.</p>
+         </div>
+      );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 text-center">
+        <p>Loading cart...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -86,26 +110,13 @@ export default function CartPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="approved" className="w-full">
+      <Tabs defaultValue="pending" className="w-full"> {/* Set default to pending */}
         <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="approved">Ready to Redeem</TabsTrigger>
-          <TabsTrigger value="pending">Pending Approval</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="pending">Pending Approval ({pending.length})</TabsTrigger> {/* Show count */}
+          <TabsTrigger value="approved">Ready to Redeem ({approved.length})</TabsTrigger> {/* Show count */}
+          <TabsTrigger value="history">History ({history.length})</TabsTrigger> {/* Show count */}
         </TabsList>
-        <TabsContent value="approved">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ready to Redeem</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {approved.length > 0 ? (
-                approved.map(item => <CartItemCard key={item.id} cartItem={item} />)
-              ) : (
-                <p className="text-muted-foreground text-center py-8">No approved items to redeem.</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+
         <TabsContent value="pending">
           <Card>
             <CardHeader>
@@ -113,13 +124,29 @@ export default function CartPage() {
             </CardHeader>
             <CardContent className="space-y-4">
                {pending.length > 0 ? (
-                pending.map(item => <CartItemCard key={item.id} cartItem={item} />)
+                pending.map(item => <CartItemCard key={item.orderId} cartItem={item} />) // Use orderId as key
               ) : (
                 <p className="text-muted-foreground text-center py-8">You have no pending requests.</p>
               )}
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="approved">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ready to Redeem</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {approved.length > 0 ? (
+                approved.map(item => <CartItemCard key={item.orderId} cartItem={item} />) // Use orderId as key
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No approved items to redeem.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="history">
           <Card>
             <CardHeader>
@@ -127,7 +154,7 @@ export default function CartPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {history.length > 0 ? (
-                 history.map(item => <CartItemCard key={item.id} cartItem={item} />)
+                 history.map(item => <CartItemCard key={item.orderId} cartItem={item} />) // Use orderId as key
               ) : (
                  <p className="text-muted-foreground text-center py-8">Your order history is empty.</p>
               )}
@@ -136,5 +163,5 @@ export default function CartPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

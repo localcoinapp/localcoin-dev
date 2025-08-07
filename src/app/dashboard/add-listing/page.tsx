@@ -1,4 +1,3 @@
-
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -29,9 +28,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore"; // Changed getDoc to onSnapshot
+import { db } from "@/lib/firebase"; // Removed auth import as useAuth is used
+import { useAuth } from "@/hooks/use-auth"; // Import useAuth hook
 import { useEffect, useState } from "react";
 
 const formSchema = z.object({
@@ -45,8 +44,8 @@ const categories = ['Coffee', 'Pastry', 'Accommodation', 'Food', 'Workspace', 'D
 
 export default function AddListingPage() {
   const router = useRouter();
-  const [user] = useAuthState(auth);
-  const [isMerchant, setIsMerchant] = useState(false);
+  const { user } = useAuth(); // Use useAuth hook
+  const [merchantData, setMerchantData] = useState<any>(null); // State to store merchant data
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,69 +58,70 @@ export default function AddListingPage() {
   })
 
   useEffect(() => {
-    const checkMerchantStatus = async () => {
-      if (user) {
-        const merchantRef = doc(db, "merchants", user.uid);
-        const docSnap = await getDoc(merchantRef);
-        if (docSnap.exists()) {
-          const merchantData = docSnap.data();
-          // Assuming your merchant document has an 'owner' field that matches the user ID
-          // And potentially a 'role' field if you have different types of users
-          if (merchantData?.owner === user.uid) { // Adjust this check based on your data structure
-            setIsMerchant(true);
-          } else {
-            router.push('/dashboard'); // Redirect if not the owner of the merchant document
-          }
+    if (user && user.merchantId) {
+      const merchantDocRef = doc(db, 'merchants', user.merchantId);
+      const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          setMerchantData(data); // Set merchant data in state
         } else {
-          router.push('/dashboard'); // Redirect if no merchant document found for the user
+          // Redirect if merchant document doesn't exist for the user's merchantId
+          router.push('/dashboard');
         }
-      } else {
-        router.push('/login'); // Redirect to login if not authenticated
-      }
-    };
-    checkMerchantStatus();
-  }, [user, router]);
+      }, (error) => {
+        console.error("Error fetching merchant data:", error);
+        // Handle error, perhaps redirect or show an error message
+        router.push('/dashboard');
+      });
+      return () => unsubscribe(); // Cleanup the subscription
+    } else if (user && !user.merchantId) {
+       // If user is logged in but has no merchantId, redirect
+       router.push('/dashboard');
+    } else if (!user) {
+      // If user is not logged in, redirect to login
+      router.push('/login');
+    }
+  }, [user, router]); // Depend on user and router
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!user) {
+    if (!user || !user.merchantId) {
       return; // Should be handled by useEffect redirect
     }
 
-    const merchantRef = doc(db, "merchants", user.uid);
+    const merchantRef = doc(db, "merchants", user.merchantId); // Use user.merchantId
 
-    getDoc(merchantRef)
-      .then((docSnap) => {
-        if (docSnap.exists()) {
-          const merchantData = docSnap.data();
-          const currentListings = merchantData?.listings || []; // Assuming listings is an array
+    // No need to get the doc again here, as we have merchantData from the snapshot
+    // We can directly update the listings array
 
-          const newListing = {
-            id: Date.now().toString(), // Simple unique ID based on timestamp
-            ...values
-          };
+    try {
+      const currentListings = merchantData?.listings || []; // Use merchantData from state
 
-          return updateDoc(merchantRef, {
-            listings: [...currentListings, newListing]
-          });
-        } else {
-          console.error("Merchant document not found for the current user.");
-          throw new Error("Merchant not found");
-        }
-      })
-      .then(() => {
-        router.push('/dashboard');
-      })
-      .catch((error) => console.error("Error adding listing:", error));
+      const newListing = {
+        id: Date.now().toString(), // Simple unique ID based on timestamp
+        ...values
+      };
+
+      await updateDoc(merchantRef, {
+        listings: [...currentListings, newListing]
+      });
+
+      router.push('/dashboard');
+    } catch (error) {
+      console.error("Error adding listing:", error);
+      // Handle error, show a toast or message
+    }
   };
 
-  if (!user || !isMerchant) {
-    // You can show a loading spinner or a message while checking
+  if (!user || !merchantData) {
+    // Show a loading spinner or a message while checking/fetching data
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 text-center">
-        <p>Checking merchant status...</p>
+        <p>Loading merchant data...</p>
       </div>
     );
   }
+
+  // Render the form only when merchantData is available
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-2xl text-left shadow-lg">
