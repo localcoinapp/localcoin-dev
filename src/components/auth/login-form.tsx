@@ -6,8 +6,9 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { signInWithEmailAndPassword, signInWithRedirect, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
+import { auth, db } from "@/lib/firebase"
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -59,34 +60,46 @@ export function LoginForm() {
       });
     }
   }
-
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
+  
+  const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
-      await signInWithRedirect(auth, provider);
-    } catch (error: any)
-     {
-      console.error("Google Sign-In Error:", error);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user exists in Firestore
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (!userDoc.exists()) {
+        // Create user document if it doesn't exist
+        await setDoc(userDocRef, {
+          email: user.email,
+          name: user.displayName,
+          avatar: user.photoURL,
+          role: 'user', // Default role
+          walletBalance: 0
+        });
+      }
+      toast({ title: "Success", description: "You have been logged in." });
+      router.push('/');
+    } catch (error: any) {
+      console.error("Social Sign-In Error:", error);
       toast({
         variant: "destructive",
-        title: "Google Sign-In Failed",
+        title: "Sign-In Failed",
         description: `Error: ${error.code} - ${error.message}`,
       });
     }
   }
 
-  const handleAppleSignIn = async () => {
+  const handleGoogleSignIn = () => {
+    const provider = new GoogleAuthProvider();
+    handleSocialSignIn(provider);
+  }
+
+  const handleAppleSignIn = () => {
     const provider = new OAuthProvider('apple.com');
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (error: any) {
-      console.error("Apple Sign-In Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Apple Sign-In Failed",
-        description: `Error: ${error.code} - ${error.message}`,
-      });
-    }
+    handleSocialSignIn(provider);
   }
 
   return (

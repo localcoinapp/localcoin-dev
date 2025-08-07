@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword, signInWithRedirect, GoogleAuthProvider, OAuthProvider, getRedirectResult, onAuthStateChanged } from "firebase/auth"
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
 import { setDoc, doc, getDoc, query, where, collection, getDocs } from "firebase/firestore"
 import React from "react"
@@ -50,75 +50,17 @@ export function SignupForm() {
     },
   })
 
-  React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", user.email));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          const existingUserDoc = querySnapshot.docs[0];
-          await setDoc(existingUserDoc.ref, {
-            uid: user.uid,
-          }, { merge: true });
-        } else {
-          const userDocRef = doc(db, "users", user.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (!userDoc.exists()) {
-            await setDoc(userDocRef, {
-              email: user.email,
-              role: 'user',
-            }, { merge: true });
-          }
-        }
-        router.push('/');
-      }
-    });
-
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          toast({ title: "Success", description: "Your account has been created." });
-        }
-      } catch (error: any) {
-        console.error("Redirect Result Error:", error);
-        toast({
-          variant: "destructive",
-          title: "Sign-in Failed",
-          description: `Error: ${error.code} - ${error.message}`,
-        });
-      }
-    };
-    handleRedirectResult();
-
-    return () => unsubscribe();
-  }, [router, toast]);
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", values.email));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-        const user = userCredential.user;
-        const existingUserDoc = querySnapshot.docs[0];
-        await setDoc(existingUserDoc.ref, {
-          uid: user.uid,
-          country: values.country,
-        }, { merge: true });
-      } else {
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const user = userCredential.user;
         await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
           email: values.email,
           country: values.country,
           role: 'user',
+          walletBalance: 0,
         });
-      }
       toast({ title: "Success", description: "Your account has been created." });
       router.push('/');
     } catch (error: any) {
@@ -131,33 +73,45 @@ export function SignupForm() {
     }
   }
 
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
+  const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
-      await signInWithRedirect(auth, provider);
-    } catch (error: any)
-     {
-      console.error("Google Sign-In Error:", error);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName,
+            avatar: user.photoURL,
+            role: 'user',
+            walletBalance: 0,
+            country: 'US', // Default country, can be improved later
+        });
+      }
+      toast({ title: "Success", description: "Your account has been created." });
+      router.push('/');
+    } catch (error: any) {
+      console.error("Social Sign-Up Error:", error);
       toast({
         variant: "destructive",
-        title: "Google Sign-In Failed",
+        title: "Sign-Up Failed",
         description: `Error: ${error.code} - ${error.message}`,
       });
     }
   }
 
-  const handleAppleSignIn = async () => {
+  const handleGoogleSignIn = () => {
+    const provider = new GoogleAuthProvider();
+    handleSocialSignIn(provider);
+  }
+
+  const handleAppleSignIn = () => {
     const provider = new OAuthProvider('apple.com');
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (error: any) {
-      console.error("Apple Sign-In Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Apple Sign-In Failed",
-        description: `Error: ${error.code} - ${error.message}`,
-      });
-    }
+    handleSocialSignIn(provider);
   }
 
   return (
@@ -253,5 +207,3 @@ export function SignupForm() {
     </Card>
   )
 }
-
-    
