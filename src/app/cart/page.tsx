@@ -47,34 +47,46 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<Order[]>([]); // State to hold real cart items from the database
   const [isLoading, setIsLoading] = useState(true); // Loading state
 
-
   useEffect(() => {
-    if (user) {
-      if (user.uid) { // Add check for user.uid
-      const unsubscribe = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          const userData = doc.data();
-           // Check if 'cart' array exists and is an array, otherwise default to empty array
-          setCartItems((userData?.cart as Order[] || []).filter(item => item !== null && item !== undefined)); // Ensure null/undefined items are filtered out
-        } else {
-          setCartItems([]); // Set cart to empty if user document doesn't exist (shouldn't happen if logged in)
-        }
-        setIsLoading(false); // Set loading to false after initial data fetch
-      }, (error) => {
-        console.error("Error fetching user cart:", error);
-        setCartItems([]); // Set cart to empty on error
-        setIsLoading(false); // Set loading to false on error
-      });
-       return () => unsubscribe(); // Clean up the subscription
-      } else {
-         setCartItems([]); // Clear cart if user exists but uid is not available
-         setIsLoading(false); // Set loading to false
-      }
-      return () => unsubscribe(); // Clean up the subscription
+    console.log("User object in useEffect:", user);
+    let unsubscribe: () => void; // Declare unsubscribe outside the if blocks
+
+    // Change condition to check for user.id
+    if (user && user.id) {
+        console.log("User ID (document ID):", user.id); // Log user.id
+        // Use user.id for the document reference
+        const userDocRef = doc(db, "users", user.id);
+        unsubscribe = onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+                console.log("Fetched user data:", doc.data());
+                const userData = doc.data();
+                console.log("Cart items state (before set):", cartItems); // Log before setting state
+                // Check if 'cart' array exists and is an array, otherwise default to empty array
+                setCartItems((userData?.cart as Order[] || []).filter(item => item !== null && item !== undefined)); // Ensure null/undefined items are filtered out
+                console.log("Cart items state (after set):", cartItems); // Log after setting state
+            } else {
+                console.log("User document does not exist."); // Add this line
+                setCartItems([]); // Set cart to empty if user document doesn't exist (shouldn't happen if logged in)
+            }
+            setIsLoading(false); // Set loading to false after initial data fetch
+        }, (error) => {
+            console.error("Error fetching user cart:", error);
+            setCartItems([]); // Set cart to empty on error
+            setIsLoading(false); // Set loading to false on error
+        });
+
+        // Return the cleanup function here, within the block where unsubscribe is defined
+        return () => unsubscribe();
     } else {
-      setCartItems([]); // Clear cart if user is not logged in
-      setIsLoading(false); // Set loading to false if user is not logged in
+        // This message is now more accurate if user or user.id is missing
+        console.log("User object or user ID is missing."); // Add this line
+        setCartItems([]); // Clear cart if user is not logged in or id is not available
+        setIsLoading(false); // Set loading to false if user is not logged in or id is not available
     }
+
+    // No cleanup needed if unsubscribe was not defined
+    return undefined;
+
   }, [user]); // Re-run effect if user changes
 
 

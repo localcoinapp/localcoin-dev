@@ -1,0 +1,14 @@
+{
+  "cart": [
+    {
+      "orderId": "order_123",
+      "title": "Single Espresso",
+      "price": 2.50,
+      "quantity": 1,
+      "merchantId": "CI3v89nhEqJVAm59oRdt",
+      "merchantName": "Kaffee Klatsch",
+      "redeemCode": null,
+      "status": "pending_approval"
+    }
+  ]
+}

@@ -79,18 +79,17 @@ export default function DashboardPage() {
             recentTransactions: doc.data()?.recentTransactions || [],
           });
         } else {
-            setMerchantData(null);
+          setMerchantData(null);
         }
         setIsLoading(false);
       }, (error) => {
-          console.error("Error fetching merchant data:", error);
-          setIsLoading(false);
+        console.error("Error fetching merchant data:", error);
+        setIsLoading(false);
       });
       return () => unsubscribe();
     } else if (user) {
-        // User is logged in but not a merchant
-        setIsLoading(false);
-        setMerchantData(null);
+      setIsLoading(false);
+      setMerchantData(null);
     }
   }, [user]);
 
@@ -99,10 +98,10 @@ export default function DashboardPage() {
     const listingRef = doc(db, "merchants", user.merchantId);
     const updatedListing = { ...listing, active: !listing.active };
     try {
-        await updateDoc(listingRef, { listings: arrayRemove(listing) });
-        await updateDoc(listingRef, { listings: arrayUnion(updatedListing) });
+      await updateDoc(listingRef, { listings: arrayRemove(listing) });
+      await updateDoc(listingRef, { listings: arrayUnion(updatedListing) });
     } catch (error) {
-        console.error("Error updating listing status:", error);
+      console.error("Error updating listing status:", error);
     }
   };
 
@@ -138,23 +137,23 @@ export default function DashboardPage() {
   }
 
   if (!user || !merchantData) {
-       return (
-         <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
-           <Card className="w-full max-w-lg text-center">
-               <CardHeader>
-                   <CardTitle>Become a Merchant</CardTitle>
-                   <CardDescription>You are not a merchant yet. Apply to start selling your own services on the marketplace.</CardDescription>
-               </CardHeader>
-               <CardContent>
-                   <Link href="/dashboard/become-merchant">
-                       <Button>
-                           Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                       </Button>
-                   </Link>
-               </CardContent>
-           </Card>
-         </div>
-       );
+    return (
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <Card className="w-full max-w-lg text-center">
+          <CardHeader>
+            <CardTitle>Become a Merchant</CardTitle>
+            <CardDescription>You are not a merchant yet. Apply to start selling your own services on the marketplace.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/dashboard/become-merchant">
+              <Button>
+                Get Started <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // If we've passed the checks above, we are a merchant with data.
@@ -162,27 +161,10 @@ export default function DashboardPage() {
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold font-headline">Merchant Dashboard</h1>
-            <p className="text-muted-foreground">Manage your store, wallet, and listings.</p>
-          </div>
-          <div className="flex gap-2 mt-4 sm:mt-0">
-            <Link href="/dashboard/add-listing" passHref>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add New Listing
-              </Button>
-            </Link>
-            <Link href="/dashboard/settings" passHref>
-              <Button variant="outline">
-                <Settings className="mr-2 h-4 w-4" />
-                Store Settings
-              </Button>
-            </Link>
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold font-headline mb-6">Welcome to your Merchant Dashboard</h1>
+        <p className="text-muted-foreground mb-4">You can manage your listings, view transactions, and handle customer orders here.</p>
 
+        {/* Include the grid with the three cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -222,20 +204,45 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        {/* Include the grid with the Incoming Orders and Your Listings tables */}
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2 grid gap-8">
-              {/* Incoming Orders Table */}
-              <Card>
+            {/* Incoming Orders Table */}
+            <Card>
                 <CardHeader>
                     <CardTitle>Incoming Orders</CardTitle>
                     <CardDescription>Review and approve new requests from customers.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {merchantData.incomingOrders?.length > 0 ? (
-                        <p>Incoming orders table here.</p> // Placeholder
-                    ) : (
-                        <p className="text-muted-foreground text-center p-4">No pending orders.</p>
-                    )}
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Order ID</TableHead>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Quantity</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    {/* Add more table headers for other order details */}
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {merchantData.incomingOrders.map((order: any) => (
+                                    <TableRow key={order.orderId}>
+                                        <TableCell>{order.orderId}</TableCell>
+                                        <TableCell>{order.userId}</TableCell> {/* Display user ID for now, you might want to fetch user data */}
+                                        <TableCell>{order.title}</TableCell>
+                                        <TableCell>{order.quantity}</TableCell>
+                                        <TableCell><Badge>{order.status}</Badge></TableCell>
+                                        {/* Add more table cells for other order details */}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                ) : (
+                  <p className="text-muted-foreground text-center p-4">No pending orders.</p>
+              )}
+
                 </CardContent>
               </Card>
           </div>
@@ -292,6 +299,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+
       {/* Modals */}
       <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <AlertDialogContent>
@@ -318,4 +326,3 @@ export default function DashboardPage() {
       )}
     </>
   );
-}

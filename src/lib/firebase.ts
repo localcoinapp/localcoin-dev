@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, getDoc } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -21,4 +21,4 @@ const db = getFirestore(app);
 // Set persistence to local. This is the crucial part for this environment.
 setPersistence(auth, browserLocalPersistence);
 
-export { app, auth, db };
+export { app, auth, db, getDoc };

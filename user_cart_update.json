@@ -1,0 +1,14 @@
+{
+  "cart": [
+    {
+      "orderId": "order_123",
+      "title": "paella diner for 2",
+      "price": 50,
+      "quantity": 1,
+      "merchantId": "CI3v89nhEqJVAm59oRdt",
+      "merchantName": "Katari Farms",
+      "redeemCode": null,
+      "status": "pending_approval"
+    }
+  ]
+}
