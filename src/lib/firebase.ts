@@ -18,7 +18,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Set persistence to local
+// Set persistence to local. This is the crucial part for this environment.
 setPersistence(auth, browserLocalPersistence);
 
 export { app, auth, db };
