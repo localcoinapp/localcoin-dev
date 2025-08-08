@@ -39,7 +39,7 @@ export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChang
         title: "Ready to Go!",
         description: "The merchant has been notified. They will complete the transaction on their end."
     })
-    // NOTE: We do not close the modal here. The user must do it manually.
+    // NOTE: We do not close the modal here. The user must do it manually by clicking close.
     // The parent component `cart/page.tsx` controls the state.
   }
 

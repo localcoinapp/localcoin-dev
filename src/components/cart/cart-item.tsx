@@ -1,3 +1,4 @@
+
 'use client';
 
 import { formatDistanceToNow } from 'date-fns';
@@ -48,7 +49,7 @@ export function CartItemCard({ cartItem, onCancel, onRedeem, isRedeemDialogOpen,
                        {cartItem.price.toFixed(2)} {siteConfig.token.symbol}
                     </p>
                     
-                    {cartItem.status === 'approved' && onRedeem && onOpenChange && (
+                    {(cartItem.status === 'approved' || cartItem.status === 'ready_to_redeem') && onRedeem && onOpenChange && (
                         <RedeemDialog 
                             isOpen={isRedeemDialogOpen ?? false}
                             onOpenChange={onOpenChange}
@@ -60,12 +61,6 @@ export function CartItemCard({ cartItem, onCancel, onRedeem, isRedeemDialogOpen,
                                 Redeem
                             </Button>
                         </RedeemDialog>
-                    )}
-                    {cartItem.status === 'ready_to_redeem' && (
-                        <Button size="sm" variant="success" disabled>
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Ready
-                        </Button>
                     )}
                      {cartItem.status === 'pending_approval' && onCancel && (
                         <Button variant="outline" size="sm" onClick={onCancel}>Cancel Request</Button>
