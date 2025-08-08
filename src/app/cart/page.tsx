@@ -150,6 +150,10 @@ export default function CartPage() {
         tx.update(merchantDocRef, { pendingOrders: updatedPendingOrders });
       });
 
+      toast({
+        title: "Ready to Go!",
+        description: "The merchant has been notified. They will complete the transaction on their end."
+      });
       // NOTE: We do NOT close the dialog here. The user must do it manually.
     } catch (error) {
       console.error("Error approving to redeem:", error);
