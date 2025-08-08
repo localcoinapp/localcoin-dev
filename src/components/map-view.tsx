@@ -53,16 +53,16 @@ const MapView = ({ merchants }: MapViewProps) => {
                 if (userMarkerRef.current) {
                     userMarkerRef.current.setLatLng(userLatLng);
                 } else {
-                    // Ideally use a different icon for the user
-                    const blueIcon = new L.Icon({
-                        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                    // Use a red icon for the user
+                    const redIcon = new L.Icon({
+                        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
                         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
                         iconSize: [25, 41],
                         iconAnchor: [12, 41],
                         popupAnchor: [1, -34],
                         shadowSize: [41, 41]
                       });
-                    userMarkerRef.current = L.marker(userLatLng, { icon: blueIcon })
+                    userMarkerRef.current = L.marker(userLatLng, { icon: redIcon })
                         .addTo(mapInstance.current!)
                         .bindPopup("You are here");
                 }
@@ -87,9 +87,11 @@ const MapView = ({ merchants }: MapViewProps) => {
 
         // Add new markers for merchants
         merchantsWithPosition.forEach(merchant => {
-            L.marker([merchant.position.lat, merchant.position.lng])
-            .addTo(mapInstance.current!)
-            .bindPopup(`<b>${merchant.companyName}</b><br><a href="/merchants/${merchant.id}">View Details</a>`);
+            if (merchant.position && typeof merchant.position.lat === 'number' && typeof merchant.position.lng === 'number') {
+                L.marker([merchant.position.lat, merchant.position.lng])
+                .addTo(mapInstance.current!)
+                .bindPopup(`<b>${merchant.companyName}</b><br><a href="/merchants/${merchant.id}">View Details</a>`);
+            }
         });
 
         // Adjust bounds if user location wasn't found and we have merchants
