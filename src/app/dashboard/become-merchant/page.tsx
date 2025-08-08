@@ -28,6 +28,8 @@ import { Activity, CheckCircle } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
+import { geocodeAddress } from "@/ai/flows/geocode-address";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   country: z.string().min(1, { message: "Please select a country." }),
@@ -55,6 +57,7 @@ const formSchema = z.object({
 
 export default function BecomeMerchantPage() {
   const [applicationStatus, setApplicationStatus] = useState<'idle' | 'pending' | 'approved'>('idle');
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -75,14 +78,36 @@ export default function BecomeMerchantPage() {
 
   const selectedCountry = form.watch("country");
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log("Application submitted for review:", values);
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setApplicationStatus('pending');
-    // In a real application, you would send this data to your backend for manual review.
-    // We'll simulate the review process with a timeout.
-    setTimeout(() => {
-        setApplicationStatus('approved');
-    }, 3000);
+    try {
+      // Construct full address
+      const fullAddress = `${values.houseNumber} ${values.street}, ${values.city}, ${values.state || ''} ${values.zipCode}, ${values.country}`;
+      
+      // Geocode the address
+      const position = await geocodeAddress({ address: fullAddress });
+
+      const applicationData = {
+        ...values,
+        position: position, // Add coordinates to the application data
+      };
+
+      console.log("Application submitted for review:", applicationData);
+      // In a real application, you would send this data to your backend.
+      // We'll simulate the review process with a timeout.
+      setTimeout(() => {
+          setApplicationStatus('approved');
+      }, 3000);
+
+    } catch (error) {
+      console.error("Error during application submission:", error);
+      toast({
+        title: "Submission Error",
+        description: "Could not geocode the address. Please check it and try again.",
+        variant: "destructive",
+      });
+      setApplicationStatus('idle');
+    }
   }
 
   const renderStateField = () => {
@@ -312,7 +337,9 @@ export default function BecomeMerchantPage() {
                     )}
                   />
                   <div className="text-center pt-4">
-                    <Button type="submit" size="lg">Submit Application</Button>
+                    <Button type="submit" size="lg" disabled={applicationStatus === 'pending'}>
+                      {applicationStatus === 'pending' ? 'Submitting...' : 'Submit Application'}
+                    </Button>
                   </div>
                 </form>
               </Form>

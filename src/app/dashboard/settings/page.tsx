@@ -33,6 +33,7 @@ import { db } from "@/lib/firebase"
 import { doc, onSnapshot, updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { geocodeAddress } from "@/ai/flows/geocode-address"
 
 const storeSettingsSchema = z.object({
     name: z.string().min(2, { message: "Company name must be at least 2 characters." }),
@@ -90,9 +91,19 @@ export default function StoreSettingsPage() {
 
   const onSubmit = async (values: StoreSettingsValues) => {
     if (!user || !user.merchantId) return;
-    const merchantDocRef = doc(db, 'merchants', user.merchantId);
+
     try {
-      await updateDoc(merchantDocRef, values);
+      const fullAddress = `${values.houseNumber} ${values.street}, ${values.city}, ${values.state || ''} ${values.zipCode}, ${values.country}`;
+      const position = await geocodeAddress({ address: fullAddress });
+
+      const dataToUpdate = {
+        ...values,
+        position,
+      };
+
+      const merchantDocRef = doc(db, 'merchants', user.merchantId);
+      await updateDoc(merchantDocRef, dataToUpdate);
+
       toast({
         title: "Success",
         description: "Your store settings have been updated.",
@@ -102,7 +113,7 @@ export default function StoreSettingsPage() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "There was an error updating your store settings.",
+        description: "There was an error updating your store settings. Could not geocode address.",
       });
     }
   }
@@ -389,7 +400,9 @@ export default function StoreSettingsPage() {
               </div>
 
               <div className="text-right pt-4">
-                <Button type="submit" size="lg">Save Changes</Button>
+                <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
               </div>
             </form>
           </Form>
