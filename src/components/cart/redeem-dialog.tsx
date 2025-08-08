@@ -11,8 +11,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ReactNode, useState, useEffect } from "react";
-import { CheckCircle } from "lucide-react";
+import { ReactNode } from "react";
+import { toast } from "@/hooks/use-toast";
 
 interface RedeemDialogProps {
   cartItem: {
@@ -27,15 +27,6 @@ interface RedeemDialogProps {
 }
 
 export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChange }: RedeemDialogProps) {
-  const [isApproved, setIsApproved] = useState(false);
-
-  useEffect(() => {
-    // Reset the internal state when the dialog is closed or a new item is opened
-    if (!isOpen) {
-      setIsApproved(false);
-    }
-  }, [isOpen]);
-
 
   if (!cartItem.redeemCode) {
     // This case should ideally not be hit if the dialog is only shown for 'approved' items
@@ -44,7 +35,12 @@ export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChang
 
   const handleApproveClick = () => {
     onRedeem();
-    setIsApproved(true);
+    toast({
+        title: "Ready to Go!",
+        description: "The merchant has been notified. They will complete the transaction on their end."
+    })
+    // NOTE: We do not close the modal here. The user must do it manually.
+    // The parent component `cart/page.tsx` controls the state.
   }
 
   return (
@@ -53,7 +49,6 @@ export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChang
         {children}
       </AlertDialogTrigger>
       <AlertDialogContent>
-        {!isApproved ? (
           <>
             <AlertDialogHeader>
               <AlertDialogTitle className="text-center text-2xl font-headline">Redeem Your Item</AlertDialogTitle>
@@ -72,28 +67,14 @@ export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChang
                 </div>
             </div>
             <AlertDialogFooter className="sm:justify-between sm:flex-row-reverse w-full mt-2">
+                {/* 
+                  Using a standard Button instead of AlertDialogAction prevents the dialog
+                  from closing automatically on click. This is the key to the fix.
+                */}
                 <Button onClick={handleApproveClick}>I've shown the merchant, approve for redemption</Button>
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
             </AlertDialogFooter>
           </>
-        ) : (
-          <>
-            <AlertDialogHeader>
-                <AlertDialogTitle className="text-center text-2xl font-headline">Ready to Go!</AlertDialogTitle>
-            </AlertDialogHeader>
-            <div className="flex flex-col items-center justify-center text-center p-8">
-                <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4"/>
-                <p className="text-lg font-semibold">The merchant has been notified.</p>
-                <p className="text-muted-foreground mt-2">
-                    They will now complete the transaction on their end. You can close this window.
-                </p>
-            </div>
-            <AlertDialogFooter>
-                <Button onClick={() => onOpenChange(false)}>Close</Button>
-            </AlertDialogFooter>
-          </>
-        )}
-
       </AlertDialogContent>
     </AlertDialog>
   )
