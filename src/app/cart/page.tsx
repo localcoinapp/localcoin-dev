@@ -140,10 +140,6 @@ export default function CartPage() {
         tx.update(merchantDocRef, { pendingOrders: updatedPendingOrders });
       });
 
-      toast({
-        title: "Ready to Redeem",
-        description: "The merchant has been notified and is ready to redeem your item.",
-      });
       // NOTE: We do NOT close the dialog here. The user must do it manually.
     } catch (error) {
       console.error("Error approving to redeem:", error);
@@ -170,9 +166,9 @@ export default function CartPage() {
             case 'date-asc':
                 return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
             case 'name-asc':
-                return a.title.localeCompare(b.title);
+                return (a.title || '').localeCompare(b.title || '');
             case 'name-desc':
-                return b.title.localeCompare(a.title);
+                return (b.title || '').localeCompare(a.title || '');
             case 'price-asc':
                 return a.price - b.price;
             case 'price-desc':
