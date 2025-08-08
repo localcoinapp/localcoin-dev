@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -90,11 +91,22 @@ export default function CartPage() {
     }
   };
 
-  const handleApproveToRedeem = async (orderId: string, merchantId: string) => {
+  const handleApproveToRedeem = async (order: Order) => {
     if (!user?.id) return;
 
+    // Check wallet balance
+    const currentBalance = user.walletBalance || 0;
+    if (currentBalance < order.price) {
+        toast({
+            title: "Insufficient Funds",
+            description: "Sorry, you do not have enough funds. Please top up your wallet.",
+            variant: "destructive"
+        });
+        return; // Halt the process
+    }
+
     const userDocRef = doc(db, 'users', user.id);
-    const merchantDocRef = doc(db, 'merchants', merchantId);
+    const merchantDocRef = doc(db, 'merchants', order.merchantId);
 
     try {
       await runTransaction(db, async (tx) => {
@@ -105,10 +117,10 @@ export default function CartPage() {
         const merchantData = merchantSnap.data();
 
         const updatedUserCart = (userData.cart || []).map((item: Order) =>
-          item.orderId === orderId ? { ...item, status: 'ready_to_redeem' } : item
+          item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
         const updatedPendingOrders = (merchantData.pendingOrders || []).map((item: Order) =>
-          item.orderId === orderId ? { ...item, status: 'ready_to_redeem' } : item
+          item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
 
         tx.update(userDocRef, { cart: updatedUserCart });
@@ -192,7 +204,7 @@ export default function CartPage() {
                   <CartItemCard 
                     key={item.orderId} 
                     cartItem={item} 
-                    onRedeem={() => handleApproveToRedeem(item.orderId, item.merchantId)}
+                    onRedeem={() => handleApproveToRedeem(item)}
                     isRedeemDialogOpen={openRedeemDialogId === item.orderId}
                     onOpenChange={(isOpen) => setOpenRedeemDialogId(isOpen ? item.orderId : null)}
                   />
