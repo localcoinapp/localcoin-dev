@@ -13,11 +13,13 @@ export type MerchantItem = {
   price: number
   quantity: number
   category: string
+  active?: boolean;
 }
 
 export type Merchant = {
   id: string
-  name: string
+  name?: string;
+  companyName: string;
   category: string
   rating: number
   imageUrl: string
@@ -27,7 +29,9 @@ export type Merchant = {
     lng: number
   }
   description: string
-  items: MerchantItem[]
+  listings: MerchantItem[]
+  pendingOrders?: CartItem[];
+  merchantWalletBalance?: number;
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
@@ -48,11 +52,13 @@ export type User = {
   state?: string;
   province?: string;
   merchantId?: string;
+  walletBalance?: number;
+  cart?: CartItem[];
 };
 
 
 export type Message = {
-  id: string
+  id:string
   text: string
   createdAt: string
   sender: Pick<User, 'id' | 'name' | 'avatar'>
@@ -65,12 +71,21 @@ export type Chat = {
   messages: Message[]
 }
 
+export type OrderStatus = 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'completed' | 'ready_to_redeem' | 'refunded';
+
 export type CartItem = {
-    id: string;
-    item: MerchantItem;
-    merchantId: string;
-    merchantName: string;
-    status: 'pending' | 'approved' | 'denied' | 'redeemed' | 'canceled';
-    requestedAt: string;
-    confirmationCode?: string;
+  orderId: string;
+  title: string;
+  itemId: string;
+  listingId: string;
+  price: number;
+  quantity: number;
+  merchantId: string;
+  merchantName: string;
+  redeemCode: string | null;
+  status: OrderStatus;
+  timestamp?: any;
+  redeemedAt?: any;
+  userId: string;
+  userName: string;
 }

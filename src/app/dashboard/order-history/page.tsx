@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from "react";
@@ -17,26 +18,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, History } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, Timestamp } from "firebase/firestore";
+import type { CartItem, OrderStatus } from "@/types";
 
-type Order = {
-  orderId: string;
-  userName: string;
-  name: string;
-  status: 'completed' | 'rejected' | 'cancelled';
-  timestamp?: Timestamp;
-  redeemedAt?: Timestamp;
-};
+type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
 
-const formatDate = (timestamp: Timestamp | undefined) => {
+const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
-    // Firebase timestamps have a toDate() method.
-    return timestamp.toDate().toLocaleDateString('en-US', {
+    const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
+    return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -45,8 +47,11 @@ const formatDate = (timestamp: Timestamp | undefined) => {
 
 export default function OrderHistoryPage() {
   const { user } = useAuth();
-  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+  const [orderHistory, setOrderHistory] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('date-desc');
 
   useEffect(() => {
     if (user && user.merchantId) {
@@ -55,8 +60,8 @@ export default function OrderHistoryPage() {
         if (doc.exists()) {
           const data = doc.data();
           const allOrders = data?.pendingOrders || [];
-          const history: Order[] = allOrders.filter((order: any) => 
-            ['completed', 'rejected', 'cancelled'].includes(order.status)
+          const history: CartItem[] = allOrders.filter((order: any) => 
+            ['completed', 'rejected', 'cancelled', 'refunded'].includes(order.status)
           );
           setOrderHistory(history);
         } else {
@@ -73,6 +78,27 @@ export default function OrderHistoryPage() {
     }
   }, [user]);
 
+  const filteredAndSortedHistory = orderHistory
+    .filter(order => statusFilter === 'all' || order.status === statusFilter)
+    .sort((a, b) => {
+      switch (sortOption) {
+        case 'date-desc':
+            return (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0) - (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0);
+        case 'date-asc':
+            return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
+        case 'name-asc':
+          return a.title.localeCompare(b.title);
+        case 'name-desc':
+          return b.title.localeCompare(a.title);
+        case 'price-asc':
+          return a.price - b.price;
+        case 'price-desc':
+          return b.price - a.price;
+        default:
+          return 0;
+      }
+    });
+
   if (isLoading) {
     return <div className="container text-center"><p>Loading order history...</p></div>;
   }
@@ -88,41 +114,74 @@ export default function OrderHistoryPage() {
             </Link>
             <div>
                 <h1 className="text-3xl font-bold font-headline">Order History</h1>
-                <p className="text-muted-foreground">A record of all completed, rejected, and canceled orders.</p>
+                <p className="text-muted-foreground">A record of all past orders.</p>
             </div>
         </div>
       </div>
       
       <Card>
-        <CardHeader>
-          <CardTitle>Past Orders</CardTitle>
-          <CardDescription>Browse through your historical order data.</CardDescription>
+        <CardHeader className="flex-row items-center justify-between">
+            <div>
+                <CardTitle>Past Orders</CardTitle>
+                <CardDescription>Browse through your historical order data.</CardDescription>
+            </div>
+            <div className="flex items-center gap-4">
+                 <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
+                    </SelectContent>
+                </Select>
+                 <Select value={sortOption} onValueChange={(value) => setSortOption(value as any)}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="date-desc">Newest First</SelectItem>
+                        <SelectItem value="date-asc">Oldest First</SelectItem>
+                        <SelectItem value="name-asc">Item Name (A-Z)</SelectItem>
+                        <SelectItem value="name-desc">Item Name (Z-A)</SelectItem>
+                        <SelectItem value="price-asc">Price (Low-High)</SelectItem>
+                        <SelectItem value="price-desc">Price (High-Low)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
         </CardHeader>
         <CardContent>
-          {orderHistory.length > 0 ? (
+          {filteredAndSortedHistory.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Item</TableHead>
+                   <TableHead>Price</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orderHistory.map((order) => (
+                {filteredAndSortedHistory.map((order) => (
                   <TableRow key={order.orderId}>
                     <TableCell className="font-mono text-xs">{order.orderId.substring(0, 8)}...</TableCell>
                     <TableCell>{order.userName}</TableCell>
-                    <TableCell>{order.name}</TableCell>
+                    <TableCell>{order.title}</TableCell>
+                    <TableCell>{order.price.toFixed(2)}</TableCell>
                     <TableCell>
                         <Badge 
                             variant={
                                 order.status === 'completed' ? 'default' 
                                 : order.status === 'rejected' ? 'destructive' 
-                                : 'secondary'
+                                : order.status === 'refunded' ? 'secondary'
+                                : 'outline'
                             }
+                            className={order.status === 'refunded' ? 'bg-blue-500 text-white' : ''}
                         >
                             {order.status}
                         </Badge>
@@ -137,7 +196,7 @@ export default function OrderHistoryPage() {
           ) : (
             <div className="text-center text-muted-foreground p-8">
               <History className="mx-auto h-12 w-12 mb-4" />
-              <p>No historical orders found.</p>
+              <p>No historical orders found matching your criteria.</p>
             </div>
           )}
         </CardContent>

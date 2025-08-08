@@ -9,6 +9,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -20,24 +27,21 @@ import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, runTransaction } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
+import type { CartItem, OrderStatus } from '@/types';
 
-interface Order {
-  orderId: string;
-  title: string;
-  itemId: string; 
-  price: number;
-  quantity: number;
-  merchantId: string;
-  merchantName: string;
-  redeemCode: string | null;
-  status: 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'completed' | 'ready_to_redeem';
-}
+type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
+
 
 export default function CartPage() {
   const { user } = useAuth();
-  const [cartItems, setCartItems] = useState<Order[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openRedeemDialogId, setOpenRedeemDialogId] = useState<string | null>(null);
+
+  // State for history filtering and sorting
+  const [historyFilter, setHistoryFilter] = useState<OrderStatus | 'all'>('all');
+  const [historySort, setHistorySort] = useState<SortOption>('date-desc');
+
 
   useEffect(() => {
     if (!user?.id) {
@@ -50,7 +54,7 @@ export default function CartPage() {
     const unsubscribe = onSnapshot(userDocRef, (snap) => {
       if (snap.exists()) {
         const userData = snap.data();
-        const cart = (userData?.cart as Order[] | undefined) ?? [];
+        const cart = (userData?.cart as CartItem[] | undefined) ?? [];
         setCartItems(cart.filter(Boolean));
       } else {
         setCartItems([]);
@@ -65,7 +69,7 @@ export default function CartPage() {
     return () => unsubscribe();
   }, [user]);
 
-  const handleCancelOrder = async (order: Order) => {
+  const handleCancelOrder = async (order: CartItem) => {
     if (!user?.id) return;
     // Simplified cancel logic to just update status
     const userRef = doc(db, "users", user.id);
@@ -76,10 +80,10 @@ export default function CartPage() {
             const merchSnap = await tx.get(merchantRef);
             if (!userSnap.exists() || !merchSnap.exists()) throw "Doc not found";
 
-            const newCart = (userSnap.data().cart || []).map((item: Order) => 
+            const newCart = (userSnap.data().cart || []).map((item: CartItem) => 
                 item.orderId === order.orderId ? {...item, status: 'cancelled'} : item
             );
-            const newPending = (merchSnap.data().pendingOrders || []).map((item: Order) => 
+            const newPending = (merchSnap.data().pendingOrders || []).map((item: CartItem) => 
                 item.orderId === order.orderId ? {...item, status: 'cancelled'} : item
             );
             tx.update(userRef, { cart: newCart });
@@ -91,7 +95,7 @@ export default function CartPage() {
     }
   };
 
-  const handleApproveToRedeem = async (order: Order) => {
+  const handleApproveToRedeem = async (order: CartItem) => {
     if (!user?.id) return;
 
     // Check wallet balance
@@ -116,10 +120,10 @@ export default function CartPage() {
         const userData = userSnap.data();
         const merchantData = merchantSnap.data();
 
-        const updatedUserCart = (userData.cart || []).map((item: Order) =>
+        const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
           item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
-        const updatedPendingOrders = (merchantData.pendingOrders || []).map((item: Order) =>
+        const updatedPendingOrders = (merchantData.pendingOrders || []).map((item: CartItem) =>
           item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
 
@@ -146,7 +150,29 @@ export default function CartPage() {
   // Buckets
   const pending = cartItems.filter((item) => item.status === 'pending_approval');
   const approved = cartItems.filter((item) => ['approved', 'ready_to_redeem'].includes(item.status));
-  const history = cartItems.filter((item) => ['rejected', 'cancelled', 'completed'].includes(item.status));
+  
+  const history = cartItems
+    .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded'].includes(item.status))
+    .filter(item => historyFilter === 'all' || item.status === historyFilter)
+    .sort((a, b) => {
+        switch (historySort) {
+            case 'date-desc':
+                return (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0) - (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0);
+            case 'date-asc':
+                return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
+            case 'name-asc':
+                return a.title.localeCompare(b.title);
+            case 'name-desc':
+                return b.title.localeCompare(a.title);
+            case 'price-asc':
+                return a.price - b.price;
+            case 'price-desc':
+                return b.price - a.price;
+            default:
+                return 0;
+        }
+    });
+
 
   if (!user) {
     return (
@@ -218,7 +244,36 @@ export default function CartPage() {
 
         <TabsContent value="history">
           <Card>
-            <CardHeader><CardTitle>Order History</CardTitle></CardHeader>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>Order History</CardTitle>
+              <div className="flex items-center gap-4">
+                  <Select value={historyFilter} onValueChange={(value) => setHistoryFilter(value as any)}>
+                      <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="refunded">Refunded</SelectItem>
+                      </SelectContent>
+                  </Select>
+                   <Select value={historySort} onValueChange={(value) => setHistorySort(value as any)}>
+                      <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="date-desc">Newest First</SelectItem>
+                          <SelectItem value="date-asc">Oldest First</SelectItem>
+                          <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                          <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                          <SelectItem value="price-asc">Price (Low-High)</SelectItem>
+                          <SelectItem value="price-desc">Price (High-Low)</SelectItem>
+                      </SelectContent>
+                  </Select>
+              </div>
+            </CardHeader>
             <CardContent className="space-y-4">
               {history.length > 0 ? (
                 history.map((item) => (
