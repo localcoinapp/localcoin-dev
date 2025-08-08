@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from "react";
@@ -274,6 +275,20 @@ export default function DashboardPage() {
         const orderToRedeem = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === order.orderId);
         if (!orderToRedeem) return; // Already processed
 
+        // --- Wallet Balance Transfer ---
+        const itemPrice = orderToRedeem.price;
+        const currentUserBalance = userData.walletBalance || 0;
+        const currentMerchantBalance = merchantData.merchantWalletBalance || 0;
+
+        if (currentUserBalance < itemPrice) {
+          throw new Error("Insufficient user funds.");
+        }
+
+        const newUserBalance = currentUserBalance - itemPrice;
+        const newMerchantBalance = currentMerchantBalance + itemPrice;
+        // --- End Wallet Balance Transfer ---
+
+
         // --- Update status to completed ---
         const completedOrder = { ...orderToRedeem, status: 'completed', redeemedAt: new Date() };
 
@@ -291,18 +306,25 @@ export default function DashboardPage() {
         transaction.update(merchantDocRef, {
           pendingOrders: updatedPendingOrders,
           recentTransactions: updatedTransactions,
-          reserved: updatedReserved
+          reserved: updatedReserved,
+          merchantWalletBalance: newMerchantBalance // Update merchant balance
         });
-        transaction.update(userDocRef, { cart: updatedUserCart });
+        transaction.update(userDocRef, { 
+            cart: updatedUserCart,
+            walletBalance: newUserBalance // Update user balance
+        });
       });
 
       toast({ title: "Order Redeemed!", description: "The transaction has been successfully completed." });
       setIsRedeemModalOpen(false);
       setRedeemingOrder(null);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error redeeming order:", error);
-      toast({ title: "Redemption Failed", description: "There was a problem completing the redemption.", variant: "destructive" });
+      const errorMessage = error.message === "Insufficient user funds." 
+        ? "Redemption failed: The user has insufficient funds."
+        : "There was a problem completing the redemption.";
+      toast({ title: "Redemption Failed", description: errorMessage, variant: "destructive" });
     }
   };
 
