@@ -36,7 +36,7 @@ import { useToast } from "@/hooks/use-toast"
 import { geocodeAddress } from "@/ai/flows/geocode-address"
 
 const storeSettingsSchema = z.object({
-    name: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+    companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
     country: z.string().min(1, { message: "Please select a country." }),
     street: z.string().min(3, { message: "Please enter a street name." }),
     houseNumber: z.string().min(1, { message: "Please enter a house number." }),
