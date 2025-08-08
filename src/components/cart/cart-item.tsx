@@ -1,5 +1,4 @@
-
-'use client'
+'use client';
 
 import { formatDistanceToNow } from 'date-fns';
 import type { CartItem } from "@/types";
@@ -13,91 +12,74 @@ import { RedeemDialog } from './redeem-dialog';
 
 interface CartItemCardProps {
     cartItem: CartItem;
+    onCancel?: () => void;
+    onRedeem?: () => void;
+    isRedeemDialogOpen?: boolean;
+    onOpenChange?: (isOpen: boolean) => void;
 }
 
-const statusConfig = {
-    'pending_approval': { // Changed key
-        icon: Clock,
-        label: "Pending Approval",
-        color: "bg-yellow-500",
-        text: "text-yellow-500",
-    },
-    'ready_to_redeem': { // Changed key
-        icon: CheckCircle,
-        label: "Approved", // You might want to change this label to "Ready to Redeem"
-        color: "bg-green-500",
-        text: "text-green-500",
-    },
-    'rejected': { // Changed key
-        icon: XCircle,
-        label: "Denied", // You might want to change this label to "Rejected"
-        color: "bg-red-500",
-        text: "text-red-500",
-    },
-    'completed': { // Changed key
-        icon: Star,
-        label: "Redeemed", // You might want to change this label to "Completed"
-        color: "bg-blue-500",
-        text: "text-blue-500",
-    },
-    'cancelled': { // Changed key
-        icon: Undo2,
-        label: "Canceled", // You might want to change this label to "Cancelled"
-        color: "bg-gray-500",
-        text: "text-gray-500",
-    }
-    // You might also want to add 'completed' if it's a distinct status
-}
+const statusConfig: Record<string, { label: string; color: string }> = {
+    'pending_approval': { label: "Pending", color: "bg-yellow-500" },
+    'approved': { label: "Approved", color: "bg-green-500" },
+    'ready_to_redeem': { label: "Ready to Redeem", color: "bg-blue-500" },
+    'rejected': { label: "Denied", color: "bg-red-500" },
+    'completed': { label: "Redeemed", color: "bg-purple-500" },
+    'cancelled': { label: "Canceled", color: "bg-gray-500" },
+};
 
-export function CartItemCard({ cartItem }: CartItemCardProps) {
+export function CartItemCard({ cartItem, onCancel, onRedeem, isRedeemDialogOpen, onOpenChange }: CartItemCardProps) {
     const config = statusConfig[cartItem.status];
+    const requestedAt = cartItem.timestamp?.toDate ? formatDistanceToNow(cartItem.timestamp.toDate(), { addSuffix: true }) : 'some time ago';
 
     return (
-        <Card className={cn("overflow-hidden", cartItem.status === 'rejected' && 'bg-muted/50')}> {/* Adjusted denied to rejected */}
+        <Card className={cn("overflow-hidden", cartItem.status === 'rejected' && 'bg-muted/50')}>
             <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex-grow">
                     <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="secondary" className={cn(config?.color, "text-white")}>{config?.label}</Badge> {/* Added optional chaining */}
-                        <p className="text-sm text-muted-foreground">from {cartItem.merchantName}</p>
+                        {config && <Badge variant="secondary" className={cn(config.color, "text-white")}>{config.label}</Badge>}
+                        <p className="text-muted-foreground text-sm">from {cartItem.merchantName}</p>
                     </div>
-                    <h3 className="font-bold text-lg">{cartItem.title}</h3> {/* Changed to cartItem.title */}
-                    {/* You might need to adjust the requestedAt field name if it's different in your Order interface */}
-                    {/* <p className="text-muted-foreground text-sm">
-                        Requested {formatDistanceToNow(new Date(cartItem.requestedAt), { addSuffix: true })}
-                    </p> */}
+                    <h3 className="font-bold text-lg">{cartItem.title}</h3>
+                    <p className="text-muted-foreground text-sm">Requested {requestedAt}</p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <p className="font-bold text-xl">
-                       {cartItem.price.toFixed(2)} {siteConfig.token.symbol} {/* Changed to cartItem.price */}
+                       {cartItem.price.toFixed(2)} {siteConfig.token.symbol}
                     </p>
-                    {cartItem.status === 'ready_to_redeem' && ( // Adjusted status check
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm">Cancel</Button>
-                            <RedeemDialog cartItem={cartItem}>
-                                <Button size="sm">
-                                    <QrCode className="mr-2 h-4 w-4" />
-                                    Redeem
-                                </Button>
-                            </RedeemDialog>
-                        </div>
+                    
+                    {cartItem.status === 'approved' && onRedeem && onOpenChange && (
+                        <RedeemDialog 
+                            isOpen={isRedeemDialogOpen ?? false}
+                            onOpenChange={onOpenChange}
+                            cartItem={cartItem} 
+                            onRedeem={onRedeem}
+                        >
+                            <Button size="sm" onClick={() => onOpenChange(true)}>
+                                <QrCode className="mr-2 h-4 w-4" />
+                                Redeem
+                            </Button>
+                        </RedeemDialog>
                     )}
-                     {cartItem.status === 'pending_approval' && ( // Adjusted status check
-                         <Button variant="outline" size="sm">Cancel Request</Button>
+                    {cartItem.status === 'ready_to_redeem' && (
+                        <Button size="sm" variant="success" disabled>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Ready
+                        </Button>
                     )}
-                     {/* Add buttons for other statuses if needed */}
+                     {cartItem.status === 'pending_approval' && onCancel && (
+                        <Button variant="outline" size="sm" onClick={onCancel}>Cancel Request</Button>
+                     )}
                      {(cartItem.status === 'rejected' || cartItem.status === 'cancelled') && (
                         <Button variant="outline" size="sm" disabled>
                             {cartItem.status === 'rejected' ? 'Request Denied' : 'Request Cancelled'}
                         </Button>
                      )}
                       {cartItem.status === 'completed' && (
-                        <Button variant="outline" size="sm" disabled>
-                           Redeemed
-                        </Button>
+                        <Button variant="outline" size="sm" disabled>Redeemed</Button>
                      )}
                 </div>
             </CardContent>
         </Card>
-    )
+    );
 }
-

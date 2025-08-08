@@ -72,12 +72,14 @@ export default function MerchantProfilePage() {
   }
 
   const handleAddToCart = async (item: MerchantItem) => {
-    console.log("handleAddToCart called");
-    if (!user || !user.id) { // Use user.id based on our previous debugging
-        console.error("User not authenticated or user ID not available.");
-        return; // Exit if user or user.uid is not available
+    if (!user || !user.id) {
+      console.error("User not authenticated or user ID not available.");
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to add items to your cart.",
+      });
+      return; // Exit if user or user.uid is not available
     }
-
     const userDocRef = doc(db, 'users', user.id); // Use user.id for user document
 
     const cartItem = {
@@ -92,55 +94,46 @@ export default function MerchantProfilePage() {
         timestamp: new Date(), // Add a timestamp
     };
 
-    // Data structure for the merchant's pending order
-    const pendingOrderForMerchant = {
-        orderId: cartItem.orderId, // Use the same orderId
-        userId: user.id, // Include user ID
-        userName: user.name, // Include user name
-        item: { // Include item details
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            // Add other item details as needed
-        },
+    if (!merchant?.id) {
+      console.error("Merchant ID is not available.");
+      toast({
+        title: "Error",
+        description: "Merchant data is incomplete. Cannot add to cart.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const merchantDocRef = doc(db, 'merchants', merchant.id);
+
+    try {
+      // Add item to user's cart
+      await updateDoc(userDocRef, {
+        cart: arrayUnion(cartItem)
+      });
+      console.log(`Added item ${item.name} to user ${user.id}'s cart in Firestore`);
+
+      // Data structure for the merchant's pending order
+      const pendingOrderForMerchant = {
+        orderId: cartItem.orderId,
+        id: item.id, // Move item.id here
+        name: item.name, // Move item.name here
+        price: item.price, // Move item.price here
         quantity: cartItem.quantity,
+        userId: user.id,
+        userName: user.name, // Assuming user has a 'name' field
         status: 'pending_approval',
         timestamp: cartItem.timestamp,
         // Add other relevant fields like user contact info if necessary
-    };
+      };
 
-    // Logic to decrement merchant inventory
-    const merchantDocRef = doc(db, 'merchants', merchant.id); // Reference to merchant document
+      // Add pending order to merchant
+      await updateDoc(merchantDocRef, {
+        pendingOrders: arrayUnion(pendingOrderForMerchant),
+      });
+      console.log(`Added pending order ${cartItem.orderId} for merchant ${merchant.companyName} in Firestore`);
 
-    try {
-        // Fetch the current merchant data to get the listings array
-        const merchantDoc = await getDoc(merchantDocRef);
-        if (!merchantDoc.exists()) {
-            console.error("Merchant document not found!");
-            toast({
-                title: "Error",
-                description: "Could not update merchant inventory. Merchant data not found.",
-                variant: "destructive"
-            });
-            return;
-        }
-        const merchantData = merchantDoc.data();
-        let updatedListings = merchantData.listings || [];
-
-        // Find the item in the listings and decrement quantity
-        updatedListings = updatedListings.map((listing: MerchantItem) => {
-            if (listing.id === item.id) {
-                return {
-                    ...listing,
-                    quantity: listing.quantity - cartItem.quantity, // Decrement quantity
-                };
-            }
-            return listing;
-        });
-
-        await updateDoc(userDocRef, {
-            cart: arrayUnion(cartItem)
-        });
+      // Now decrement inventory after successful updates
     } catch (error) {
         console.error("Error adding item to cart:", error);
         toast({
@@ -150,18 +143,42 @@ export default function MerchantProfilePage() {
         });
     }
 
+    // Logic to decrement merchant inventory
     try {
-        // Update merchant's pending orders and listings
-        await updateDoc(merchantDocRef, {
-            pendingOrders: arrayUnion(pendingOrderForMerchant), // Add to pendingOrders array
-            listings: updatedListings, // Update the listings array
-        });
-        console.log(`Added pending order ${cartItem.orderId} and updated inventory for merchant ${merchant.companyName} in Firestore`);
-
+      // Fetch the current merchant data to get the listings array
+      const merchantDoc = await getDoc(merchantDocRef);
+      if (!merchantDoc.exists()) {
+        console.error("Merchant document not found for inventory update!");
         toast({
-            title: "Added to Cart",
-            description: `${item.name} has been added to your cart. The merchant will review your request.`,
+          title: "Error",
+          description: "Could not update merchant inventory. Merchant data not found.",
+          variant: "destructive"
         });
+        return;
+      }
+      const merchantData = merchantDoc.data();
+      let updatedListings = merchantData.listings || [];
+
+      // Find the item in the listings and decrement quantity
+      updatedListings = updatedListings.map((listing: MerchantItem) => {
+        if (listing.id === item.id) {
+          return {
+            ...listing,
+            quantity: listing.quantity - cartItem.quantity, // Decrement quantity
+          };
+        }
+        return listing;
+      });
+
+      await updateDoc(merchantDocRef, {
+        listings: updatedListings, // Update the listings array
+      });
+      console.log(`Updated inventory for merchant ${merchant.companyName} in Firestore`);
+
+      toast({
+        title: "Added to Cart",
+        description: `${item.name} has been added to your cart. The merchant will review your request.`,
+      });
     } catch (error) {
         console.error("Error updating merchant pending orders or inventory:", error); // Log the error
         toast({

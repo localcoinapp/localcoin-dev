@@ -1,9 +1,8 @@
 
-'use client'
+'use client';
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -11,24 +10,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import type { CartItem } from "@/types"
-import { siteConfig } from "@/config/site"
-import { QrCode } from "lucide-react"
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { ReactNode } from "react";
 
 interface RedeemDialogProps {
-  cartItem: CartItem;
-  children: React.ReactNode;
+  cartItem: {
+    title: string;
+    merchantName: string;
+    redeemCode: string | null;
+  };
+  onRedeem: () => void;
+  children: ReactNode;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function RedeemDialog({ cartItem, children }: RedeemDialogProps) {
-  const handleApproveToRedeem = () => {
-    // In a real app, this would update the cart item's status and notify the merchant.
-    console.log(`User approved to redeem item ${cartItem.id}. Waiting for merchant confirmation.`);
+export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChange }: RedeemDialogProps) {
+  if (!cartItem.redeemCode) {
+    // This case should ideally not be hit if the dialog is only shown for 'approved' items
+    return <>{children}</>;
   }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         {children}
       </AlertDialogTrigger>
@@ -36,23 +41,23 @@ export function RedeemDialog({ cartItem, children }: RedeemDialogProps) {
         <AlertDialogHeader>
           <AlertDialogTitle className="text-center text-2xl font-headline">Redeem Your Item</AlertDialogTitle>
           <AlertDialogDescription className="text-center">
-            Show this code to the merchant to finalize your transaction. The final payment will be transferred upon confirmation.
+            Show this code to the merchant to finalize your transaction. The user must approve the redemption.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col items-center justify-center p-6 bg-muted rounded-lg">
             <p className="text-sm font-semibold text-muted-foreground">CONFIRMATION CODE</p>
             <p className="text-5xl font-bold font-mono tracking-widest text-primary my-4">
-                {cartItem.confirmationCode}
+                {cartItem.redeemCode}
             </p>
             <div className="text-center">
-                <p className="font-bold">{cartItem.item.name}</p>
+                <p className="font-bold">{cartItem.title}</p>
                 <p className="text-muted-foreground">{cartItem.merchantName}</p>
             </div>
         </div>
-        <AlertDialogFooter className="mt-4">
-          <AlertDialogCancel>Close</AlertDialogCancel>
-          <AlertDialogAction onClick={handleApproveToRedeem}>Approve to Redeem</AlertDialogAction>
-        </AlertDialogFooter>
+        <div className="flex flex-col sm:flex-row-reverse gap-2 mt-4">
+            <Button onClick={onRedeem}>Approve for Redemption</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        </div>
       </AlertDialogContent>
     </AlertDialog>
   )
