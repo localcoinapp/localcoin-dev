@@ -48,11 +48,14 @@ const MapView = ({ merchants }: MapViewProps) => {
                 mapInstance.current?.removeLayer(layer);
             }
         });
+        
+        // Filter merchants to only include those with valid positions
+        const merchantsWithPosition = merchants.filter(m => m.position && typeof m.position.lat === 'number' && typeof m.position.lng === 'number');
 
         // Add new markers
-        if (merchants.length > 0) {
-            const bounds = L.latLngBounds(merchants.map(m => [m.position.lat, m.position.lng]));
-            merchants.forEach(merchant => {
+        if (merchantsWithPosition.length > 0) {
+            const bounds = L.latLngBounds(merchantsWithPosition.map(m => [m.position.lat, m.position.lng]));
+            merchantsWithPosition.forEach(merchant => {
                 L.marker([merchant.position.lat, merchant.position.lng])
                 .addTo(mapInstance.current!)
                 .bindPopup(`<b>${merchant.name}</b><br><a href="/merchants/${merchant.id}">View Details</a>`);
@@ -69,4 +72,3 @@ const MapView = ({ merchants }: MapViewProps) => {
 };
 
 export default MapView;
-
