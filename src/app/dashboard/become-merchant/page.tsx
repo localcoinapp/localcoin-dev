@@ -81,15 +81,17 @@ export default function BecomeMerchantPage() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setApplicationStatus('pending');
     try {
-      // Construct full address
-      const fullAddress = `${values.houseNumber} ${values.street}, ${values.city}, ${values.state || ''} ${values.zipCode}, ${values.country}`;
-      
-      // Geocode the address
-      const position = await geocodeAddress({ address: fullAddress });
+      const position = await geocodeAddress({
+        street: values.street,
+        houseNumber: values.houseNumber,
+        city: values.city,
+        zipCode: values.zipCode,
+        country: values.country,
+      });
 
       const applicationData = {
         ...values,
-        position: position, // Add coordinates to the application data
+        position, // Add coordinates to the application data
       };
 
       console.log("Application submitted for review:", applicationData);

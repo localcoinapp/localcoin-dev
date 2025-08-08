@@ -1,4 +1,3 @@
-
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -35,6 +34,7 @@ import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { geocodeAddress } from "@/ai/flows/geocode-address"
 import { Skeleton } from "@/components/ui/skeleton"
+import { geohashForLocation } from "geofire-common"
 
 const storeSettingsSchema = z.object({
     companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
@@ -83,10 +83,8 @@ export default function StoreSettingsPage() {
           const data = doc.data();
           setMerchantData(data);
           form.reset(data);
-          setIsLoading(false);
-        } else {
-            setIsLoading(false);
         }
+        setIsLoading(false);
       });
       return () => unsubscribe();
     } else {
@@ -100,12 +98,24 @@ export default function StoreSettingsPage() {
     if (!user || !user.merchantId) return;
 
     try {
-      const fullAddress = `${values.houseNumber} ${values.street}, ${values.city}, ${values.state || ''} ${values.zipCode}, ${values.country}`;
-      const position = await geocodeAddress({ address: fullAddress });
+      const position = await geocodeAddress({
+        street: values.street,
+        houseNumber: values.houseNumber,
+        city: values.city,
+        zipCode: values.zipCode,
+        country: values.country,
+      });
+
+      if (!position || !position.lat || !position.lng) {
+        throw new Error("Geocoding failed to return valid coordinates.");
+      }
+      
+      const geohash = geohashForLocation([position.lat, position.lng]);
 
       const dataToUpdate = {
         ...values,
         position,
+        geohash,
       };
 
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
@@ -120,7 +130,7 @@ export default function StoreSettingsPage() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "There was an error updating your store settings. Could not geocode address.",
+        description: (error as Error).message || "There was an error updating your store settings. Could not geocode address.",
       });
     }
   }
@@ -401,7 +411,7 @@ export default function StoreSettingsPage() {
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
                         <Input 
-                            placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "Your phone number"}
+                            placeholder={selectedCountry === 'us' ? "(555) 123-4567" : "Your phone number"}
                             {...field} />
                       </FormControl>
                       <FormMessage />

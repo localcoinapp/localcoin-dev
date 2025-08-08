@@ -1,18 +1,15 @@
 'use server';
 
-/**
- * @fileOverview A flow for converting a street address into geographic coordinates.
- * 
- * - geocodeAddress - A function that takes an address string and returns latitude and longitude.
- * - GeocodeAddressInput - The input type for the geocodeAddress function.
- * - GeocodeAddressOutput - The return type for the geocodeAddress function.
- */
-
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { action } from '@genkit-ai/core';
 
 const GeocodeAddressInputSchema = z.object({
-  address: z.string().describe('The full street address to geocode.'),
+  street: z.string().describe("The street name."),
+  houseNumber: z.string().describe("The house number."),
+  city: z.string().describe("The city."),
+  zipCode: z.string().describe("The ZIP or postal code."),
+  country: z.string().describe("The country (can be a name or a 2-letter ISO code)."),
 });
 export type GeocodeAddressInput = z.infer<typeof GeocodeAddressInputSchema>;
 
@@ -22,29 +19,43 @@ const GeocodeAddressOutputSchema = z.object({
 });
 export type GeocodeAddressOutput = z.infer<typeof GeocodeAddressOutputSchema>;
 
-export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeAddressOutput> {
-    return geocodeAddressFlow(input);
+export const geocodeAddress = action(
+  {
+    name: 'geocodeAddress',
+    inputSchema: GeocodeAddressInputSchema,
+    outputSchema: GeocodeAddressOutputSchema,
+  },
+  async (input) => {
+    const prompt = `You are a highly specialized geocoding API. Your only function is to convert structured address data into geographic coordinates.
+
+You will receive a JSON object containing address components. Your task is to find the precise latitude and longitude for this address.
+
+CRITICAL INSTRUCTIONS:
+1.  If the "country" field is a 2-letter ISO 3166-1 alpha-2 country code, you MUST convert it to its full country name before proceeding. For example, "DE" means "Germany", and "US" means "United States".
+2.  Your output MUST be a valid JSON object containing only the "lat" and "lng" keys. Do not include any other text, commentary, or explanations.
+
+Input Address Data:
+{
+  "street": "${input.street}",
+  "houseNumber": "${input.houseNumber}",
+  "city": "${input.city}",
+  "zipCode": "${input.zipCode}",
+  "country": "${input.country}"
 }
+`;
+    
+    const { output } = await ai.generate({
+        prompt,
+        model: 'googleai/gemini-1.5-flash',
+        output: {
+            schema: GeocodeAddressOutputSchema,
+        },
+    });
 
-const prompt = ai.definePrompt({
-    name: 'geocodeAddressPrompt',
-    input: { schema: GeocodeAddressInputSchema },
-    output: { schema: GeocodeAddressOutputSchema },
-    prompt: `You are an expert geocoding service. Convert the following address into latitude and longitude coordinates.
-
-Address: {{{address}}}
-
-Return only the coordinates in the specified JSON format.`,
-});
-
-const geocodeAddressFlow = ai.defineFlow(
-    {
-        name: 'geocodeAddressFlow',
-        inputSchema: GeocodeAddressInputSchema,
-        outputSchema: GeocodeAddressOutputSchema,
-    },
-    async (input) => {
-        const { output } = await prompt(input);
-        return output!;
+    if (!output) {
+      throw new Error("Geocoding failed: The AI model did not return a valid output. Please check the address and try again.");
     }
+    
+    return output;
+  }
 );
