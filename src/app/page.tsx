@@ -116,7 +116,7 @@ export default function MarketplacePage() {
               </Button>
             </div>
           </div>
-           <TabsList className="grid w-full sm:w-auto sm:grid-cols-2">
+           <TabsList className="grid w-full grid-cols-2 sm:w-auto">
               <TabsTrigger value="list"><List className="mr-2" />List View</TabsTrigger>
               <TabsTrigger value="map"><Map className="mr-2" />Map View</TabsTrigger>
             </TabsList>
