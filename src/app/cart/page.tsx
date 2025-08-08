@@ -29,7 +29,7 @@ import { doc, onSnapshot, runTransaction } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import type { CartItem, OrderStatus } from '@/types';
 
-type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
+type SortOption = 'date-desc' | 'date-asc' | 'price-asc' | 'price-desc';
 
 
 export default function CartPage() {
@@ -118,6 +118,16 @@ export default function CartPage() {
   const handleApproveToRedeem = async (order: CartItem) => {
     if (!user?.id) return;
     
+    const currentBalance = user?.walletBalance || 0;
+    if (currentBalance < order.price) {
+      toast({
+        title: "Insufficient Funds",
+        description: "Sorry, you do not have enough funds. Please top up your wallet.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const userDocRef = doc(db, 'users', user.id);
     const merchantDocRef = doc(db, 'merchants', order.merchantId);
 
@@ -165,10 +175,6 @@ export default function CartPage() {
                 return (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0) - (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0);
             case 'date-asc':
                 return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
-            case 'name-asc':
-                return (a.title || '').localeCompare(b.title || '');
-            case 'name-desc':
-                return (b.title || '').localeCompare(a.title || '');
             case 'price-asc':
                 return a.price - b.price;
             case 'price-desc':
@@ -271,8 +277,6 @@ export default function CartPage() {
                       <SelectContent>
                           <SelectItem value="date-desc">Newest First</SelectItem>
                           <SelectItem value="date-asc">Oldest First</SelectItem>
-                          <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                          <SelectItem value="name-desc">Name (Z-A)</SelectItem>
                           <SelectItem value="price-asc">Price (Low-High)</SelectItem>
                           <SelectItem value="price-desc">Price (High-Low)</SelectItem>
                       </SelectContent>

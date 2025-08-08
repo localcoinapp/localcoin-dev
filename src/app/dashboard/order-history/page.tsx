@@ -33,7 +33,7 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, Timestamp } from "firebase/firestore";
 import type { CartItem, OrderStatus } from "@/types";
 
-type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
+type SortOption = 'date-desc' | 'date-asc' | 'price-asc' | 'price-desc';
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
@@ -86,10 +86,6 @@ export default function OrderHistoryPage() {
             return (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0) - (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0);
         case 'date-asc':
             return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
-        case 'name-asc':
-          return (a.title || '').localeCompare(b.title || '');
-        case 'name-desc':
-          return (b.title || '').localeCompare(a.title || '');
         case 'price-asc':
           return a.price - b.price;
         case 'price-desc':
@@ -145,8 +141,6 @@ export default function OrderHistoryPage() {
                     <SelectContent>
                         <SelectItem value="date-desc">Newest First</SelectItem>
                         <SelectItem value="date-asc">Oldest First</SelectItem>
-                        <SelectItem value="name-asc">Item Name (A-Z)</SelectItem>
-                        <SelectItem value="name-desc">Item Name (Z-A)</SelectItem>
                         <SelectItem value="price-asc">Price (Low-High)</SelectItem>
                         <SelectItem value="price-desc">Price (High-Low)</SelectItem>
                     </SelectContent>
