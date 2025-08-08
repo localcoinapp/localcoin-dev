@@ -165,7 +165,7 @@ export default function OrderHistoryPage() {
                   <TableRow key={order.orderId}>
                     <TableCell className="font-mono text-xs">{order.orderId.substring(0, 8)}...</TableCell>
                     <TableCell>{order.userName}</TableCell>
-                    <TableCell>{order.title}</TableCell>
+                    <TableCell>{order.name}</TableCell>
                     <TableCell>{order.price.toFixed(2)}</TableCell>
                     <TableCell>
                         <Badge 

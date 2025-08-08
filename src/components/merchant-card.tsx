@@ -33,7 +33,7 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
         <div className="relative h-48 w-full">
           <img
             src={merchant.imageUrl || '/placeholder.svg'}
-            alt={merchant.name}
+            alt={merchant.companyName}
             className="h-full w-full object-cover"
             data-ai-hint={merchant.aiHint}
           />
@@ -41,7 +41,7 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
       </CardHeader>
       <CardContent className="p-4 flex-grow">
         <Badge variant="secondary" className="mb-2">{merchant.category}</Badge>
-        <CardTitle className="text-xl font-bold font-headline">{merchant.name}</CardTitle>
+        <CardTitle className="text-xl font-bold font-headline">{merchant.companyName}</CardTitle>
         <CardDescription className="mt-2 text-sm text-muted-foreground">{merchant.description}</CardDescription>
       </CardContent>
     </div>
