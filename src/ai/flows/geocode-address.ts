@@ -1,8 +1,9 @@
+
 'use server';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { action } from '@genkit-ai/core';
+import { action } from 'genkit';
 
 const GeocodeAddressInputSchema = z.object({
   street: z.string().describe("The street name."),
