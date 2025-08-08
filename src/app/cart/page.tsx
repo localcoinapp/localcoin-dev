@@ -94,21 +94,30 @@ export default function CartPage() {
         toast({ title: "Error", description: "Could not cancel order.", variant: "destructive"});
     }
   };
+  
+  const handleRedeemDialogOpenChange = (isOpen: boolean, order: CartItem) => {
+    if (isOpen) {
+      // Check wallet balance BEFORE opening the dialog
+      const currentBalance = user?.walletBalance || 0;
+      if (currentBalance < order.price) {
+        toast({
+          title: "Insufficient Funds",
+          description: "Sorry, you do not have enough funds. Please top up your wallet.",
+          variant: "destructive"
+        });
+        setOpenRedeemDialogId(null); // Explicitly keep it closed
+        return;
+      }
+      setOpenRedeemDialogId(order.orderId);
+    } else {
+      setOpenRedeemDialogId(null);
+    }
+  }
+
 
   const handleApproveToRedeem = async (order: CartItem) => {
     if (!user?.id) return;
-
-    // Check wallet balance
-    const currentBalance = user.walletBalance || 0;
-    if (currentBalance < order.price) {
-        toast({
-            title: "Insufficient Funds",
-            description: "Sorry, you do not have enough funds. Please top up your wallet.",
-            variant: "destructive"
-        });
-        return; // Halt the process
-    }
-
+    
     const userDocRef = doc(db, 'users', user.id);
     const merchantDocRef = doc(db, 'merchants', order.merchantId);
 
@@ -232,7 +241,7 @@ export default function CartPage() {
                     cartItem={item} 
                     onRedeem={() => handleApproveToRedeem(item)}
                     isRedeemDialogOpen={openRedeemDialogId === item.orderId}
-                    onOpenChange={(isOpen) => setOpenRedeemDialogId(isOpen ? item.orderId : null)}
+                    onOpenChange={(isOpen) => handleRedeemDialogOpenChange(isOpen, item)}
                   />
                 ))
               ) : (
