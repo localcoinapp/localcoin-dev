@@ -34,6 +34,7 @@ import { doc, onSnapshot, updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { geocodeAddress } from "@/ai/flows/geocode-address"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const storeSettingsSchema = z.object({
     companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
@@ -67,6 +68,7 @@ export default function StoreSettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const form = useForm<StoreSettingsValues>({
     resolver: zodResolver(storeSettingsSchema),
@@ -81,9 +83,14 @@ export default function StoreSettingsPage() {
           const data = doc.data();
           setMerchantData(data);
           form.reset(data);
+          setIsLoading(false);
+        } else {
+            setIsLoading(false);
         }
       });
       return () => unsubscribe();
+    } else {
+        setIsLoading(false);
     }
   }, [user, form]);
 
@@ -174,8 +181,41 @@ export default function StoreSettingsPage() {
     return null;
   }
 
+  if (isLoading) {
+    return (
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+          <Card className="w-full max-w-3xl text-left shadow-lg">
+            <CardHeader>
+                <Skeleton className="h-8 w-1/2 mx-auto" />
+                <Skeleton className="h-4 w-3/4 mx-auto" />
+            </CardHeader>
+            <CardContent className="space-y-8">
+                <div className="flex items-center space-x-6">
+                    <Skeleton className="h-24 w-24 rounded-full" />
+                    <div className="flex-grow space-y-2">
+                        <Skeleton className="h-6 w-full" />
+                    </div>
+                </div>
+                <Skeleton className="h-24 w-full" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                 <div className="text-right pt-4">
+                    <Skeleton className="h-10 w-24 ml-auto" />
+                </div>
+            </CardContent>
+          </Card>
+        </div>
+    );
+  }
+
   if (!merchantData) {
-    return <div>Loading...</div>;
+      return (
+        <div className="container text-center p-8">
+            <p>Could not load merchant data. You may not be a merchant.</p>
+        </div>
+      )
   }
 
   return (
