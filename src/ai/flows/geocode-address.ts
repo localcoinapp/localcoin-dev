@@ -1,6 +1,7 @@
+
 'use server';
 
-import { action } from '@genkit-ai/next/action';
+import { action } from '@genkit-ai/next';
 import { z } from 'zod';
 import { ai } from '../genkit';
 
