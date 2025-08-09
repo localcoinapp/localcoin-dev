@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -32,8 +33,8 @@ import { db } from "@/lib/firebase"
 import { doc, onSnapshot, updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { geocodeAddress } from "@/ai/flows/geocode-address"
 import { Skeleton } from "@/components/ui/skeleton"
+import { geocodeAddress } from "@/ai/flows/geocode-address"
 import { geohashForLocation } from "geofire-common"
 
 const storeSettingsSchema = z.object({
@@ -107,9 +108,9 @@ export default function StoreSettingsPage() {
       });
 
       if (!position || !position.lat || !position.lng) {
-        throw new Error("Geocoding failed to return valid coordinates.");
+        throw new Error("Could not geocode the address. Please check the details and try again.");
       }
-      
+
       const geohash = geohashForLocation([position.lat, position.lng]);
 
       const dataToUpdate = {
@@ -130,7 +131,7 @@ export default function StoreSettingsPage() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: (error as Error).message || "There was an error updating your store settings. Could not geocode address.",
+        description: (error as Error).message || "There was an error updating your store settings.",
       });
     }
   }
