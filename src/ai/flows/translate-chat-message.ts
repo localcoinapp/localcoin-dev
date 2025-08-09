@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const TranslateChatMessageInputSchema = z.object({
   message: z.string().describe('The message to translate.'),

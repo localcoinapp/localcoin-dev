@@ -1,9 +1,14 @@
-
 'use server';
+/**
+ * @fileOverview A geocoding flow to convert an address to latitude and longitude.
+ *
+ * - geocodeAddress - A function that takes an address and returns its coordinates.
+ * - GeocodeAddressInput - The input type for the geocodeAddress function.
+ * - GeocodeAddressOutput - The return type for the geocodeAddress function.
+ */
 
-import { action } from '@genkit-ai/next';
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { ai } from '../genkit';
 
 const GeocodeAddressInputSchema = z.object({
   street: z.string(),
@@ -22,35 +27,37 @@ const GeocodeAddressOutputSchema = z.object({
 
 export type GeocodeAddressOutput = z.infer<typeof GeocodeAddressOutputSchema>;
 
-export const geocodeAddress = action(
+const geocodePrompt = ai.definePrompt({
+  name: 'geocodePrompt',
+  input: { schema: GeocodeAddressInputSchema },
+  output: { schema: GeocodeAddressOutputSchema },
+  prompt: `You are an expert geocoder. Given the following address, provide the precise latitude and longitude.
+      Street: {{street}}
+      House Number: {{houseNumber}}
+      City: {{city}}
+      ZIP Code: {{zipCode}}
+      Country: {{country}}
+
+      Return ONLY the JSON object with lat and lng.`,
+});
+
+const geocodeAddressFlow = ai.defineFlow(
   {
-    name: 'geocodeAddress',
+    name: 'geocodeAddressFlow',
     inputSchema: GeocodeAddressInputSchema,
     outputSchema: GeocodeAddressOutputSchema,
   },
   async (input) => {
-    const prompt = `You are an expert geocoder. Given the following address, provide the precise latitude and longitude.
-      Street: ${input.street}
-      House Number: ${input.houseNumber}
-      City: ${input.city}
-      ZIP Code: ${input.zipCode}
-      Country: ${input.country}
-      
-      Return ONLY the JSON object with lat and lng.`;
-
-    const llmResponse = await ai.generate({
-      prompt: prompt,
-      model: 'googleai/gemini-1.5-flash',
-      output: {
-        format: 'json',
-        schema: GeocodeAddressOutputSchema,
-      },
-    });
-
-    const output = llmResponse.output();
+    const llmResponse = await geocodePrompt(input);
+    const output = llmResponse.output;
+    
     if (!output) {
       throw new Error('Unable to geocode address. The model did not return valid coordinates.');
     }
     return output;
   }
 );
+
+export async function geocodeAddress(input: GeocodeAddressInput): Promise<GeocodeAddressOutput> {
+  return geocodeAddressFlow(input);
+}
