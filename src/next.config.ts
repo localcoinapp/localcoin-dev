@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+       {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+      },
     ],
   },
   async rewrites() {
@@ -31,9 +35,10 @@ const nextConfig: NextConfig = {
         source: '/_next/image',
         destination: '/_next/image',
       },
+       // This rule will proxy requests from /firebase-storage/... to the actual Firebase Storage API.
       {
-        source: '/:path*',
-        destination: 'http://localhost:9000/:path*',
+        source: '/firebase-storage/:path*',
+        destination: 'https://firebasestorage.googleapis.com/:path*',
       },
     ];
   },
