@@ -30,16 +30,15 @@ export async function POST(req: NextRequest) {
 
         const url = `/users/${userId}/${filename}`;
 
-        // Also update the user's profile in Firebase
+        // Also update the user's profile in Firestore
+        // This part now correctly targets the Firestore document
+        const userDocRef = doc(db, "users", userId);
+        await setDoc(userDocRef, { avatar: url }, { merge: true });
+
+        // We can still attempt to update the auth profile, but Firestore is the source of truth for the app UI
         const currentUser = auth.currentUser;
         if (currentUser && currentUser.uid === userId) {
             await updateProfile(currentUser, { photoURL: url });
-            const userDocRef = doc(db, "users", userId);
-            await setDoc(userDocRef, { avatar: url }, { merge: true });
-        } else {
-            // This case might happen if the token is expired or there's a mismatch.
-            // For now, we'll log it, but in a real app, you might want more robust error handling.
-            console.warn("User from request does not match authenticated user. Profile not updated in Firebase.");
         }
 
 
