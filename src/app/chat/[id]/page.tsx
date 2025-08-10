@@ -120,6 +120,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     return <div className="text-center p-8">Chat not found or you do not have access.</div>;
   }
 
+  // Determine if the current user is a merchant in this specific chat
+  const isUserTheMerchantInThisChat = chat.participantIds.includes(user?.id || '') && chat.participants.find(p => p.id === user?.id)?.name === chat.participants.find(p => p.id !== user?.id)?.name;
+
+
   return (
     <div className="flex justify-center items-center h-full p-4">
     <Card className="w-full max-w-2xl h-full flex flex-col shadow-2xl">
@@ -141,9 +145,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       <CardContent className="flex-1 p-0">
         <ScrollArea className="h-[calc(100vh-16rem)] p-4" ref={scrollAreaRef as any}>
           <div className="space-y-4">
-            {messages.map((message) => (
-              <ChatBubble key={message.id} message={message} isMe={message.senderId === user?.id} />
-            ))}
+            {messages.map((message) => {
+              const isMe = message.senderId === user?.id;
+              return <ChatBubble key={message.id} message={message} isMe={isMe} />
+            })}
           </div>
         </ScrollArea>
       </CardContent>
@@ -193,3 +198,5 @@ const ChatPageSkeleton = () => (
         </Card>
     </div>
 );
+
+    

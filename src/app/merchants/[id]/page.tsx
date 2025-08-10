@@ -60,12 +60,12 @@ export default function MerchantPage() {
   }, [merchantId]);
 
   const handleAddToCart = async (item: MerchantItem) => {
-    if (!user) return;
+    if (!user || !merchantId) return;
 
     setAddingToCart(item.id);
 
     const userDocRef = doc(db, 'users', user.id);
-    const merchantDocRef = doc(db, 'merchants', merchant!.id);
+    const merchantDocRef = doc(db, 'merchants', merchantId);
 
     try {
         await runTransaction(db, async (transaction) => {
@@ -136,76 +136,60 @@ export default function MerchantPage() {
 
 
  const handleMessageMerchant = async () => {
-    if (!user || !merchantId) {
+    if (!user || !merchant) {
       toast({ title: "Error", description: "You must be logged in to start a chat.", variant: "destructive" });
       return;
     }
+    
+    // A user cannot start a chat with themselves if they are the merchant owner
+    if (user.id === merchant.ownerId) {
+        toast({ title: "Info", description: "You cannot start a chat with yourself.", variant: "default" });
+        return;
+    }
+
 
     setIsCreatingChat(true);
 
     try {
-      // Step 1: Fetch the merchant document to reliably get the ownerId
-      const merchantRef = doc(db, 'merchants', merchantId);
-      const merchantSnap = await getDoc(merchantRef);
+        // Create a consistent, predictable chat ID between the user and the merchant
+        const participantIds = [user.id, merchant.id].sort();
+        const chatId = participantIds.join('_');
+        const chatDocRef = doc(db, 'chats', chatId);
 
-      if (!merchantSnap.exists()) {
-          throw new Error("This merchant does not exist.");
-      }
-      const currentMerchantData = merchantSnap.data() as Merchant;
-      const ownerId = currentMerchantData.ownerId;
-      
-      if (!ownerId) {
-          throw new Error("This merchant does not have an assigned owner.");
-      }
-      
-      // Step 2: Fetch the merchant's user profile for their details
-      const merchantUserDocRef = doc(db, 'users', ownerId);
-      const merchantUserSnap = await getDoc(merchantUserDocRef);
+        const chatDoc = await getDoc(chatDocRef);
 
-      if (!merchantUserSnap.exists()) {
-        throw new Error("Merchant's user profile not found.");
-      }
-      const merchantUserData = merchantUserSnap.data() as User;
+        if (chatDoc.exists()) {
+            router.push(`/chat/${chatId}`);
+        } else {
+            // Create the chat if it doesn't exist
+            const currentUserParticipant: ChatParticipant = {
+                id: user.id,
+                name: user.name || user.email || 'Anonymous User',
+                avatar: user.avatar || null,
+            };
 
-      // Step 3: Construct a consistent Chat ID and check if it exists
-      const participantIds = [user.id, ownerId].sort();
-      const chatId = participantIds.join('_');
-      const chatDocRef = doc(db, 'chats', chatId);
+            const merchantParticipant: ChatParticipant = {
+                id: merchant.id, // Use merchant ID as the participant ID
+                name: merchant.companyName,
+                avatar: merchant.logo || null,
+            };
+            
+            const chatData = {
+                participantIds: participantIds,
+                participants: [currentUserParticipant, merchantParticipant],
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                lastMessage: null,
+            };
 
-      const chatDoc = await getDoc(chatDocRef);
-
-      if (chatDoc.exists()) {
-        router.push(`/chat/${chatId}`);
-      } else {
-        // Step 4: Create the chat if it doesn't exist
-        const currentUserParticipant: ChatParticipant = {
-          id: user.id,
-          name: user.name || user.email || 'Anonymous User',
-          avatar: user.avatar || null,
-        };
-
-        const merchantParticipant: ChatParticipant = {
-          id: ownerId,
-          name: merchantUserData.name || currentMerchantData.companyName,
-          avatar: merchantUserData.avatar || currentMerchantData.logo || null,
-        };
-        
-        const chatData = {
-          participantIds: participantIds,
-          participants: [currentUserParticipant, merchantParticipant],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessage: null,
-        };
-
-        await setDoc(chatDocRef, chatData);
-        router.push(`/chat/${chatId}`);
-      }
+            await setDoc(chatDocRef, chatData);
+            router.push(`/chat/${chatId}`);
+        }
     } catch (error) {
-      console.error("Error creating or finding chat:", error);
-      toast({ title: "Error", description: (error as Error).message || "Could not start a conversation.", variant: "destructive" });
+        console.error("Error creating or finding chat:", error);
+        toast({ title: "Error", description: (error as Error).message || "Could not start a conversation.", variant: "destructive" });
     } finally {
-      setIsCreatingChat(false);
+        setIsCreatingChat(false);
     }
   };
 
@@ -296,7 +280,7 @@ export default function MerchantPage() {
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
-                    {user && user.id !== merchant.ownerId && (
+                    {user && (
                          <Button onClick={handleMessageMerchant} disabled={isCreatingChat} className="w-full">
                             {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4"/>}
                             Message Merchant
@@ -369,3 +353,5 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
+
+    

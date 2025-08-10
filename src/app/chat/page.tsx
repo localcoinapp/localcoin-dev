@@ -29,6 +29,7 @@ export default function ChatListPage() {
     }
 
     const chatsRef = collection(db, "chats");
+    // This query now correctly fetches chats where the user's ID OR a merchant ID they are chatting with is present.
     const q = query(
         chatsRef, 
         where("participantIds", "array-contains", user.id),
@@ -77,6 +78,7 @@ export default function ChatListPage() {
           <ScrollArea className="h-[60vh]">
             <div className="space-y-4">
               {chats.length > 0 ? chats.map((chat) => {
+                // Find the other participant, which could be a user or a merchant representation
                 const otherUser = chat.participants.find(p => p.id !== user?.id);
                 if (!otherUser) return null;
 
@@ -115,3 +117,4 @@ export default function ChatListPage() {
   )
 }
 
+    
