@@ -25,7 +25,12 @@ import type { Merchant } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDatabase } from '@/lib/seed';
 import { useToast } from '@/hooks/use-toast';
-import MapView from '@/components/map-view';
+import dynamic from 'next/dynamic';
+
+const MapView = dynamic(() => import('@/components/map-view'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[600px] w-full" />,
+});
 
 const categories = ['All', 'Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events', 'Activities'];
 
@@ -146,11 +151,9 @@ export default function MarketplacePage() {
             )}
         </TabsContent>
         <TabsContent value="map">
-          {loading ? (
-            <Skeleton className="h-[600px] w-full" />
-          ) : (
+          <div className="w-full h-[600px] rounded-lg overflow-hidden">
             <MapView merchants={merchants} />
-          )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

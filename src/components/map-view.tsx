@@ -4,12 +4,10 @@
 import { useEffect, useRef } from 'react';
 import type { Merchant } from '@/types';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-
-// Set the default icon path BEFORE initializing the map
-// This is a common fix for Leaflet in Next.js environments
-// where the default image path is not resolved correctly.
-L.Icon.Default.imagePath = '/_next/image?url=%2Fimages%2F&w=256&q=75';
+// Import marker icons
+import 'leaflet/dist/images/marker-icon.png';
+import 'leaflet/dist/images/marker-icon-2x.png';
+import 'leaflet/dist/images/marker-shadow.png';
 
 
 interface MapViewProps {
@@ -24,7 +22,18 @@ const MapView = ({ merchants }: MapViewProps) => {
 
   // 1. Initialize map and user location marker
   useEffect(() => {
-    if (typeof window !== 'undefined' && mapRef.current && !mapInstance.current) {
+    // Dynamically import Leaflet only on the client side
+    const L = require('leaflet');
+
+     // Manually set icon paths
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png').default.src,
+      iconUrl: require('leaflet/dist/images/marker-icon.png').default.src,
+      shadowUrl: require('leaflet/dist/images/marker-shadow.png').default.src,
+    });
+    
+    if (mapRef.current && !mapInstance.current) {
       
       // Initialize map
       mapInstance.current = L.map(mapRef.current).setView([40.7128, -74.0060], 12); // Default to NYC
@@ -90,6 +99,7 @@ const MapView = ({ merchants }: MapViewProps) => {
 
   // 2. Update merchant markers when the merchants prop changes
   useEffect(() => {
+    const L = require('leaflet');
     if (mapInstance.current) {
       // Clear existing merchant markers from the map
       merchantMarkersRef.current.forEach(marker => {
@@ -119,7 +129,7 @@ const MapView = ({ merchants }: MapViewProps) => {
     }
   }, [merchants]); // This effect re-runs whenever the 'merchants' prop changes
 
-  return <div ref={mapRef} style={{ height: '100%', width: '100%', borderRadius: '0.5rem' }} />;
+  return <div ref={mapRef} style={{ height: '100%', minHeight: '600px', width: '100%', borderRadius: '0.5rem' }} />;
 };
 
 export default MapView;
