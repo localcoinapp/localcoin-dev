@@ -107,8 +107,16 @@ const MapView = ({ merchants }: MapViewProps) => {
 
       // Create and add new markers for each valid merchant
       validMerchants.forEach(merchant => {
+          const popupContent = `
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+              <img src="${merchant.logo || 'https://placehold.co/50x50'}" alt="${merchant.companyName}" style="width:50px; height:50px; border-radius:4px; object-fit:contain;" />
+              <h4 style="margin:0; font-size:16px;">${merchant.companyName}</h4>
+            </div>
+            <p style="margin:0 0 10px; font-size:14px; color:#555;">${merchant.description}</p>
+            <a href="/merchants/${merchant.id}" style="color:blue; text-decoration:underline;">View Details</a>
+          `;
           const marker = L.marker([merchant.position.lat, merchant.position.lng])
-            .bindPopup(`<b>${merchant.companyName}</b><br><a href="/merchants/${merchant.id}" style="color: blue; text-decoration: underline;">View Details</a>`);
+            .bindPopup(popupContent);
           
           marker.addTo(mapInstance.current!);
           merchantMarkersRef.current.push(marker); // Store new marker
