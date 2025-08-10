@@ -31,7 +31,7 @@ const translateChatMessagePrompt = ai.definePrompt({
   input: {schema: TranslateChatMessageInputSchema},
   output: {schema: TranslateChatMessageOutputSchema},
   prompt: `Translate the following message to {{targetLanguage}}:\n\n{{message}}`,
-  model: 'gemini-pro',
+  model: 'gemini-1.5-flash',
 });
 
 const translateChatMessageFlow = ai.defineFlow(
