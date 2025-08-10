@@ -31,7 +31,7 @@ const enhancePrompt = ai.definePrompt({
   name: 'enhanceDescriptionPrompt',
   input: { schema: EnhanceDescriptionInputSchema },
   output: { schema: EnhanceDescriptionOutputSchema },
-  prompt: `You are an expert content writer for online startups. Turn the following text into an amazing and concise business description with a maximum of 100 characters.
+  prompt: `You are an expert marketing copywriter for online startups. Turn the following text into a compelling business description with a sales-pitch tone, with a maximum of 300 characters.
 
 Input Description:
 "{{description}}"
