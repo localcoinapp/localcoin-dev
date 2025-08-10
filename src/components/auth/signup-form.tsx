@@ -56,6 +56,7 @@ export function SignupForm() {
         const user = userCredential.user;
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
+          id: user.uid,
           email: values.email,
           country: values.country,
           role: 'user',
@@ -84,6 +85,7 @@ export function SignupForm() {
       if (!userDoc.exists()) {
         await setDoc(userDocRef, {
             uid: user.uid,
+            id: user.uid,
             email: user.email,
             name: user.displayName,
             avatar: user.photoURL,
