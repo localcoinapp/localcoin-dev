@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -30,7 +31,8 @@ import {
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function ChatPage({ params }: { params: { id: string } }) {
+export default function ChatPage() {
+  const params = useParams();
   const { user, loading: authLoading } = useAuth();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,7 +41,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const [accessDenied, setAccessDenied] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const chatId = params.id;
+  const chatId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   useEffect(() => {
     if (authLoading) return; // Wait for authentication to resolve
