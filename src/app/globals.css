@@ -67,47 +67,47 @@
     Theme: Tropics
   ================================================================= */
   .theme-tropics {
-    --background: 40 67% 89%; /* #f4e8d1 - sand */
-    --foreground: 25 25% 30%; /* #5c4b40 - dark brown */
-    --card: 39 80% 94%; /* #faebd7 - antique white */
-    --card-foreground: 25 25% 30%;
-    --popover: 39 80% 94%;
-    --popover-foreground: 25 25% 30%;
-    --primary: 180 50% 45%; /* #39a6a6 - teal */
+    --background: 200 100% 98%; /* #cfeefc - very light blue */
+    --foreground: 195 18% 24%; /* #31424a - dark slate blue */
+    --card: 0 0% 100%;
+    --card-foreground: 195 18% 24%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 195 18% 24%;
+    --primary: 202 100% 62%; /* #3eb5ff - bright blue */
     --primary-foreground: 0 0% 100%;
-    --secondary: 195 53% 79%; /* #a4d2e7 - light blue */
-    --secondary-foreground: 25 25% 30%;
-    --muted: 39 60% 90%; /* #f5eadd */
-    --muted-foreground: 25 25% 45%;
-    --accent: 0 84% 67%; /* #ff6b6b - coral */
+    --secondary: 185 14% 75%; /* #b5c4c6 - grayish blue */
+    --secondary-foreground: 195 18% 24%;
+    --muted: 185 14% 95%; /* #f0f2f3 */
+    --muted-foreground: 195 18% 44%;
+    --accent: 110 37% 42%; /* #385737 - dark green */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%; /* #e54848 */
     --destructive-foreground: 0 0% 100%;
-    --border: 39 30% 80%; /* #e1d6c6 */
-    --input: 39 30% 80%;
-    --ring: 180 50% 45%;
+    --border: 185 14% 90%; /* #e1e5e6 */
+    --input: 185 14% 90%;
+    --ring: 202 100% 62%;
     --radius: 0.75rem; /* More rounded */
   }
   .dark.theme-tropics {
-    --background: 20 12% 12%; /* #25221e - deep jungle brown */
-    --foreground: 40 67% 89%; /* #f4e8d1 - sand */
-    --card: 20 12% 18%; /* #35302a */
-    --card-foreground: 40 67% 89%;
-    --popover: 20 12% 10%;
-    --popover-foreground: 40 67% 89%;
-    --primary: 180 50% 65%; /* #79c9c9 - lighter teal */
-    --primary-foreground: 20 12% 12%;
-    --secondary: 195 30% 30%; /* #35505c - deep sea blue */
+    --background: 195 25% 15%; /* #1d2b30 - deep sea blue */
+    --foreground: 200 100% 98%;
+    --card: 195 25% 20%; /* #253840 */
+    --card-foreground: 200 100% 98%;
+    --popover: 195 25% 10%;
+    --popover-foreground: 200 100% 98%;
+    --primary: 205 90% 70%; /* #82c8ff - lighter bright blue */
+    --primary-foreground: 195 25% 10%;
+    --secondary: 185 15% 30%; /* #414c4e - dark grayish blue */
     --secondary-foreground: 0 0% 100%;
-    --muted: 20 12% 24%;
-    --muted-foreground: 40 67% 80%;
-    --accent: 0 84% 75%; /* #ff8c8c - lighter coral */
+    --muted: 185 15% 25%;
+    --muted-foreground: 200 100% 90%;
+    --accent: 110 40% 60%; /* #6aa869 - lighter green */
     --accent-foreground: 0 0% 0%;
     --destructive: 0 72% 61%; /* #ec6363 */
     --destructive-foreground: 0 0% 100%;
-    --border: 20 12% 30%;
-    --input: 20 12% 30%;
-    --ring: 180 50% 65%;
+    --border: 185 15% 25%;
+    --input: 185 15% 25%;
+    --ring: 205 90% 70%;
   }
 
   /* =================================================================
