@@ -58,28 +58,17 @@ export default function MerchantPage() {
   }, [id]);
 
   const handleAddToCart = async (item: MerchantItem) => {
-    if (!user || !merchant) {
-      toast({
-        title: "Please log in",
-        description: "You need to be logged in to add items to your cart.",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!user) return; // The parent page already ensures the user is logged in.
 
     setAddingToCart(item.id);
 
     const userDocRef = doc(db, 'users', user.id);
-    const merchantDocRef = doc(db, 'merchants', merchant.id);
+    const merchantDocRef = doc(db, 'merchants', merchant!.id);
 
     try {
         await runTransaction(db, async (transaction) => {
-            const [userSnap, merchantSnap] = await Promise.all([
-                transaction.get(userDocRef),
-                transaction.get(merchantDocRef)
-            ]);
+            const merchantSnap = await transaction.get(merchantDocRef);
 
-            if (!userSnap.exists()) throw new Error("User not found");
             if (!merchantSnap.exists()) throw new Error("Merchant not found");
             
             const merchantData = merchantSnap.data() as Merchant;
@@ -102,8 +91,8 @@ export default function MerchantPage() {
               listingId: item.id,
               price: item.price,
               quantity: 1,
-              merchantId: merchant.id,
-              merchantName: merchant.companyName,
+              merchantId: merchant!.id,
+              merchantName: merchant!.companyName,
               redeemCode: null,
               status: 'pending_approval',
               timestamp: Timestamp.now(),
@@ -144,10 +133,10 @@ export default function MerchantPage() {
 
   const handleMessageMerchant = async () => {
     setIsCreatingChat(true);
-    if (!user || !merchant) return;
 
-    // Create a consistent, predictable chat ID
-    const participantIds = [user.id, merchant.ownerId].sort();
+    // No auth check needed here as per user instruction.
+    // The page visibility logic already handles this.
+    const participantIds = [user!.id, merchant!.ownerId].sort();
     const chatId = participantIds.join('_');
     const chatDocRef = doc(db, 'chats', chatId);
 
@@ -160,8 +149,8 @@ export default function MerchantPage() {
         await setDoc(chatDocRef, {
           participantIds: participantIds,
           participants: [
-            { id: user.id, name: user.name || user.email, avatar: user.avatar },
-            { id: merchant.ownerId, name: merchant.companyName, avatar: merchant.logo }
+            { id: user!.id, name: user!.name || user!.email, avatar: user!.avatar },
+            { id: merchant!.ownerId, name: merchant!.companyName, avatar: merchant!.logo }
           ],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -337,3 +326,5 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
+
+    
