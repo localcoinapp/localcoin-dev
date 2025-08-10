@@ -18,7 +18,20 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+       {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+      },
     ],
+  },
+   async rewrites() {
+    return [
+      // This rule will proxy requests from /firebase-storage/... to the actual Firebase Storage API.
+      {
+        source: '/firebase-storage/:path*',
+        destination: 'https://firebasestorage.googleapis.com/:path*',
+      },
+    ];
   },
 };
 
