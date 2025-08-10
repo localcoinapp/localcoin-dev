@@ -28,24 +28,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useRouter } from "next/navigation"
-import { doc, onSnapshot, updateDoc } from "firebase/firestore"; // Changed getDoc to onSnapshot
-import { db } from "@/lib/firebase"; // Removed auth import as useAuth is used
-import { useAuth } from "@/hooks/use-auth"; // Import useAuth hook
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { storeCategories } from "@/data/store-categories"
+import { enhanceItemDescription } from "@/ai/flows/enhance-item-description"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2, Sparkles } from "lucide-react"
 
 const formSchema = z.object({
   name: z.string().min(3, { message: "Item name must be at least 3 characters." }),
   price: z.coerce.number().min(0.01, { message: "Price must be greater than 0." }),
   category: z.string().min(1, { message: "Please select a category." }),
   quantity: z.coerce.number().int().min(0, { message: "Quantity must be a positive number." }),
+  description: z.string().optional(),
 })
 
 export default function AddListingPage() {
   const router = useRouter();
-  const { user } = useAuth(); // Use useAuth hook
-  const [merchantData, setMerchantData] = useState<any>(null); // State to store merchant data
+  const { user } = useAuth(); 
+  const [merchantData, setMerchantData] = useState<any>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,6 +61,7 @@ export default function AddListingPage() {
       price: 0,
       category: "",
       quantity: 1,
+      description: "",
     },
   })
 
@@ -63,41 +71,57 @@ export default function AddListingPage() {
       const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          setMerchantData(data); // Set merchant data in state
+          setMerchantData(data);
         } else {
-          // Redirect if merchant document doesn't exist for the user's merchantId
           router.push('/dashboard');
         }
       }, (error) => {
         console.error("Error fetching merchant data:", error);
-        // Handle error, perhaps redirect or show an error message
         router.push('/dashboard');
       });
-      return () => unsubscribe(); // Cleanup the subscription
+      return () => unsubscribe();
     } else if (user && !user.merchantId) {
-       // If user is logged in but has no merchantId, redirect
        router.push('/dashboard');
     } else if (!user) {
-      // If user is not logged in, redirect to login
       router.push('/login');
     }
-  }, [user, router]); // Depend on user and router
+  }, [user, router]);
+
+  const handleEnhanceDescription = async () => {
+    const currentDescription = form.getValues('description');
+    if (!currentDescription) {
+        toast({
+            title: "No Description",
+            description: "Please enter a description first before enhancing.",
+            variant: "destructive"
+        });
+        return;
+    }
+    setIsEnhancing(true);
+    try {
+        const result = await enhanceItemDescription({ description: currentDescription });
+        form.setValue('description', result.enhancedDescription, { shouldValidate: true });
+    } catch (error) {
+        console.error("Error enhancing description:", error);
+        toast({ title: "Enhancement Failed", description: "Could not enhance the description.", variant: "destructive" });
+    } finally {
+        setIsEnhancing(false);
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user || !user.merchantId) {
-      return; // Should be handled by useEffect redirect
+      return; 
     }
 
-    const merchantRef = doc(db, "merchants", user.merchantId); // Use user.merchantId
-
-    // No need to get the doc again here, as we have merchantData from the snapshot
-    // We can directly update the listings array
+    const merchantRef = doc(db, "merchants", user.merchantId);
 
     try {
-      const currentListings = merchantData?.listings || []; // Use merchantData from state
+      const currentListings = merchantData?.listings || [];
 
       const newListing = {
-        id: Date.now().toString(), // Simple unique ID based on timestamp
+        id: Date.now().toString(),
+        active: true,
         ...values
       };
 
@@ -108,12 +132,10 @@ export default function AddListingPage() {
       router.push('/dashboard');
     } catch (error) {
       console.error("Error adding listing:", error);
-      // Handle error, show a toast or message
     }
   };
 
   if (!user || !merchantData) {
-    // Show a loading spinner or a message while checking/fetching data
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 text-center">
         <p>Loading merchant data...</p>
@@ -121,7 +143,6 @@ export default function AddListingPage() {
     );
   }
 
-  // Render the form only when merchantData is available
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-2xl text-left shadow-lg">
@@ -199,6 +220,41 @@ export default function AddListingPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex justify-between items-center">
+                      <FormLabel>Item Description</FormLabel>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleEnhanceDescription}
+                        disabled={isEnhancing}
+                      >
+                        {isEnhancing ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-2" />
+                        )}
+                        Enhance with AI
+                      </Button>
+                    </div>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe the item..."
+                        className="resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
 
               <div className="flex justify-end gap-4 pt-4">
                 <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
