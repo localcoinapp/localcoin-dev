@@ -136,20 +136,34 @@ export default function MerchantPage() {
 
 
  const handleMessageMerchant = async () => {
-    if (!user || !merchant || !merchant.ownerId) {
-      toast({ title: "Error", description: "Merchant owner information is missing.", variant: "destructive" });
+    if (!user || !merchantId) {
+      toast({ title: "Error", description: "You must be logged in to message a merchant.", variant: "destructive" });
       return;
     }
     
-    if (user.id === merchant.ownerId) {
-        toast({ title: "Info", description: "You cannot start a chat with yourself.", variant: "default" });
-        return;
-    }
-
     setIsCreatingChat(true);
 
     try {
-        const participantIds = [user.id, merchant.ownerId].sort();
+        // Step 1: Fetch the full merchant document to get the ownerId
+        const merchantDocRef = doc(db, 'merchants', merchantId);
+        const merchantDocSnap = await getDoc(merchantDocRef);
+
+        if (!merchantDocSnap.exists()) {
+            throw new Error("Merchant details could not be found.");
+        }
+        const merchantData = merchantDocSnap.data() as Merchant;
+        const ownerId = merchantData.ownerId;
+
+        if (!ownerId) {
+            throw new Error("Merchant owner information is missing.");
+        }
+        
+        if (user.id === ownerId) {
+            toast({ title: "Info", description: "You cannot start a chat with yourself.", variant: "default" });
+            return;
+        }
+
+        const participantIds = [user.id, ownerId].sort();
         const chatId = participantIds.join('_');
         const chatDocRef = doc(db, 'chats', chatId);
 
@@ -161,7 +175,7 @@ export default function MerchantPage() {
         }
 
         // Fetch owner's user data to create a complete participant profile
-        const ownerUserDocRef = doc(db, 'users', merchant.ownerId);
+        const ownerUserDocRef = doc(db, 'users', ownerId);
         const ownerUserSnap = await getDoc(ownerUserDocRef);
         if (!ownerUserSnap.exists()) {
             throw new Error("Merchant owner's user account not found.");
@@ -175,9 +189,9 @@ export default function MerchantPage() {
         };
 
         const merchantOwnerParticipant: ChatParticipant = {
-            id: merchant.ownerId,
-            name: ownerUserData.name || merchant.companyName, // Fallback to company name
-            avatar: ownerUserData.avatar || merchant.logo || null, // Fallback to merchant logo
+            id: ownerId,
+            name: ownerUserData.name || merchantData.companyName, 
+            avatar: ownerUserData.avatar || merchantData.logo || null,
         };
         
         const chatData = {
@@ -359,5 +373,3 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
-
-    
