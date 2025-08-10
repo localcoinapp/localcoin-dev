@@ -35,6 +35,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { geohashForLocation } from "geofire-common";
+import { storeCategories } from "@/data/store-categories";
 
 type Position = { lat: number; lng: number };
 
@@ -109,8 +110,6 @@ const storeSettingsSchema = z.object({
 });
 
 type StoreSettingsValues = z.infer<typeof storeSettingsSchema>;
-
-const storeCategories = ['Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events', 'Activities', 'Farm', 'Service'];
 
 export default function StoreSettingsPage() {
   const { user } = useAuth();

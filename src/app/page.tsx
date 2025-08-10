@@ -26,13 +26,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { seedDatabase } from '@/lib/seed';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
+import { storeCategories } from '@/data/store-categories';
 
 const MapView = dynamic(() => import('@/components/map-view'), {
   ssr: false,
   loading: () => <Skeleton className="h-[600px] w-full" />,
 });
-
-const categories = ['All', 'Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events', 'Activities'];
 
 export default function MarketplacePage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
@@ -111,7 +110,7 @@ export default function MarketplacePage() {
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
+                  {storeCategories.map((cat) => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
                 </SelectContent>

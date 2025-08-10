@@ -33,6 +33,7 @@ import { doc, onSnapshot, updateDoc } from "firebase/firestore"; // Changed getD
 import { db } from "@/lib/firebase"; // Removed auth import as useAuth is used
 import { useAuth } from "@/hooks/use-auth"; // Import useAuth hook
 import { useEffect, useState } from "react";
+import { storeCategories } from "@/data/store-categories"
 
 const formSchema = z.object({
   name: z.string().min(3, { message: "Item name must be at least 3 characters." }),
@@ -40,8 +41,6 @@ const formSchema = z.object({
   category: z.string().min(1, { message: "Please select a category." }),
   quantity: z.coerce.number().int().min(0, { message: "Quantity must be a positive number." }),
 })
-
-const categories = ['Coffee', 'Pastry', 'Accommodation', 'Food', 'Workspace', 'Dining', 'Beverages', 'Service', 'Farm'];
 
 export default function AddListingPage() {
   const router = useRouter();
@@ -191,7 +190,7 @@ export default function AddListingPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {categories.map((cat) => (
+                          {storeCategories.map((cat) => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
                         </SelectContent>
