@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useEffect, useState } from 'react';
@@ -134,20 +135,31 @@ export default function MerchantPage() {
 
 
   const handleMessageMerchant = async () => {
-    if (!user || !merchant?.ownerId) return;
+    console.log("handleMessageMerchant called");
+    if (!user || !merchant?.ownerId) {
+      console.log("User or merchant owner ID missing", { user, merchant });
+      return;
+    }
 
     setIsCreatingChat(true);
+    console.log("Attempting to create or find chat...");
+    console.log("Current User:", user);
+    console.log("Merchant:", merchant);
 
     const participantIds = [user.id, merchant.ownerId].sort();
     const chatId = participantIds.join('_');
+    console.log("Generated Chat ID:", chatId);
     const chatDocRef = doc(db, 'chats', chatId);
 
     try {
+      console.log("Checking for existing chat document...");
       const chatDoc = await getDoc(chatDocRef);
 
       if (chatDoc.exists()) {
+        console.log("Chat exists, redirecting...");
         router.push(`/chat/${chatId}`);
       } else {
+        console.log("Chat does not exist, creating new chat document...");
         const currentUserParticipant: ChatParticipant = {
           id: user.id,
           name: user.name || user.email || 'User',
@@ -160,13 +172,17 @@ export default function MerchantPage() {
           avatar: merchant.logo || null,
         };
         
-        await setDoc(chatDocRef, {
+        const chatData = {
           participantIds: participantIds,
           participants: [currentUserParticipant, merchantParticipant],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: null,
-        });
+        };
+
+        console.log("Chat data to be written:", chatData);
+        await setDoc(chatDocRef, chatData);
+        console.log("Chat document created successfully. Redirecting...");
         router.push(`/chat/${chatId}`);
       }
     } catch (error) {
@@ -174,6 +190,7 @@ export default function MerchantPage() {
       toast({ title: "Error", description: "Could not start a conversation.", variant: "destructive" });
     } finally {
       setIsCreatingChat(false);
+      console.log("handleMessageMerchant finished.");
     }
   };
 
