@@ -19,17 +19,6 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
-const assignRole = (firebaseUser: FirebaseUser): UserRole => {
-  switch (firebaseUser.email) {
-    case 'localcoinapp@gmail.com':
-      return 'admin';
-    case 'katarifarms22@gmail.com':
-      return 'merchant';
-    default:
-      return 'user';
-  }
-};
-
 const protectedRoutes = ['/wallet', '/dashboard', '/chat', '/profile', '/settings'];
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -41,26 +30,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        const role = assignRole(firebaseUser);
         const userDocRef = doc(db, "users", firebaseUser.uid);
         
-        const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
-          if (doc.exists()) {
+        const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            // Correctly merge the document data with essential info from firebaseUser
+            const docData = docSnap.data();
             setUser({
-              id: firebaseUser.uid,
-              name: firebaseUser.displayName,
+              id: firebaseUser.uid, // Explicitly set the id from firebaseUser
+              name: firebaseUser.displayName || docData.name,
               email: firebaseUser.email,
-              avatar: firebaseUser.photoURL,
-              role: role,
-              ...doc.data(),
+              avatar: firebaseUser.photoURL || docData.avatar,
+              ...docData, // Spread the rest of the data from Firestore
             });
           } else {
+             // This case might happen if Firestore doc creation is delayed
+             // We still set a minimal user object to keep the app functional
             setUser({
               id: firebaseUser.uid,
               name: firebaseUser.displayName,
               email: firebaseUser.email,
               avatar: firebaseUser.photoURL,
-              role: role,
+              role: 'user', // default role
             });
           }
           setLoading(false);

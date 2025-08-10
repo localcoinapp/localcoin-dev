@@ -1,13 +1,14 @@
+
 'use client'
 
 import { useState } from "react"
 import { translateChatMessage } from "@/ai/flows/translate-chat-message"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { Languages } from "lucide-react"
+import { format } from 'date-fns';
 
 interface ChatBubbleProps {
   message: Message;
@@ -33,14 +34,10 @@ export function ChatBubble({ message, isMe }: ChatBubbleProps) {
     }
   }
 
+  const messageTimestamp = message.timestamp?.toDate ? format(message.timestamp.toDate(), 'p') : '';
+
   return (
     <div className={cn("flex items-end gap-2", isMe ? "justify-end" : "justify-start")}>
-      {!isMe && (
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={message.sender.avatar || undefined} />
-          <AvatarFallback>{message.sender.name?.charAt(0)}</AvatarFallback>
-        </Avatar>
-      )}
       <div
         className={cn(
           "max-w-xs md:max-w-md lg:max-w-lg rounded-xl p-3 shadow-md",
@@ -75,15 +72,9 @@ export function ChatBubble({ message, isMe }: ChatBubbleProps) {
           "text-xs mt-1",
           isMe ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
         )}>
-          {message.createdAt}
+          {messageTimestamp}
         </p>
       </div>
-      {isMe && message.sender.avatar && (
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={message.sender.avatar || undefined} />
-          <AvatarFallback>{message.sender.name?.charAt(0)}</AvatarFallback>
-        </Avatar>
-      )}
     </div>
   )
 }

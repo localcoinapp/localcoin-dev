@@ -42,13 +42,14 @@ export type Merchant = {
   instagram?: string;
   logo?: string;
   banner?: string;
-  ownerId: string; // Add ownerId to link merchant to a user
+  ownerId: string;
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
 
 export type User = {
   id: string;
+  uid?: string; // Keep uid for backwards compatibility if needed, but prefer id
   name: string | null;
   email: string | null;
   avatar: string | null;
@@ -86,7 +87,10 @@ export type Chat = {
   id: string;
   participantIds: string[];
   participants: ChatParticipant[];
-  lastMessage: Message | null;
+  lastMessage: {
+    text: string;
+    timestamp: Timestamp;
+  } | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -111,5 +115,3 @@ export type CartItem = {
   userName: string;
   category: string;
 }
-
-    
