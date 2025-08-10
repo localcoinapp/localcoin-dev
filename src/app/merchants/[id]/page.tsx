@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, setDoc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Merchant, MerchantItem } from '@/types';
-import { Globe, Instagram, MapPin, MessageSquare, Loader2 } from 'lucide-react';
+import { Merchant, MerchantItem, CartItem } from '@/types';
+import { Globe, Instagram, MapPin, MessageSquare, Loader2, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,6 +28,7 @@ export default function MerchantPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [addingToCart, setAddingToCart] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -38,7 +39,7 @@ export default function MerchantPage() {
           const merchantData = { id: snapshot.id, ...snapshot.data() } as Merchant;
           setMerchant(merchantData);
           if (merchantData.listings) {
-            setListings(merchantData.listings);
+            setListings(merchantData.listings.filter(l => l.active));
           } else {
             setListings([]);
           }
@@ -56,13 +57,94 @@ export default function MerchantPage() {
     }
   }, [id]);
 
-  const handleMessageMerchant = async () => {
-    setIsCreatingChat(true);
+  const handleAddToCart = async (item: MerchantItem) => {
     if (!user || !merchant) {
-      toast({ title: "Error", description: "Cannot initiate chat. User or merchant not found.", variant: "destructive" });
-      setIsCreatingChat(false);
+      toast({
+        title: "Please log in",
+        description: "You need to be logged in to add items to your cart.",
+        variant: "destructive"
+      });
       return;
     }
+
+    setAddingToCart(item.id);
+
+    const userDocRef = doc(db, 'users', user.id);
+    const merchantDocRef = doc(db, 'merchants', merchant.id);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const [userSnap, merchantSnap] = await Promise.all([
+                transaction.get(userDocRef),
+                transaction.get(merchantDocRef)
+            ]);
+
+            if (!userSnap.exists()) throw new Error("User not found");
+            if (!merchantSnap.exists()) throw new Error("Merchant not found");
+            
+            const merchantData = merchantSnap.data() as Merchant;
+            const currentListings = merchantData.listings || [];
+            const listingIndex = currentListings.findIndex(l => l.id === item.id);
+
+            if (listingIndex === -1) throw new Error("Item not found");
+            if (currentListings[listingIndex].quantity <= 0) throw new Error("Item is out of stock");
+
+            // Decrement quantity
+            currentListings[listingIndex].quantity -= 1;
+            
+            const orderId = `order_${user.id}_${item.id}_${Date.now()}`;
+            
+            // Create new cart item
+            const newCartItem: CartItem = {
+              orderId,
+              title: item.name,
+              itemId: item.id,
+              listingId: item.id,
+              price: item.price,
+              quantity: 1,
+              merchantId: merchant.id,
+              merchantName: merchant.companyName,
+              redeemCode: null,
+              status: 'pending_approval',
+              timestamp: Timestamp.now(),
+              userId: user.id,
+              userName: user.name || 'Anonymous',
+              category: item.category,
+            };
+
+            const newPendingOrder = { ...newCartItem }; // Use a copy for the merchant
+            
+            // Update merchant doc
+            transaction.update(merchantDocRef, { 
+                listings: currentListings,
+                pendingOrders: arrayUnion(newPendingOrder),
+            });
+            // Update user doc
+            transaction.update(userDocRef, {
+                cart: arrayUnion(newCartItem)
+            });
+        });
+
+        toast({
+            title: "Added to Cart!",
+            description: `${item.name} has been added to your cart.`,
+        });
+    } catch (error) {
+        console.error("Error adding to cart:", error);
+        toast({
+            title: "Error",
+            description: (error as Error).message || "Could not add item to cart.",
+            variant: "destructive"
+        });
+    } finally {
+        setAddingToCart(null);
+    }
+  };
+
+
+  const handleMessageMerchant = async () => {
+    setIsCreatingChat(true);
+    if (!user || !merchant) return;
 
     // Create a consistent, predictable chat ID
     const participantIds = [user.id, merchant.ownerId].sort();
@@ -73,10 +155,8 @@ export default function MerchantPage() {
       const chatDoc = await getDoc(chatDocRef);
 
       if (chatDoc.exists()) {
-        // Chat already exists, navigate to it
         router.push(`/chat/${chatId}`);
       } else {
-        // Create a new chat document with the specific ID
         await setDoc(chatDocRef, {
           participantIds: participantIds,
           participants: [
@@ -143,20 +223,26 @@ export default function MerchantPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {listings.length > 0 ? (
                 listings.map((listing) => (
-                  <Card key={listing.id} className="shadow-md hover:shadow-xl transition-shadow">
+                  <Card key={listing.id} className="shadow-md hover:shadow-xl transition-shadow flex flex-col">
                     <CardHeader>
                       <CardTitle>{listing.name}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-lg font-semibold">${listing.price.toFixed(2)}</p>
+                    <CardContent className="flex-grow">
+                      <p className="text-lg font-semibold">{listing.price.toFixed(2)} LCL</p>
                       <p className="text-sm text-gray-500">Category: {listing.category}</p>
                       <p className="text-sm text-gray-500">In Stock: {listing.quantity}</p>
-                      <Button asChild className="mt-4 w-full" disabled={!listing.active || listing.quantity === 0}>
-                        <Link href={`/listing/${listing.id}`}>
-                           {(!listing.active || listing.quantity === 0) ? 'Unavailable' : 'View Details'}
-                        </Link>
-                      </Button>
+                     
                     </CardContent>
+                     <CardContent>
+                        <Button 
+                            onClick={() => handleAddToCart(listing)} 
+                            className="w-full mt-4" 
+                            disabled={listing.quantity === 0 || !!addingToCart}
+                        >
+                          {addingToCart === listing.id ? <Loader2 className="animate-spin" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
+                          {listing.quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                        </Button>
+                     </CardContent>
                   </Card>
                 ))
               ) : (
