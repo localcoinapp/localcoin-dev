@@ -20,6 +20,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from "@/components/ui/form"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
@@ -53,19 +54,19 @@ export default function SettingsPage() {
         resolver: zodResolver(settingsFormSchema),
         defaultValues: {
             ...defaultValues,
-            theme: theme || "default-eco",
+            theme: theme || "theme-default-eco",
             mode: mode || "system",
         },
     })
     
     React.useEffect(() => {
-        form.setValue("theme", theme || "default-eco");
+        form.setValue("theme", theme || "theme-default-eco");
         form.setValue("mode", mode || "system");
     }, [theme, mode, form]);
 
 
     function onSubmit(data: SettingsFormValues) {
-        setTheme(data.theme);
+        setTheme(data.theme as any);
         setMode(data.mode);
         toast({
             title: "Settings Saved",
