@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,14 +24,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import { countries } from "@/data/countries";
 import { states } from "@/data/states";
 import { provinces } from "@/data/provinces";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/lib/firebase";
+import { db, storage, ref, uploadBytesResumable, getDownloadURL } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { geohashForLocation } from "geofire-common";
@@ -112,7 +113,10 @@ export default function StoreSettingsPage() {
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const [positionPreview, setPositionPreview] = useState<Position | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const form = useForm<StoreSettingsValues>({
     resolver: zodResolver(storeSettingsSchema),
@@ -146,6 +150,43 @@ export default function StoreSettingsPage() {
   }, [user, form]);
 
   const selectedCountry = form.watch("country");
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+  
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && user && user.merchantId) {
+        uploadLogo(file, user.merchantId);
+    }
+  };
+
+  const uploadLogo = (file: File, merchantId: string) => {
+    setIsUploading(true);
+    const storageRef = ref(storage, `merchant-logos/${merchantId}/${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        // Optional: handle progress
+      },
+      (error) => {
+        console.error("Upload failed:", error);
+        toast({ title: "Upload Failed", description: "Could not upload the logo.", variant: "destructive" });
+        setIsUploading(false);
+      },
+      () => {
+        getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+          const merchantDocRef = doc(db, 'merchants', merchantId);
+          await setDoc(merchantDocRef, { logo: downloadURL }, { merge: true });
+          toast({ title: "Logo Updated", description: "Your new logo has been saved." });
+          setIsUploading(false);
+        });
+      }
+    );
+  };
+
 
   const onSubmit = async (values: StoreSettingsValues) => {
     if (!user || !user.merchantId) return;
@@ -330,13 +371,22 @@ export default function StoreSettingsPage() {
                     <AvatarImage src={merchantData?.logo || "https://placehold.co/100x100"} alt="Store logo" />
                     <AvatarFallback>{(merchantData?.companyName?.[0] || "S")}</AvatarFallback>
                   </Avatar>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/png, image/jpeg, image/gif"
+                  />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className="absolute bottom-0 right-0 rounded-full"
+                    onClick={handleAvatarClick}
+                    disabled={isUploading}
                   >
-                    <Camera className="h-4 w-4" />
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
                     <span className="sr-only">Change logo</span>
                   </Button>
                 </div>
@@ -561,7 +611,7 @@ export default function StoreSettingsPage() {
               )}
 
               <div className="text-right pt-4">
-                <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
+                <Button type="submit" size="lg" disabled={form.formState.isSubmitting || isUploading}>
                   {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
