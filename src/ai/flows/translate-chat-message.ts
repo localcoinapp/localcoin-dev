@@ -39,7 +39,10 @@ const translateChatMessageFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await translateChatMessagePrompt(input);
-    return output!;
+    if (!output) {
+        throw new Error("Translation failed: The AI model did not return an output.");
+    }
+    return output;
   }
 );
 
