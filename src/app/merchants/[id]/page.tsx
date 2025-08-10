@@ -15,6 +15,7 @@ import { Merchant, MerchantItem, CartItem, ChatParticipant, User } from '@/types
 import { Globe, Instagram, MapPin, MessageSquare, Loader2, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
 
 interface Listing extends MerchantItem {
   title?: string; 
@@ -30,6 +31,8 @@ export default function MerchantPage() {
   const [loading, setLoading] = useState(true);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
+  const [itemQuantities, setItemQuantities] = useState<{[key: string]: number}>({});
+
 
   const merchantId = Array.isArray(id) ? id[0] : id;
 
@@ -41,7 +44,14 @@ export default function MerchantPage() {
           const merchantData = { id: snapshot.id, ...snapshot.data() } as Merchant;
           setMerchant(merchantData);
           if (merchantData.listings) {
-            setListings(merchantData.listings.filter(l => l.active));
+            const activeListings = merchantData.listings.filter(l => l.active);
+            setListings(activeListings);
+            // Initialize quantities for all listings to 1
+            const initialQuantities = activeListings.reduce((acc, l) => {
+                acc[l.id] = 1;
+                return acc;
+            }, {} as {[key: string]: number});
+            setItemQuantities(initialQuantities);
           } else {
             setListings([]);
           }
@@ -58,9 +68,19 @@ export default function MerchantPage() {
       return () => unsubscribe();
     }
   }, [merchantId]);
+  
+  const handleQuantityChange = (itemId: string, quantity: number) => {
+    setItemQuantities(prev => ({...prev, [itemId]: Math.max(1, quantity) })); // Ensure quantity is at least 1
+  }
 
   const handleAddToCart = async (item: MerchantItem) => {
     if (!user || !merchantId) return;
+    
+    const quantity = itemQuantities[item.id] || 1;
+    if (quantity <= 0) {
+        toast({ title: "Invalid Quantity", description: "Please enter a quantity greater than zero.", variant: "destructive" });
+        return;
+    }
 
     setAddingToCart(item.id);
 
@@ -80,10 +100,10 @@ export default function MerchantPage() {
             const listingIndex = currentListings.findIndex(l => l.id === item.id);
 
             if (listingIndex === -1) throw new Error("Item not found");
-            if (currentListings[listingIndex].quantity <= 0) throw new Error("Item is out of stock");
+            if (currentListings[listingIndex].quantity < quantity) throw new Error("Not enough items in stock");
 
             // Decrement quantity
-            currentListings[listingIndex].quantity -= 1;
+            currentListings[listingIndex].quantity -= quantity;
             
             const orderId = `order_${user.id}_${item.id}_${Date.now()}`;
             
@@ -93,8 +113,8 @@ export default function MerchantPage() {
               title: item.name,
               itemId: item.id,
               listingId: item.id,
-              price: item.price,
-              quantity: 1,
+              price: item.price * quantity,
+              quantity: quantity,
               merchantId: merchant!.id,
               merchantName: merchant!.companyName,
               redeemCode: null,
@@ -105,14 +125,12 @@ export default function MerchantPage() {
               category: item.category,
             };
 
-            const newPendingOrder = { ...newCartItem }; // Use a copy for the merchant
+            const newPendingOrder = { ...newCartItem }; 
             
-            // Update merchant doc
             transaction.update(merchantDocRef, { 
                 listings: currentListings,
                 pendingOrders: arrayUnion(newPendingOrder),
             });
-            // Update user doc
             transaction.update(userDocRef, {
                 cart: arrayUnion(newCartItem)
             });
@@ -120,7 +138,7 @@ export default function MerchantPage() {
 
         toast({
             title: "Added to Cart!",
-            description: `${item.name} has been added to your cart.`,
+            description: `${item.name} (x${quantity}) has been added to your cart.`,
         });
     } catch (error) {
         console.error("Error adding to cart:", error);
@@ -267,10 +285,20 @@ export default function MerchantPage() {
                       <p className="text-lg font-semibold">{listing.price.toFixed(2)} LCL</p>
                       {listing.description && <p className="text-sm text-muted-foreground">{listing.description}</p>}
                     </CardContent>
-                     <CardContent>
+                     <CardContent className="flex items-end gap-2">
+                        <div className="w-20">
+                            <Input 
+                                type="number"
+                                value={itemQuantities[listing.id] || 1}
+                                onChange={(e) => handleQuantityChange(listing.id, parseInt(e.target.value, 10))}
+                                min="1"
+                                max={listing.quantity}
+                                disabled={listing.quantity === 0}
+                            />
+                        </div>
                         <Button 
                             onClick={() => handleAddToCart(listing)} 
-                            className="w-full mt-4" 
+                            className="w-full" 
                             disabled={listing.quantity === 0 || !!addingToCart}
                         >
                           {addingToCart === listing.id ? <Loader2 className="animate-spin" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
@@ -371,5 +399,3 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
-
-    
