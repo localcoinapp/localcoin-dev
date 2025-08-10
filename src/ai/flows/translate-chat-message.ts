@@ -24,12 +24,6 @@ const TranslateChatMessageOutputSchema = z.object({
 
 export type TranslateChatMessageOutput = z.infer<typeof TranslateChatMessageOutputSchema>;
 
-export async function translateChatMessage(
-  input: TranslateChatMessageInput
-): Promise<TranslateChatMessageOutput> {
-  return translateChatMessageFlow(input);
-}
-
 const translateChatMessagePrompt = ai.definePrompt({
   name: 'translateChatMessagePrompt',
   input: {schema: TranslateChatMessageInputSchema},
@@ -48,3 +42,10 @@ const translateChatMessageFlow = ai.defineFlow(
     return output!;
   }
 );
+
+
+export async function translateChatMessage(
+  input: TranslateChatMessageInput
+): Promise<TranslateChatMessageOutput> {
+  return translateChatMessageFlow(input);
+}
