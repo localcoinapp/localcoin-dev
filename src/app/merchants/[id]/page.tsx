@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Merchant, MerchantItem, CartItem, ChatParticipant } from '@/types';
+import { Merchant, MerchantItem, CartItem, ChatParticipant, User } from '@/types';
 import { Globe, Instagram, MapPin, MessageSquare, Loader2, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -134,42 +134,43 @@ export default function MerchantPage() {
   };
 
 
-  const handleMessageMerchant = async () => {
-    console.log("handleMessageMerchant called");
-    if (!user || !merchant?.ownerId) {
-      console.log("User or merchant owner ID missing", { user, merchant });
+ const handleMessageMerchant = async () => {
+    if (!user || !merchant || !merchant.ownerId) {
+      toast({ title: "Error", description: "Cannot start chat. User or merchant details are missing.", variant: "destructive" });
       return;
     }
 
     setIsCreatingChat(true);
-    console.log("Attempting to create or find chat...");
-    console.log("Current User:", user);
-    console.log("Merchant:", merchant);
-
-    const participantIds = [user.id, merchant.ownerId].sort();
-    const chatId = participantIds.join('_');
-    console.log("Generated Chat ID:", chatId);
-    const chatDocRef = doc(db, 'chats', chatId);
 
     try {
-      console.log("Checking for existing chat document...");
+      // Fetch merchant's user data to get their name/avatar
+      const merchantUserDocRef = doc(db, 'users', merchant.ownerId);
+      const merchantUserSnap = await getDoc(merchantUserDocRef);
+
+      if (!merchantUserSnap.exists()) {
+        throw new Error("Merchant user profile not found.");
+      }
+      const merchantUserData = merchantUserSnap.data() as User;
+
+      const participantIds = [user.id, merchant.ownerId].sort();
+      const chatId = participantIds.join('_');
+      const chatDocRef = doc(db, 'chats', chatId);
+
       const chatDoc = await getDoc(chatDocRef);
 
       if (chatDoc.exists()) {
-        console.log("Chat exists, redirecting...");
         router.push(`/chat/${chatId}`);
       } else {
-        console.log("Chat does not exist, creating new chat document...");
         const currentUserParticipant: ChatParticipant = {
           id: user.id,
-          name: user.name || user.email || 'User',
+          name: user.name || user.email || 'Anonymous User',
           avatar: user.avatar || null,
         };
 
         const merchantParticipant: ChatParticipant = {
           id: merchant.ownerId,
-          name: merchant.companyName,
-          avatar: merchant.logo || null,
+          name: merchantUserData.name || merchant.companyName,
+          avatar: merchantUserData.avatar || merchant.logo || null,
         };
         
         const chatData = {
@@ -180,9 +181,7 @@ export default function MerchantPage() {
           lastMessage: null,
         };
 
-        console.log("Chat data to be written:", chatData);
         await setDoc(chatDocRef, chatData);
-        console.log("Chat document created successfully. Redirecting...");
         router.push(`/chat/${chatId}`);
       }
     } catch (error) {
@@ -190,7 +189,6 @@ export default function MerchantPage() {
       toast({ title: "Error", description: "Could not start a conversation.", variant: "destructive" });
     } finally {
       setIsCreatingChat(false);
-      console.log("handleMessageMerchant finished.");
     }
   };
 
