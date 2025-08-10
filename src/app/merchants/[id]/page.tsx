@@ -263,11 +263,9 @@ export default function MerchantPage() {
                     <CardHeader>
                       <CardTitle>{listing.name}</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-grow">
+                    <CardContent className="flex-grow space-y-2">
                       <p className="text-lg font-semibold">{listing.price.toFixed(2)} LCL</p>
-                      <p className="text-sm text-gray-500">Category: {listing.category}</p>
-                      <p className="text-sm text-gray-500">In Stock: {listing.quantity}</p>
-                     
+                      {listing.description && <p className="text-sm text-muted-foreground">{listing.description}</p>}
                     </CardContent>
                      <CardContent>
                         <Button 
