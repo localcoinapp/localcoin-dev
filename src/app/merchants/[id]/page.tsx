@@ -58,6 +58,9 @@ export default function MerchantPage() {
   if (!merchant) {
     return <div className="container mx-auto p-4 text-center">Merchant not found.</div>;
   }
+  
+  const fullAddress = [merchant.street, merchant.houseNumber, merchant.city, merchant.zipCode].filter(Boolean).join(', ');
+
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -84,12 +87,6 @@ export default function MerchantPage() {
                 </Avatar>
                 <p className="text-muted-foreground flex-1 pt-2">{merchant.description}</p>
             </div>
-            {merchant.address && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground border-t pt-4">
-                <MapPin className="h-4 w-4" />
-                <span>{merchant.address}</span>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -124,12 +121,18 @@ export default function MerchantPage() {
           </CardContent>
         </Card>
 
-        {(merchant.website || merchant.instagram) && (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Connect</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col sm:flex-row gap-4">
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-2xl font-bold">Connect</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 {fullAddress && (
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+                    <MapPin className="h-5 w-5 flex-shrink-0" />
+                    <span>{fullAddress}</span>
+                  </div>
+                )}
+                <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
                     {merchant.website && (
                       <Button asChild variant="outline" className="w-full">
                         <a href={merchant.website} target="_blank" rel="noopener noreferrer">
@@ -146,9 +149,9 @@ export default function MerchantPage() {
                          </a>
                        </Button>
                     )}
-                </CardContent>
-            </Card>
-        )}
+                </div>
+            </CardContent>
+        </Card>
 
       </div>
     </div>

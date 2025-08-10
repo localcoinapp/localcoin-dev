@@ -32,6 +32,14 @@ export type Merchant = {
   listings: MerchantItem[]
   pendingOrders?: CartItem[];
   merchantWalletBalance?: number;
+  street?: string;
+  houseNumber?: string;
+  city?: string;
+  zipCode?: string;
+  website?: string;
+  instagram?: string;
+  logo?: string;
+  banner?: string;
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
