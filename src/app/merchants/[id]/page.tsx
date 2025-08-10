@@ -58,28 +58,20 @@ export default function MerchantPage() {
   }, [id]);
 
   const handleMessageMerchant = async () => {
-    if (!user || !merchant || !merchant.ownerId) {
-      toast({ title: "Error", description: "You must be logged in to message a merchant.", variant: "destructive" });
-      return;
-    }
-    
-    if (user.id === merchant.ownerId) {
-        toast({ title: "Info", description: "You cannot start a chat with yourself." });
-        return;
-    }
-
+    // The button is only rendered if user and merchant are valid and not the same person,
+    // so we can proceed directly.
     setIsCreatingChat(true);
 
     try {
       // Check if a chat already exists
       const chatsRef = collection(db, "chats");
-      const q = query(chatsRef, where('participantIds', 'array-contains', user.id));
+      const q = query(chatsRef, where('participantIds', 'array-contains', user!.id));
       const querySnapshot = await getDocs(q);
 
       let existingChat: { id: string; [key: string]: any; } | null = null;
       querySnapshot.forEach(doc => {
         const chat = doc.data();
-        if (chat.participantIds.includes(merchant.ownerId)) {
+        if (chat.participantIds.includes(merchant!.ownerId)) {
           existingChat = { id: doc.id, ...chat };
         }
       });
@@ -89,10 +81,10 @@ export default function MerchantPage() {
       } else {
         // Create a new chat
         const newChatRef = await addDoc(chatsRef, {
-          participantIds: [user.id, merchant.ownerId],
+          participantIds: [user!.id, merchant!.ownerId],
           participants: [
-            { id: user.id, name: user.name || user.email, avatar: user.avatar },
-            { id: merchant.ownerId, name: merchant.companyName, avatar: merchant.logo }
+            { id: user!.id, name: user!.name || user!.email, avatar: user!.avatar },
+            { id: merchant!.ownerId, name: merchant!.companyName, avatar: merchant!.logo }
           ],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
