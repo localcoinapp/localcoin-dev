@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence, updateProfile } from 'firebase/auth';
 import { getFirestore, getDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
@@ -23,4 +23,4 @@ const storage = getStorage(app);
 // Set persistence to local. This is the crucial part for this environment.
 setPersistence(auth, browserLocalPersistence);
 
-export { app, auth, db, storage, ref, uploadBytesResumable, getDownloadURL, getDoc };
+export { app, auth, db, storage, ref, uploadBytesResumable, getDownloadURL, getDoc, updateProfile };

@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -29,16 +30,15 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Camera } from "lucide-react"
+import { Camera, Loader2 } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
 import { useAuth } from "@/hooks/use-auth"
-import { auth, db } from "@/lib/firebase"
+import { auth, db, storage, ref, uploadBytesResumable, getDownloadURL, updateProfile } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
-import { updateProfile } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
-import React from "react"
+import React, { useRef, useState } from "react"
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -61,6 +61,8 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>
 export default function ProfilePage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -99,6 +101,46 @@ export default function ProfilePage() {
       })
     }
   }, [user, form])
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploading(true);
+    const storageRef = ref(storage, `avatars/${user.id}/${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    uploadTask.on(
+      'state_changed',
+      (snapshot) => { /* Optional: Handle progress */ },
+      (error) => {
+        console.error("Upload failed:", error);
+        toast({ title: "Upload Failed", description: "Could not upload the image.", variant: "destructive" });
+        setIsUploading(false);
+      },
+      async () => {
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            await updateProfile(currentUser, { photoURL: downloadURL });
+            const userDocRef = doc(db, "users", currentUser.uid);
+            await setDoc(userDocRef, { avatar: downloadURL }, { merge: true });
+            toast({ title: "Avatar Updated", description: "Your new avatar has been saved." });
+          }
+        } catch (error) {
+           console.error("Error updating profile:", error);
+           toast({ title: "Error", description: "Failed to update profile picture.", variant: "destructive" });
+        } finally {
+            setIsUploading(false);
+        }
+      }
+    );
+  };
 
   async function onSubmit(data: ProfileFormValues) {
     try {
@@ -151,13 +193,23 @@ export default function ProfilePage() {
                     <AvatarImage src={user?.avatar || "https://placehold.co/100x100"} alt="User avatar" />
                     <AvatarFallback>{user?.name?.[0] || "U"}</AvatarFallback>
                   </Avatar>
+                   <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/*"
+                    capture="environment"
+                  />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className="absolute bottom-0 right-0 rounded-full"
+                    onClick={handleAvatarClick}
+                    disabled={isUploading}
                   >
-                    <Camera className="h-4 w-4" />
+                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
                     <span className="sr-only">Change avatar</span>
                   </Button>
                 </div>
@@ -321,7 +373,9 @@ export default function ProfilePage() {
               />
 
               <div className="text-right">
-                <Button type="submit">Update Profile</Button>
+                <Button type="submit" disabled={form.formState.isSubmitting || isUploading}>
+                    {form.formState.isSubmitting || isUploading ? 'Saving...' : 'Update Profile'}
+                </Button>
               </div>
             </form>
           </Form>
