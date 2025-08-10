@@ -127,11 +127,10 @@ export default function ProfilePage() {
             throw new Error(errorData.error || 'Upload failed');
         }
 
-        const { url } = await response.json();
-        
-        // The API route now handles updating Firebase, so the client just needs to show success.
-        // We rely on the onSnapshot listener in useAuth to update the UI with the new avatar URL.
         toast({ title: "Avatar Updated", description: "Your new avatar has been saved." });
+        // Force a reload to ensure the new avatar is displayed.
+        window.location.reload();
+
     } catch (error) {
         console.error("Upload failed:", error);
         toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
