@@ -31,9 +31,10 @@ export default function MerchantPage() {
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
 
+  const merchantId = Array.isArray(id) ? id[0] : id;
+
   useEffect(() => {
-    if (id) {
-      const merchantId = Array.isArray(id) ? id[0] : id;
+    if (merchantId) {
       const merchantDocRef = doc(db, 'merchants', merchantId);
       const unsubscribe = onSnapshot(merchantDocRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -56,7 +57,7 @@ export default function MerchantPage() {
 
       return () => unsubscribe();
     }
-  }, [id]);
+  }, [merchantId]);
 
   const handleAddToCart = async (item: MerchantItem) => {
     if (!user) return;
@@ -135,24 +136,40 @@ export default function MerchantPage() {
 
 
  const handleMessageMerchant = async () => {
-    if (!user || !merchant || !merchant.ownerId) {
-      toast({ title: "Error", description: "Cannot start chat. User or merchant details are missing.", variant: "destructive" });
+    if (!user || !merchantId) {
+      // This guard should technically be redundant if button is hidden, but good practice.
+      toast({ title: "Error", description: "You must be logged in to start a chat.", variant: "destructive" });
       return;
     }
 
     setIsCreatingChat(true);
 
     try {
-      // Fetch merchant's user data to get their name/avatar
-      const merchantUserDocRef = doc(db, 'users', merchant.ownerId);
+      // Step 1: Fetch the merchant document to reliably get the ownerId
+      const merchantRef = doc(db, 'merchants', merchantId);
+      const merchantSnap = await getDoc(merchantRef);
+
+      if (!merchantSnap.exists()) {
+          throw new Error("This merchant does not exist.");
+      }
+      const currentMerchantData = merchantSnap.data() as Merchant;
+      const ownerId = currentMerchantData.ownerId;
+      
+      if (!ownerId) {
+          throw new Error("This merchant does not have an assigned owner.");
+      }
+      
+      // Step 2: Fetch the merchant's user profile for their details
+      const merchantUserDocRef = doc(db, 'users', ownerId);
       const merchantUserSnap = await getDoc(merchantUserDocRef);
 
       if (!merchantUserSnap.exists()) {
-        throw new Error("Merchant user profile not found.");
+        throw new Error("Merchant's user profile not found.");
       }
       const merchantUserData = merchantUserSnap.data() as User;
 
-      const participantIds = [user.id, merchant.ownerId].sort();
+      // Step 3: Construct a consistent Chat ID and check if it exists
+      const participantIds = [user.id, ownerId].sort();
       const chatId = participantIds.join('_');
       const chatDocRef = doc(db, 'chats', chatId);
 
@@ -161,6 +178,7 @@ export default function MerchantPage() {
       if (chatDoc.exists()) {
         router.push(`/chat/${chatId}`);
       } else {
+        // Step 4: Create the chat if it doesn't exist
         const currentUserParticipant: ChatParticipant = {
           id: user.id,
           name: user.name || user.email || 'Anonymous User',
@@ -168,9 +186,9 @@ export default function MerchantPage() {
         };
 
         const merchantParticipant: ChatParticipant = {
-          id: merchant.ownerId,
-          name: merchantUserData.name || merchant.companyName,
-          avatar: merchantUserData.avatar || merchant.logo || null,
+          id: ownerId,
+          name: merchantUserData.name || currentMerchantData.companyName,
+          avatar: merchantUserData.avatar || currentMerchantData.logo || null,
         };
         
         const chatData = {
@@ -186,7 +204,7 @@ export default function MerchantPage() {
       }
     } catch (error) {
       console.error("Error creating or finding chat:", error);
-      toast({ title: "Error", description: "Could not start a conversation.", variant: "destructive" });
+      toast({ title: "Error", description: (error as Error).message || "Could not start a conversation.", variant: "destructive" });
     } finally {
       setIsCreatingChat(false);
     }
@@ -352,3 +370,5 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
+
+    
