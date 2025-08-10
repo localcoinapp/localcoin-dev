@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2, Sparkles } from "lucide-react";
 import { countries } from "@/data/countries";
 import { states } from "@/data/states";
 import { provinces } from "@/data/provinces";
@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { geohashForLocation } from "geofire-common";
 import { storeCategories } from "@/data/store-categories";
+import { enhanceDescription } from "@/ai/flows/enhance-description";
 
 type Position = { lat: number; lng: number };
 
@@ -118,6 +119,7 @@ export default function StoreSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [positionPreview, setPositionPreview] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
@@ -203,6 +205,28 @@ export default function StoreSettingsPage() {
           setIsUploadingBanner(false);
         }
       }
+    }
+  };
+
+  const handleEnhanceDescription = async () => {
+    const currentDescription = form.getValues('description');
+    if (!currentDescription) {
+        toast({
+            title: "No Description",
+            description: "Please enter a description first before enhancing.",
+            variant: "destructive"
+        });
+        return;
+    }
+    setIsEnhancing(true);
+    try {
+        const result = await enhanceDescription({ description: currentDescription });
+        form.setValue('description', result.enhancedDescription, { shouldValidate: true });
+    } catch (error) {
+        console.error("Error enhancing description:", error);
+        toast({ title: "Enhancement Failed", description: "Could not enhance the description.", variant: "destructive" });
+    } finally {
+        setIsEnhancing(false);
     }
   };
 
@@ -454,7 +478,23 @@ export default function StoreSettingsPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Store Description</FormLabel>
+                    <div className="flex justify-between items-center">
+                        <FormLabel>Store Description</FormLabel>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleEnhanceDescription}
+                            disabled={isEnhancing}
+                        >
+                            {isEnhancing ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                                <Sparkles className="h-4 w-4 mr-2" />
+                            )}
+                            Enhance with AI
+                        </Button>
+                    </div>
                     <FormControl>
                       <Textarea
                         placeholder="Describe your business and what you offer."
