@@ -132,11 +132,11 @@ export default function MerchantPage() {
 
 
   const handleMessageMerchant = async () => {
+    if (!user || !merchant?.ownerId) return;
+
     setIsCreatingChat(true);
 
-    // No auth check needed here as per user instruction.
-    // The page visibility logic already handles this.
-    const participantIds = [user!.id, merchant!.ownerId].sort();
+    const participantIds = [user.id, merchant.ownerId].sort();
     const chatId = participantIds.join('_');
     const chatDocRef = doc(db, 'chats', chatId);
 
@@ -149,8 +149,8 @@ export default function MerchantPage() {
         await setDoc(chatDocRef, {
           participantIds: participantIds,
           participants: [
-            { id: user!.id, name: user!.name || user!.email, avatar: user!.avatar },
-            { id: merchant!.ownerId, name: merchant!.companyName, avatar: merchant!.logo }
+            { id: user.id, name: user.name || user.email, avatar: user.avatar },
+            { id: merchant.ownerId, name: merchant.companyName, avatar: merchant.logo }
           ],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -326,5 +326,3 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
-
-    
