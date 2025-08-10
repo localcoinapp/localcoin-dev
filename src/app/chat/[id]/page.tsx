@@ -1,6 +1,7 @@
+
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -11,44 +12,113 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ArrowLeft, Send } from 'lucide-react'
-import type { Message } from '@/types'
+import { ArrowLeft, Send, Loader2 } from 'lucide-react'
+import { Message, Chat, ChatParticipant } from '@/types'
 import { ChatBubble } from '@/components/chat/chat-bubble'
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
-
-const otherUser = { id: '1', name: 'SunnySide Cafe', avatar: 'https://placehold.co/100x100' };
-
-const initialMessages: Message[] = [
-  { id: '1', text: 'Hello! I would like to know if you have gluten-free options.', createdAt: '10:00 AM', sender: { id: '0', name: 'Me', avatar: 'https://placehold.co/100x100' } },
-  { id: '2', text: 'Hola! Sí, tenemos varias opciones sin gluten. ¿Qué te gustaría saber?', createdAt: '10:01 AM', sender: otherUser },
-  { id: '3', text: 'Great! Do you have a gluten-free version of your pancakes?', createdAt: '10:02 AM', sender: { id: '0', name: 'Me', avatar: 'https://placehold.co/100x100' } },
-  { id: '4', text: 'Sí, claro. Nuestras tortitas de trigo sarraceno son sin gluten y muy populares.', createdAt: '10:03 AM', sender: otherUser },
-];
-
+import { db } from '@/lib/firebase';
+import { 
+    doc, 
+    collection, 
+    onSnapshot, 
+    addDoc, 
+    serverTimestamp,
+    orderBy,
+    query,
+    updateDoc
+} from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ChatPage({ params }: { params: { id: string } }) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMessage.trim() === '' || !user) return;
+  const chatId = params.id;
 
-    const message: Message = {
-      id: (messages.length + 1).toString(),
-      text: newMessage,
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      sender: {
-        id: user.id,
-        name: user.name || 'Me',
-        avatar: user.avatar || 'https://placehold.co/100x100'
-      },
+  useEffect(() => {
+    if (!chatId) return;
+
+    // Fetch chat details
+    const chatDocRef = doc(db, 'chats', chatId);
+    const unsubscribeChat = onSnapshot(chatDocRef, (doc) => {
+      if (doc.exists()) {
+        setChat({ id: doc.id, ...doc.data() } as Chat);
+      } else {
+        // Handle chat not found
+      }
+    });
+
+    // Fetch messages
+    const messagesRef = collection(db, 'chats', chatId, 'messages');
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      setMessages(msgs);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeChat();
+      unsubscribeMessages();
+    };
+  }, [chatId]);
+
+  useEffect(() => {
+    // Scroll to bottom when new messages arrive
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTo({
+        top: scrollAreaRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
-    setMessages([...messages, message]);
+  }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newMessage.trim() === '' || !user || !chatId) return;
+
+    const messagesRef = collection(db, 'chats', chatId, 'messages');
+    const chatDocRef = doc(db, 'chats', chatId);
+    const text = newMessage;
     setNewMessage('');
+
+    try {
+        const messagePayload: Omit<Message, 'id'> = {
+            senderId: user.id,
+            text,
+            timestamp: serverTimestamp() as any, // Will be replaced by server
+        };
+        await addDoc(messagesRef, messagePayload);
+
+        // Update last message on chat document
+        await updateDoc(chatDocRef, {
+            lastMessage: {
+                text,
+                timestamp: serverTimestamp(),
+            },
+            updatedAt: serverTimestamp()
+        });
+
+    } catch (error) {
+        console.error("Error sending message:", error);
+        // Handle error (e.g., show a toast)
+    }
   };
+
+  const otherUser = chat?.participants.find(p => p.id !== user?.id);
+
+  if (loading) {
+    return <ChatPageSkeleton />;
+  }
+
+  if (!chat || !otherUser) {
+    return <div className="text-center p-8">Chat not found or you do not have access.</div>;
+  }
 
   return (
     <div className="flex justify-center items-center h-full p-4">
@@ -60,19 +130,19 @@ export default function ChatPage({ params }: { params: { id: string } }) {
             </Button>
         </Link>
         <Avatar>
-          <AvatarImage src={otherUser.avatar} />
+          <AvatarImage src={otherUser.avatar || undefined} />
           <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
         </Avatar>
         <div>
             <h2 className="text-lg font-bold font-headline">{otherUser.name}</h2>
-            <p className="text-sm text-muted-foreground">Online</p>
+            {/* Could add online status here in the future */}
         </div>
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        <ScrollArea className="h-[calc(100vh-16rem)] p-4">
+        <ScrollArea className="h-[calc(100vh-16rem)] p-4" ref={scrollAreaRef as any}>
           <div className="space-y-4">
             {messages.map((message) => (
-              <ChatBubble key={message.id} message={message} isMe={message.sender.id === user?.id} />
+              <ChatBubble key={message.id} message={message} isMe={message.senderId === user?.id} />
             ))}
           </div>
         </ScrollArea>
@@ -94,3 +164,32 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     </div>
   )
 }
+
+
+const ChatPageSkeleton = () => (
+    <div className="flex justify-center items-center h-full p-4">
+        <Card className="w-full max-w-2xl h-full flex flex-col shadow-2xl">
+            <CardHeader className="flex flex-row items-center space-x-4 p-4 border-b">
+                <Skeleton className="h-10 w-10 rounded-md" />
+                <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-[150px]" />
+                        <Skeleton className="h-3 w-[100px]" />
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="flex-1 p-4 space-y-4">
+                <div className="flex justify-start gap-2"><Skeleton className="h-8 w-8 rounded-full" /><Skeleton className="h-16 w-3/4 rounded-lg" /></div>
+                <div className="flex justify-end gap-2"><Skeleton className="h-12 w-1/2 rounded-lg" /><Skeleton className="h-8 w-8 rounded-full" /></div>
+                <div className="flex justify-start gap-2"><Skeleton className="h-8 w-8 rounded-full" /><Skeleton className="h-8 w-3/5 rounded-lg" /></div>
+            </CardContent>
+            <CardFooter className="p-4 border-t">
+                <div className="flex w-full items-center space-x-2">
+                    <Skeleton className="h-10 flex-1" />
+                    <Skeleton className="h-10 w-10" />
+                </div>
+            </CardFooter>
+        </Card>
+    </div>
+);

@@ -2,8 +2,8 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { useParams, useRouter } from 'next/navigation';
+import { doc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Merchant, MerchantItem } from '@/types';
-import { Globe, Instagram, MapPin } from 'lucide-react';
+import { Globe, Instagram, MapPin, MessageSquare, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 
 interface Listing extends MerchantItem {
   title?: string; 
@@ -20,9 +22,13 @@ interface Listing extends MerchantItem {
 
 export default function MerchantPage() {
   const { id } = useParams();
+  const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -51,6 +57,57 @@ export default function MerchantPage() {
     }
   }, [id]);
 
+  const handleMessageMerchant = async () => {
+    if (!user || !merchant || !merchant.ownerId) {
+      toast({ title: "Error", description: "You must be logged in to message a merchant.", variant: "destructive" });
+      return;
+    }
+    
+    if (user.id === merchant.ownerId) {
+        toast({ title: "Info", description: "You cannot start a chat with yourself." });
+        return;
+    }
+
+    setIsCreatingChat(true);
+
+    try {
+      // Check if a chat already exists
+      const chatsRef = collection(db, "chats");
+      const q = query(chatsRef, where('participantIds', 'array-contains', user.id));
+      const querySnapshot = await getDocs(q);
+
+      let existingChat = null;
+      querySnapshot.forEach(doc => {
+        const chat = doc.data();
+        if (chat.participantIds.includes(merchant.ownerId)) {
+          existingChat = { id: doc.id, ...chat };
+        }
+      });
+      
+      if (existingChat) {
+        router.push(`/chat/${existingChat.id}`);
+      } else {
+        // Create a new chat
+        const newChatRef = await addDoc(chatsRef, {
+          participantIds: [user.id, merchant.ownerId],
+          participants: [
+            { id: user.id, name: user.name || user.email, avatar: user.avatar },
+            { id: merchant.ownerId, name: merchant.companyName, avatar: merchant.logo }
+          ],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessage: null,
+        });
+        router.push(`/chat/${newChatRef.id}`);
+      }
+    } catch (error) {
+      console.error("Error creating or finding chat:", error);
+      toast({ title: "Error", description: "Could not start a conversation.", variant: "destructive" });
+    } finally {
+      setIsCreatingChat(false);
+    }
+  };
+
   if (loading) {
     return <MerchantPageSkeleton />;
   }
@@ -60,7 +117,6 @@ export default function MerchantPage() {
   }
   
   const fullAddress = [merchant.street, merchant.houseNumber, merchant.city, merchant.zipCode].filter(Boolean).join(', ');
-
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -133,6 +189,12 @@ export default function MerchantPage() {
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
+                    {user && user.id !== merchant.ownerId && (
+                         <Button onClick={handleMessageMerchant} disabled={isCreatingChat} className="w-full">
+                            {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4"/>}
+                            Message Merchant
+                         </Button>
+                    )}
                     {merchant.website && (
                       <Button asChild variant="outline" className="w-full">
                         <a href={merchant.website} target="_blank" rel="noopener noreferrer">
@@ -200,5 +262,3 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
-
-    

@@ -1,4 +1,6 @@
 
+import type { Timestamp } from 'firebase/firestore';
+
 export type NavItem = {
   title: string
   href: string
@@ -40,6 +42,7 @@ export type Merchant = {
   instagram?: string;
   logo?: string;
   banner?: string;
+  ownerId?: string; // Add ownerId to link merchant to a user
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
@@ -66,18 +69,28 @@ export type User = {
 
 
 export type Message = {
-  id:string
-  text: string
-  createdAt: string
-  sender: Pick<User, 'id' | 'name' | 'avatar'>
-  translatedText?: string
+  id?: string
+  senderId: string;
+  text: string;
+  timestamp: Timestamp;
+  translatedText?: string;
+};
+
+export type ChatParticipant = {
+  id: string;
+  name: string;
+  avatar: string | null;
 }
 
 export type Chat = {
-  id: string
-  otherUser: Pick<User, 'id' | 'name' | 'avatar'>
-  messages: Message[]
-}
+  id: string;
+  participantIds: string[];
+  participants: ChatParticipant[];
+  lastMessage: Message | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 
 export type OrderStatus = 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'completed' | 'ready_to_redeem' | 'refunded';
 

@@ -1,3 +1,7 @@
+
+'use client'
+
+import { useEffect, useState } from "react";
 import Link from "next/link"
 import {
   Avatar,
@@ -6,30 +10,63 @@ import {
 } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { Chat, User } from "@/types"
-
-const me: User = { id: '0', name: 'Me', avatar: 'https://placehold.co/100x100' };
-
-const chats: Omit<Chat, 'messages'>[] = [
-  {
-    id: '1',
-    otherUser: { id: '1', name: 'SunnySide Cafe', avatar: 'https://placehold.co/100x100' },
-  },
-  {
-    id: '2',
-    otherUser: { id: '2', name: 'The Grand Hotel', avatar: 'https://placehold.co/100x100' },
-  },
-  {
-    id: '3',
-    otherUser: { id: '3', name: 'Tech Cowork Space', avatar: 'https://placehold.co/100x100' },
-  },
-  {
-    id: '4',
-    otherUser: { id: '4', name: 'Seaside Restaurant', avatar: 'https://placehold.co/100x100' },
-  },
-]
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Chat } from "@/types";
+import { formatDistanceToNow } from 'date-fns';
 
 export default function ChatListPage() {
+  const { user } = useAuth();
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const chatsRef = collection(db, "chats");
+    const q = query(
+        chatsRef, 
+        where("participantIds", "array-contains", user.id),
+        orderBy("updatedAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userChats = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Chat[];
+      setChats(userChats);
+      setLoading(false);
+    }, (error) => {
+        console.error("Error fetching chats: ", error);
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  if (loading) {
+      return (
+         <div className="flex h-full flex-col items-center justify-center p-4">
+            <Card className="w-full max-w-lg">
+                <CardHeader>
+                    <CardTitle className="text-2xl font-headline">Your Conversations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                    </div>
+                </CardContent>
+            </Card>
+         </div>
+      )
+  }
+  
   return (
     <div className="flex h-full flex-col items-center justify-center p-4">
       <Card className="w-full max-w-lg">
@@ -39,22 +76,37 @@ export default function ChatListPage() {
         <CardContent>
           <ScrollArea className="h-[60vh]">
             <div className="space-y-4">
-              {chats.map((chat) => (
-                <Link
-                  key={chat.id}
-                  href={`/chat/${chat.id}`}
-                  className="flex items-center space-x-4 p-2 rounded-lg transition-colors hover:bg-muted"
-                >
-                  <Avatar>
-                    <AvatarImage src={chat.otherUser.avatar} alt={chat.otherUser.name} />
-                    <AvatarFallback>{chat.otherUser.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-semibold">{chat.otherUser.name}</p>
-                    <p className="text-sm text-muted-foreground">Click to view messages</p>
-                  </div>
-                </Link>
-              ))}
+              {chats.length > 0 ? chats.map((chat) => {
+                const otherUser = chat.participants.find(p => p.id !== user?.id);
+                if (!otherUser) return null;
+
+                const lastMessageText = chat.lastMessage?.text || "No messages yet.";
+                const lastMessageTimestamp = chat.lastMessage?.timestamp 
+                    ? formatDistanceToNow(chat.lastMessage.timestamp.toDate(), { addSuffix: true })
+                    : '';
+
+                return (
+                    <Link
+                    key={chat.id}
+                    href={`/chat/${chat.id}`}
+                    className="flex items-center space-x-4 p-2 rounded-lg transition-colors hover:bg-muted"
+                    >
+                    <Avatar>
+                        <AvatarImage src={otherUser.avatar || undefined} alt={otherUser.name} />
+                        <AvatarFallback>{otherUser.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 overflow-hidden">
+                        <div className="flex justify-between items-center">
+                            <p className="font-semibold truncate">{otherUser.name}</p>
+                            <p className="text-xs text-muted-foreground flex-shrink-0">{lastMessageTimestamp}</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{lastMessageText}</p>
+                    </div>
+                    </Link>
+                )
+              }) : (
+                 <p className="text-center text-muted-foreground py-8">You have no conversations.</p>
+              )}
             </div>
           </ScrollArea>
         </CardContent>
@@ -62,3 +114,4 @@ export default function ChatListPage() {
     </div>
   )
 }
+
