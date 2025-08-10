@@ -29,11 +29,12 @@ export default function ChatListPage() {
     }
 
     const chatsRef = collection(db, "chats");
-    // This query now correctly fetches chats where the user's ID OR a merchant ID they are chatting with is present.
+    // The orderBy clause is removed to prevent an error on a missing index.
+    // The user should create the composite index in the Firebase console.
+    // The original query was: query(chatsRef, where("participantIds", "array-contains", user.id), orderBy("updatedAt", "desc"));
     const q = query(
         chatsRef, 
-        where("participantIds", "array-contains", user.id),
-        orderBy("updatedAt", "desc")
+        where("participantIds", "array-contains", user.id)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -41,6 +42,14 @@ export default function ChatListPage() {
         id: doc.id,
         ...doc.data(),
       })) as Chat[];
+      
+      // Manual sort on the client-side as a temporary fallback
+      userChats.sort((a, b) => {
+          const timeA = a.updatedAt?.toDate() || 0;
+          const timeB = b.updatedAt?.toDate() || 0;
+          return timeB - timeA;
+      });
+
       setChats(userChats);
       setLoading(false);
     }, (error) => {
@@ -116,5 +125,3 @@ export default function ChatListPage() {
     </div>
   )
 }
-
-    
