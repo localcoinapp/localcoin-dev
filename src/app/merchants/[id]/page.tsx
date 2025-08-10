@@ -144,7 +144,6 @@ export default function MerchantPage() {
     setIsCreatingChat(true);
 
     try {
-        // Step 1: Fetch the full merchant document to get the ownerId
         const merchantDocRef = doc(db, 'merchants', merchantId);
         const merchantDocSnap = await getDoc(merchantDocRef);
 
@@ -160,6 +159,7 @@ export default function MerchantPage() {
         
         if (user.id === ownerId) {
             toast({ title: "Info", description: "You cannot start a chat with yourself.", variant: "default" });
+            setIsCreatingChat(false);
             return;
         }
 
@@ -174,7 +174,6 @@ export default function MerchantPage() {
             return;
         }
 
-        // Fetch owner's user data to create a complete participant profile
         const ownerUserDocRef = doc(db, 'users', ownerId);
         const ownerUserSnap = await getDoc(ownerUserDocRef);
         if (!ownerUserSnap.exists()) {

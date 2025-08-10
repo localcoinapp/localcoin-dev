@@ -20,11 +20,12 @@ export type MerchantItem = {
 
 export type Merchant = {
   id: string
-  name?: string;
+  ownerId: string;
   companyName: string;
   category: string
   rating: number
-  imageUrl: string
+  logo: string
+  banner: string
   aiHint?: string
   position: {
     lat: number
@@ -40,9 +41,6 @@ export type Merchant = {
   zipCode?: string;
   website?: string;
   instagram?: string;
-  logo?: string;
-  banner?: string;
-  ownerId: string;
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
