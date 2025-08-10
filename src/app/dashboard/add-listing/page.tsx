@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -40,7 +41,7 @@ const formSchema = z.object({
   quantity: z.coerce.number().int().min(0, { message: "Quantity must be a positive number." }),
 })
 
-const categories = ['Coffee', 'Pastry', 'Accommodation', 'Food', 'Workspace', 'Dining', 'Beverages', 'Service'];
+const categories = ['Coffee', 'Pastry', 'Accommodation', 'Food', 'Workspace', 'Dining', 'Beverages', 'Service', 'Farm'];
 
 export default function AddListingPage() {
   const router = useRouter();

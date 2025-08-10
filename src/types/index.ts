@@ -96,4 +96,5 @@ export type CartItem = {
   redeemedAt?: any;
   userId: string;
   userName: string;
+  category: string;
 }

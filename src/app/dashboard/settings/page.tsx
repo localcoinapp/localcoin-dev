@@ -82,6 +82,7 @@ async function geocodeAddress({
 
 const storeSettingsSchema = z.object({
   companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+  category: z.string().min(1, { message: "Please select a store category." }),
   country: z.string().min(1, { message: "Please select a country." }),
   street: z.string().min(3, { message: "Please enter a street name." }),
   houseNumber: z.string().min(1, { message: "Please enter a house number." }),
@@ -108,6 +109,8 @@ const storeSettingsSchema = z.object({
 });
 
 type StoreSettingsValues = z.infer<typeof storeSettingsSchema>;
+
+const storeCategories = ['Cafe', 'Hotel', 'Coworking', 'Restaurant', 'Events', 'Activities', 'Farm', 'Service'];
 
 export default function StoreSettingsPage() {
   const { user } = useAuth();
@@ -467,6 +470,44 @@ export default function StoreSettingsPage() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Store Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {storeCategories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="taxNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tax ID / VAT Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your business tax number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="country"
@@ -489,20 +530,8 @@ export default function StoreSettingsPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="taxNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tax ID / VAT Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your business tax number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
+
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
