@@ -1,17 +1,16 @@
+'use client';
 
-'use client'
-
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -19,77 +18,130 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Camera } from "lucide-react"
-import { countries } from "@/data/countries"
-import { states } from "@/data/states"
-import { provinces } from "@/data/provinces"
-import { useAuth } from "@/hooks/use-auth"
-import { db } from "@/lib/firebase"
-import { doc, onSnapshot, updateDoc } from "firebase/firestore"
-import { useEffect, useState } from "react"
-import { useToast } from "@/hooks/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
-import { geocodeAddress } from "@/ai/flows/geocode-address"
-import { geohashForLocation } from "geofire-common"
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Camera } from "lucide-react";
+import { countries } from "@/data/countries";
+import { states } from "@/data/states";
+import { provinces } from "@/data/provinces";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { geohashForLocation } from "geofire-common";
+
+type Position = { lat: number; lng: number };
+
+// ---------- OpenStreetMap (Nominatim) geocoder ----------
+async function geocodeAddress({
+  street,
+  houseNumber,
+  city,
+  zipCode,
+  country,
+}: {
+  street: string;
+  houseNumber: string;
+  city: string;
+  zipCode: string;
+  country: string;
+}): Promise<Position | null> {
+  const query = `${houseNumber} ${street}, ${zipCode} ${city}, ${country}`;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+    query
+  )}&limit=1&addressdetails=1`;
+
+  const res = await fetch(url, {
+    headers: {
+      // OSM/Nominatim require a descriptive User-Agent with contact
+      "User-Agent": "LocalCoin/1.0 (fresh@katari.farm)",
+      "Accept": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Geocoding API request failed");
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  const lat = parseFloat(data[0].lat);
+  const lng = parseFloat(data[0].lon);
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+  return { lat, lng };
+}
+// --------------------------------------------------------
 
 const storeSettingsSchema = z.object({
-    companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
-    country: z.string().min(1, { message: "Please select a country." }),
-    street: z.string().min(3, { message: "Please enter a street name." }),
-    houseNumber: z.string().min(1, { message: "Please enter a house number." }),
-    city: z.string().min(2, { message: "Please enter a city." }),
-    state: z.string().optional(),
-    zipCode: z.string().min(3, { message: "Please enter a ZIP or postal code." }),
-    contactEmail: z.string().email({ message: "Please enter a valid email address." }),
-    phone: z.string().min(10, { message: "Please enter a valid phone number." }),
-    website: z.string().url().optional().or(z.literal('')),
-    instagram: z.string().optional(),
-    description: z.string().min(20, { message: "Description must be at least 20 characters." }),
-    taxNumber: z.string().optional(),
-    logo: z.any().optional(),
+  companyName: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+  country: z.string().min(1, { message: "Please select a country." }),
+  street: z.string().min(3, { message: "Please enter a street name." }),
+  houseNumber: z.string().min(1, { message: "Please enter a house number." }),
+  city: z.string().min(2, { message: "Please enter a city." }),
+  state: z.string().optional(),
+  zipCode: z.string().min(3, { message: "Please enter a ZIP or postal code." }),
+  contactEmail: z.string().email({ message: "Please enter a valid email address." }),
+  phone: z.string().min(6, { message: "Please enter a valid phone number." }),
+  website: z.string().url().optional().or(z.literal('')),
+  instagram: z.string().optional(),
+  description: z.string().min(20, { message: "Description must be at least 20 characters." }),
+  taxNumber: z.string().optional(),
+  logo: z.any().optional(),
 }).refine(data => {
-    if (data.country === 'US') {
-        const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
-        return usPhoneRegex.test(data.phone);
-    }
-    return true;
+  if (data.country === 'US') {
+    const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
+    return usPhoneRegex.test(data.phone);
+  }
+  return true;
 }, {
-    message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
-    path: ["phone"],
+  message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
+  path: ["phone"],
 });
 
-type StoreSettingsValues = z.infer<typeof storeSettingsSchema>
+type StoreSettingsValues = z.infer<typeof storeSettingsSchema>;
 
 export default function StoreSettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [positionPreview, setPositionPreview] = useState<Position | null>(null);
+
   const form = useForm<StoreSettingsValues>({
     resolver: zodResolver(storeSettingsSchema),
     defaultValues: {},
-  })
+    mode: "onTouched",
+  });
 
+  // Subscribe to merchant doc
   useEffect(() => {
     if (user && user.merchantId) {
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
-      const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
+      const unsubscribe = onSnapshot(merchantDocRef, (snapshot) => {
+        const data = snapshot.data();
+        if (data) {
           setMerchantData(data);
-          form.reset(data);
+          form.reset(data as Partial<StoreSettingsValues>);
+          // If position exists in doc, show preview
+          if (data.position?.lat && data.position?.lng) {
+            setPositionPreview({ lat: data.position.lat, lng: data.position.lng });
+          }
         }
+        setIsLoading(false);
+      }, (err) => {
+        console.error("Error loading merchant document:", err);
         setIsLoading(false);
       });
       return () => unsubscribe();
     } else {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [user, form]);
 
@@ -99,28 +151,45 @@ export default function StoreSettingsPage() {
     if (!user || !user.merchantId) return;
 
     try {
-      const position = await geocodeAddress({
-        street: values.street,
-        houseNumber: values.houseNumber,
-        city: values.city,
-        zipCode: values.zipCode,
-        country: values.country,
-      });
+      // Determine if address fields changed compared to loaded merchantData
+      const addressChanged =
+        values.street !== merchantData?.street ||
+        values.houseNumber !== merchantData?.houseNumber ||
+        values.city !== merchantData?.city ||
+        values.zipCode !== merchantData?.zipCode ||
+        values.country !== merchantData?.country;
 
-      if (!position || !position.lat || !position.lng) {
-        throw new Error("Could not geocode the address. Please check the details and try again.");
+      let position: Position | null = merchantData?.position ?? null;
+      let geohash: string | null = merchantData?.geohash ?? null;
+
+      if (addressChanged || !position) {
+        position = await geocodeAddress({
+          street: values.street,
+          houseNumber: values.houseNumber,
+          city: values.city,
+          zipCode: values.zipCode,
+          country: values.country,
+        });
+
+        if (!position) {
+          throw new Error("Could not geocode the address. Please check the details.");
+        }
+
+        geohash = geohashForLocation([position.lat, position.lng]);
       }
-
-      const geohash = geohashForLocation([position.lat, position.lng]);
 
       const dataToUpdate = {
         ...values,
-        position,
-        geohash,
+        ...(position && { position }),
+        ...(geohash && { geohash }),
+        // Any extra fields you'd like to maintain can be merged by setDoc merge:true
       };
 
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
-      await updateDoc(merchantDocRef, dataToUpdate);
+      // Create if missing, update if exists
+      await setDoc(merchantDocRef, dataToUpdate, { merge: true });
+
+      setPositionPreview(position ?? null);
 
       toast({
         title: "Success",
@@ -134,7 +203,7 @@ export default function StoreSettingsPage() {
         description: (error as Error).message || "There was an error updating your store settings.",
       });
     }
-  }
+  };
 
   const renderStateField = () => {
     if (selectedCountry === 'US') {
@@ -190,43 +259,56 @@ export default function StoreSettingsPage() {
       );
     }
     return null;
-  }
+  };
+
+  const mapEmbedUrl = useMemo(() => {
+    if (!positionPreview) return null;
+    const { lat, lng } = positionPreview;
+    // Create a small bbox around point for OSM embed
+    const d = 0.005; // ~500m
+    const minLon = lng - d;
+    const minLat = lat - d;
+    const maxLon = lng + d;
+    const maxLat = lat + d;
+    const marker = `&marker=${lat}%2C${lng}`;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${minLon}%2C${minLat}%2C${maxLon}%2C${maxLat}&layer=mapnik${marker}`;
+  }, [positionPreview]);
 
   if (isLoading) {
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
-          <Card className="w-full max-w-3xl text-left shadow-lg">
-            <CardHeader>
-                <Skeleton className="h-8 w-1/2 mx-auto" />
-                <Skeleton className="h-4 w-3/4 mx-auto" />
-            </CardHeader>
-            <CardContent className="space-y-8">
-                <div className="flex items-center space-x-6">
-                    <Skeleton className="h-24 w-24 rounded-full" />
-                    <div className="flex-grow space-y-2">
-                        <Skeleton className="h-6 w-full" />
-                    </div>
-                </div>
-                <Skeleton className="h-24 w-full" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-                 <div className="text-right pt-4">
-                    <Skeleton className="h-10 w-24 ml-auto" />
-                </div>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <Card className="w-full max-w-3xl text-left shadow-lg">
+          <CardHeader>
+            <Skeleton className="h-8 w-1/2 mx-auto" />
+            <Skeleton className="h-4 w-3/4 mx-auto" />
+          </CardHeader>
+          <CardContent className="space-y-8">
+            <div className="flex items-center space-x-6">
+              <Skeleton className="h-24 w-24 rounded-full" />
+              <div className="flex-grow space-y-2">
+                <Skeleton className="h-6 w-full" />
+              </div>
+            </div>
+            <Skeleton className="h-24 w-full" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="text-right pt-4">
+              <Skeleton className="h-10 w-24 ml-auto" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  if (!merchantData) {
-      return (
-        <div className="container text-center p-8">
-            <p>Could not load merchant data. You may not be a merchant.</p>
-        </div>
-      )
+  if (!user || !user.merchantId) {
+    return (
+      <div className="container text-center p-8">
+        <p>Could not load merchant data. You may not be a merchant.</p>
+      </div>
+    );
   }
 
   return (
@@ -238,14 +320,15 @@ export default function StoreSettingsPage() {
             Manage your public store information.
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="flex items-center space-x-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={merchantData.logo || "https://placehold.co/100x100"} alt="Store logo" />
-                    <AvatarFallback>{merchantData.companyName?.[0] || "S"}</AvatarFallback>
+                    <AvatarImage src={merchantData?.logo || "https://placehold.co/100x100"} alt="Store logo" />
+                    <AvatarFallback>{(merchantData?.companyName?.[0] || "S")}</AvatarFallback>
                   </Avatar>
                   <Button
                     type="button"
@@ -295,40 +378,40 @@ export default function StoreSettingsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Country</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select your country" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {countries.map((country) => (
-                              <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="taxNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tax ID / VAT Number</FormLabel>
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <Input placeholder="Your business tax number" {...field} />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your country" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="taxNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tax ID / VAT Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your business tax number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -345,7 +428,7 @@ export default function StoreSettingsPage() {
                     </FormItem>
                   )}
                 />
-                  <FormField
+                <FormField
                   control={form.control}
                   name="houseNumber"
                   render={({ field }) => (
@@ -361,7 +444,7 @@ export default function StoreSettingsPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormField
+                <FormField
                   control={form.control}
                   name="city"
                   render={({ field }) => (
@@ -374,7 +457,7 @@ export default function StoreSettingsPage() {
                     </FormItem>
                   )}
                 />
-                  {renderStateField()}
+                {renderStateField()}
                 <FormField
                   control={form.control}
                   name="zipCode"
@@ -411,9 +494,10 @@ export default function StoreSettingsPage() {
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input 
-                            placeholder={selectedCountry === 'us' ? "(555) 123-4567" : "Your phone number"}
-                            {...field} />
+                        <Input
+                          placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "Your phone number"}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -422,7 +506,7 @@ export default function StoreSettingsPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
+                <FormField
                   control={form.control}
                   name="website"
                   render={({ field }) => (
@@ -450,9 +534,35 @@ export default function StoreSettingsPage() {
                 />
               </div>
 
+              {positionPreview && (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">
+                    Coordinates saved: <span className="font-mono">{positionPreview.lat.toFixed(6)}, {positionPreview.lng.toFixed(6)}</span>
+                  </div>
+                  <div className="w-full aspect-video rounded-lg overflow-hidden border">
+                    <iframe
+                      title="Location preview"
+                      src={mapEmbedUrl || undefined}
+                      className="w-full h-full"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="text-right">
+                    <a
+                      href={`https://www.openstreetmap.org/?mlat=${positionPreview.lat}&mlon=${positionPreview.lng}#map=16/${positionPreview.lat}/${positionPreview.lng}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm underline"
+                    >
+                      Open in OpenStreetMap
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <div className="text-right pt-4">
                 <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
+                  {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </form>
@@ -460,5 +570,5 @@ export default function StoreSettingsPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
