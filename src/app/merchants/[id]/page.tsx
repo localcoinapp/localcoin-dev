@@ -76,7 +76,7 @@ export default function MerchantPage() {
       const q = query(chatsRef, where('participantIds', 'array-contains', user.id));
       const querySnapshot = await getDocs(q);
 
-      let existingChat = null;
+      let existingChat: { id: string; [key: string]: any; } | null = null;
       querySnapshot.forEach(doc => {
         const chat = doc.data();
         if (chat.participantIds.includes(merchant.ownerId)) {
@@ -262,3 +262,5 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
+
+    

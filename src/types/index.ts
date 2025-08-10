@@ -42,7 +42,7 @@ export type Merchant = {
   instagram?: string;
   logo?: string;
   banner?: string;
-  ownerId?: string; // Add ownerId to link merchant to a user
+  ownerId: string; // Add ownerId to link merchant to a user
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
@@ -111,3 +111,5 @@ export type CartItem = {
   userName: string;
   category: string;
 }
+
+    

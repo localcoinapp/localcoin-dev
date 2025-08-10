@@ -11,6 +11,7 @@ export const merchants: Omit<Merchant, 'id'>[] = [
       aiHint: "bright cafe",
       position: { lat: 52.516, lng: 13.454 },
       description: "Cozy spot for artisanal coffee and sunny side up eggs.",
+      ownerId: "merchant-1-owner-id",
       items: [
         { id: "i1", name: "Espresso", price: 2.50, quantity: 100, category: 'Coffee' },
         { id: "i2", name: "Croissant", price: 3.00, quantity: 50, category: 'Pastry' },
@@ -26,6 +27,7 @@ export const merchants: Omit<Merchant, 'id'>[] = [
       aiHint: "luxury hotel lobby",
       position: { lat: 52.518, lng: 13.450 },
       description: "Luxury stays with a historical touch in the heart of the city.",
+      ownerId: "merchant-2-owner-id",
       items: [
         { id: "i4", name: "Standard Room", price: 150.00, quantity: 10, category: 'Accommodation' },
         { id: "i5", name: "Suite", price: 300.00, quantity: 5, category: 'Accommodation' },
@@ -41,6 +43,7 @@ export const merchants: Omit<Merchant, 'id'>[] = [
       aiHint: "modern coworking space",
       position: { lat: 52.513, lng: 13.458 },
       description: "A vibrant community for startups and freelancers.",
+      ownerId: "merchant-3-owner-id",
       items: [
         { id: "i7", name: "Day Pass", price: 20.00, quantity: 100, category: 'Workspace' },
         { id: "i8", name: "Dedicated Desk (Month)", price: 250.00, quantity: 10, category: 'Workspace' },
@@ -55,6 +58,7 @@ export const merchants: Omit<Merchant, 'id'>[] = [
       aiHint: "restaurant with ocean view",
       position: { lat: 52.510, lng: 13.452 },
       description: "Fresh seafood with a stunning view of the sunset.",
+      ownerId: "merchant-4-owner-id",
       items: [
         { id: "i9", name: "Fish & Chips", price: 18.00, quantity: 40, category: 'Dining' },
         { id: "i10", name: "3-Course Menu", price: 55.00, quantity: 20, category: 'Dining' },
@@ -62,3 +66,5 @@ export const merchants: Omit<Merchant, 'id'>[] = [
       ],
     },
   ];
+
+    
