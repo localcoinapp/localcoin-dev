@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Merchant, MerchantItem, CartItem } from '@/types';
+import { Merchant, MerchantItem, CartItem, ChatParticipant } from '@/types';
 import { Globe, Instagram, MapPin, MessageSquare, Loader2, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -58,7 +58,7 @@ export default function MerchantPage() {
   }, [id]);
 
   const handleAddToCart = async (item: MerchantItem) => {
-    if (!user) return; // The parent page already ensures the user is logged in.
+    if (!user) return;
 
     setAddingToCart(item.id);
 
@@ -67,8 +67,10 @@ export default function MerchantPage() {
 
     try {
         await runTransaction(db, async (transaction) => {
+            const userSnap = await transaction.get(userDocRef);
             const merchantSnap = await transaction.get(merchantDocRef);
 
+            if (!userSnap.exists()) throw new Error("User not found");
             if (!merchantSnap.exists()) throw new Error("Merchant not found");
             
             const merchantData = merchantSnap.data() as Merchant;
@@ -146,12 +148,21 @@ export default function MerchantPage() {
       if (chatDoc.exists()) {
         router.push(`/chat/${chatId}`);
       } else {
+        const currentUserParticipant: ChatParticipant = {
+          id: user.id,
+          name: user.name || user.email || 'User',
+          avatar: user.avatar || null,
+        };
+
+        const merchantParticipant: ChatParticipant = {
+          id: merchant.ownerId,
+          name: merchant.companyName,
+          avatar: merchant.logo || null,
+        };
+        
         await setDoc(chatDocRef, {
           participantIds: participantIds,
-          participants: [
-            { id: user.id, name: user.name || user.email, avatar: user.avatar },
-            { id: merchant.ownerId, name: merchant.companyName, avatar: merchant.logo }
-          ],
+          participants: [currentUserParticipant, merchantParticipant],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: null,
