@@ -1,4 +1,3 @@
-
 'use server';
 
 import { genkit } from '@genkit-ai/core';
@@ -12,6 +11,6 @@ export const ai = genkit({
     }),
     next(),
   ],
-  logSinks: [process.env.GENKIT_ENV === 'dev' ? 'dev' : 'firebase'],
+  logSinks: process.env.GENKIT_ENV === 'dev' ? ['dev'] : [],
   enableTracingAndMetrics: true,
 });
