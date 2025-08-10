@@ -86,6 +86,7 @@ export type Chat = {
   participantIds: string[];
   participants: ChatParticipant[];
   lastMessage: {
+    id: string; // Add message ID to lastMessage object
     text: string;
     timestamp: Timestamp;
   } | null;
@@ -113,5 +114,3 @@ export type CartItem = {
   userName: string;
   category: string;
 }
-
-    

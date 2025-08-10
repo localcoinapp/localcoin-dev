@@ -27,9 +27,12 @@ import {
     serverTimestamp,
     orderBy,
     query,
-    updateDoc
+    updateDoc,
+    deleteDoc,
+    writeBatch
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/hooks/use-toast';
 
 export default function ChatPage() {
   const params = useParams();
@@ -126,11 +129,12 @@ export default function ChatPage() {
             text,
             timestamp: serverTimestamp() as any, // Will be replaced by server
         };
-        await addDoc(messagesRef, messagePayload);
+        const newDocRef = await addDoc(messagesRef, messagePayload);
 
-        // Update last message on chat document
+        // Update last message on chat document with new message ID
         await updateDoc(chatDocRef, {
             lastMessage: {
+                id: newDocRef.id,
                 text,
                 timestamp: serverTimestamp(),
             },
@@ -139,8 +143,60 @@ export default function ChatPage() {
 
     } catch (error) {
         console.error("Error sending message:", error);
-        // Handle error (e.g., show a toast)
+        toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
     }
+  };
+  
+  const handleEditMessage = async (messageId: string, newText: string) => {
+      if (!chatId || !chat) return;
+      const messageDocRef = doc(db, 'chats', chatId, 'messages', messageId);
+      const chatDocRef = doc(db, 'chats', chatId);
+
+      try {
+          const batch = writeBatch(db);
+          batch.update(messageDocRef, { text: newText });
+
+          // Also update the last message text on the chat object if it's the last message
+          if (chat.lastMessage?.id === messageId) {
+              batch.update(chatDocRef, { "lastMessage.text": newText, updatedAt: serverTimestamp() });
+          }
+          await batch.commit();
+
+          toast({ title: "Success", description: "Message updated."});
+      } catch (error) {
+          console.error("Error editing message:", error);
+          toast({ title: "Error", description: "Could not edit message.", variant: "destructive"});
+      }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+      if (!chatId || !chat) return;
+      const messageDocRef = doc(db, 'chats', chatId, 'messages', messageId);
+      const chatDocRef = doc(db, 'chats', chatId);
+
+      try {
+        const batch = writeBatch(db);
+        batch.delete(messageDocRef);
+        
+        // If we are deleting the last message, we need to find the new last message
+        if (chat.lastMessage?.id === messageId) {
+            const newLastMessage = messages.length > 1 ? messages[messages.length - 2] : null;
+            batch.update(chatDocRef, {
+                lastMessage: newLastMessage ? {
+                    id: newLastMessage.id,
+                    text: newLastMessage.text,
+                    timestamp: newLastMessage.timestamp,
+                } : null,
+                updatedAt: serverTimestamp()
+            });
+        }
+        
+        await batch.commit();
+        toast({ title: "Success", description: "Message deleted."});
+      } catch (error) {
+          console.error("Error deleting message:", error);
+          toast({ title: "Error", description: "Could not delete message.", variant: "destructive"});
+      }
   };
 
   const otherUser = chat?.participants.find(p => p.id !== user?.id);
@@ -197,7 +253,17 @@ export default function ChatPage() {
           <div className="space-y-4">
             {messages.map((message) => {
               const isMe = message.senderId === user?.id;
-              return <ChatBubble key={message.id} message={message} isMe={isMe} />
+              // The last message in the chat is editable/deletable by the sender
+              const isLastMessage = chat.lastMessage?.id === message.id;
+
+              return <ChatBubble 
+                key={message.id} 
+                message={message} 
+                isMe={isMe} 
+                isLastMessage={isLastMessage}
+                onEdit={handleEditMessage}
+                onDelete={handleDeleteMessage}
+              />
             })}
           </div>
         </ScrollArea>
@@ -248,6 +314,3 @@ const ChatPageSkeleton = () => (
         </Card>
     </div>
 );
-
-
-    
