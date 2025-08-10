@@ -1,9 +1,8 @@
-
 'use client'
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -58,39 +57,37 @@ export default function MerchantPage() {
   }, [id]);
 
   const handleMessageMerchant = async () => {
-    // The button is only rendered if user and merchant are valid and not the same person,
-    // so we can proceed directly.
     setIsCreatingChat(true);
+    if (!user || !merchant) {
+      toast({ title: "Error", description: "Cannot initiate chat. User or merchant not found.", variant: "destructive" });
+      setIsCreatingChat(false);
+      return;
+    }
+
+    // Create a consistent, predictable chat ID
+    const participantIds = [user.id, merchant.ownerId].sort();
+    const chatId = participantIds.join('_');
+    const chatDocRef = doc(db, 'chats', chatId);
 
     try {
-      // Check if a chat already exists
-      const chatsRef = collection(db, "chats");
-      const q = query(chatsRef, where('participantIds', 'array-contains', user!.id));
-      const querySnapshot = await getDocs(q);
+      const chatDoc = await getDoc(chatDocRef);
 
-      let existingChat: { id: string; [key: string]: any; } | null = null;
-      querySnapshot.forEach(doc => {
-        const chat = doc.data();
-        if (chat.participantIds.includes(merchant!.ownerId)) {
-          existingChat = { id: doc.id, ...chat };
-        }
-      });
-      
-      if (existingChat) {
-        router.push(`/chat/${existingChat.id}`);
+      if (chatDoc.exists()) {
+        // Chat already exists, navigate to it
+        router.push(`/chat/${chatId}`);
       } else {
-        // Create a new chat
-        const newChatRef = await addDoc(chatsRef, {
-          participantIds: [user!.id, merchant!.ownerId],
+        // Create a new chat document with the specific ID
+        await setDoc(chatDocRef, {
+          participantIds: participantIds,
           participants: [
-            { id: user!.id, name: user!.name || user!.email, avatar: user!.avatar },
-            { id: merchant!.ownerId, name: merchant!.companyName, avatar: merchant!.logo }
+            { id: user.id, name: user.name || user.email, avatar: user.avatar },
+            { id: merchant.ownerId, name: merchant.companyName, avatar: merchant.logo }
           ],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: null,
         });
-        router.push(`/chat/${newChatRef.id}`);
+        router.push(`/chat/${chatId}`);
       }
     } catch (error) {
       console.error("Error creating or finding chat:", error);
@@ -254,5 +251,3 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
-
-    
