@@ -95,6 +95,7 @@ const storeSettingsSchema = z.object({
   description: z.string().min(20, { message: "Description must be at least 20 characters." }),
   taxNumber: z.string().optional(),
   logo: z.any().optional(),
+  banner: z.any().optional(),
 }).refine(data => {
   if (data.country === 'US') {
     const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
@@ -114,8 +115,10 @@ export default function StoreSettingsPage() {
   const [merchantData, setMerchantData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [positionPreview, setPositionPreview] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
 
   const form = useForm<StoreSettingsValues>({
@@ -154,37 +157,51 @@ export default function StoreSettingsPage() {
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
+
+  const handleBannerClick = () => {
+    bannerFileInputRef.current?.click();
+  };
   
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, fileType: 'logo' | 'banner') => {
     const file = event.target.files?.[0];
     if (file && user && user.merchantId) {
-        uploadLogo(file, user.merchantId);
-    }
-  };
-
-  const uploadLogo = (file: File, merchantId: string) => {
-    setIsUploading(true);
-    const storageRef = ref(storage, `merchant-logos/${merchantId}/${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        // Optional: handle progress
-      },
-      (error) => {
-        console.error("Upload failed:", error);
-        toast({ title: "Upload Failed", description: "Could not upload the logo.", variant: "destructive" });
-        setIsUploading(false);
-      },
-      () => {
-        getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
-          const merchantDocRef = doc(db, 'merchants', merchantId);
-          await setDoc(merchantDocRef, { logo: downloadURL }, { merge: true });
-          toast({ title: "Logo Updated", description: "Your new logo has been saved." });
-          setIsUploading(false);
-        });
+      if (fileType === 'logo') {
+        setIsUploading(true);
+      } else {
+        setIsUploadingBanner(true);
       }
-    );
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('merchantId', user.merchantId);
+
+      try {
+          const response = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+          });
+
+          if (!response.ok) {
+              throw new Error('Upload failed');
+          }
+
+          const { url } = await response.json();
+          
+          const merchantDocRef = doc(db, 'merchants', user.merchantId);
+          await setDoc(merchantDocRef, { [fileType]: url }, { merge: true });
+
+          toast({ title: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} Updated`, description: `Your new ${fileType} has been saved.` });
+      } catch (error) {
+          console.error("Upload failed:", error);
+          toast({ title: "Upload Failed", description: `Could not upload the ${fileType}.`, variant: "destructive" });
+      } finally {
+        if (fileType === 'logo') {
+          setIsUploading(false);
+        } else {
+          setIsUploadingBanner(false);
+        }
+      }
+    }
   };
 
 
@@ -374,7 +391,7 @@ export default function StoreSettingsPage() {
                   <input
                     type="file"
                     ref={fileInputRef}
-                    onChange={handleFileChange}
+                    onChange={(e) => handleFileChange(e, 'logo')}
                     className="hidden"
                     accept="image/png, image/jpeg, image/gif"
                   />
@@ -404,6 +421,29 @@ export default function StoreSettingsPage() {
                       </FormItem>
                     )}
                   />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <FormLabel>Banner Image</FormLabel>
+                <div className="relative w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center">
+                  {merchantData?.banner && <img src={merchantData.banner} alt="Banner" className="w-full h-full object-cover rounded-lg" />}
+                  <input
+                    type="file"
+                    ref={bannerFileInputRef}
+                    onChange={(e) => handleFileChange(e, 'banner')}
+                    className="hidden"
+                    accept="image/png, image/jpeg, image/gif"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="absolute"
+                    onClick={handleBannerClick}
+                    disabled={isUploadingBanner}
+                  >
+                    {isUploadingBanner ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Camera className="h-4 w-4 mr-2" /> Change Banner</>}
+                  </Button>
                 </div>
               </div>
 
@@ -611,7 +651,7 @@ export default function StoreSettingsPage() {
               )}
 
               <div className="text-right pt-4">
-                <Button type="submit" size="lg" disabled={form.formState.isSubmitting || isUploading}>
+                <Button type="submit" size="lg" disabled={form.formState.isSubmitting || isUploading || isUploadingBanner}>
                   {form.formState.isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
               </div>

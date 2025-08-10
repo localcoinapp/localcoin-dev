@@ -30,9 +30,9 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
   const cardContent = (
     <div className='cursor-pointer'>
       <CardHeader className="p-0">
-        <div className="relative h-48 w-full">
+        <div className="relative h-40 w-full">
           <img
-            src={merchant.imageUrl || '/placeholder.svg'}
+            src={merchant.logo || '/placeholder.svg'}
             alt={merchant.companyName}
             className="h-full w-full object-cover"
             data-ai-hint={merchant.aiHint}
