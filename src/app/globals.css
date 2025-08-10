@@ -65,19 +65,19 @@
     Theme: Tropics
   ================================================================= */
   .theme-tropics {
-    --background: 24 100% 97%; /* Sandy white */
-    --foreground: 200 15% 25%; /* Deep teal text */
-    --card: 180 30% 98%; /* Very light cyan */
+    --background: 40 67% 98%; /* hsl(40, 67%, 98%) - Sandy white */
+    --foreground: 200 15% 25%; /* hsl(200, 15%, 25%) - Deep teal text */
+    --card: 0 0% 100%;
     --card-foreground: 200 15% 25%;
-    --popover: 180 30% 98%;
+    --popover: 0 0% 100%;
     --popover-foreground: 200 15% 25%;
-    --primary: 180 70% 45%; /* Turquoise */
+    --primary: 180 70% 45%; /* hsl(180, 70%, 45%) - Turquoise */
     --primary-foreground: 0 0% 100%;
-    --secondary: 30 90% 90%; /* Light coral */
+    --secondary: 30 90% 90%; /* hsl(30, 90%, 90%) - Light coral */
     --secondary-foreground: 30 90% 20%;
-    --muted: 180 10% 95%;
+    --muted: 180 10% 95%; /* hsl(180, 10%, 95%) */
     --muted-foreground: 180 10% 45%;
-    --accent: 350 80% 60%; /* Bright pink/coral */
+    --accent: 350 80% 60%; /* hsl(350, 80%, 60%) - Bright pink */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
@@ -87,19 +87,19 @@
     --radius: 0.75rem; /* More rounded */
   }
   .dark.theme-tropics {
-    --background: 200 40% 10%; /* Deep ocean blue */
-    --foreground: 180 20% 90%; /* Light cyan text */
+    --background: 200 40% 10%; /* hsl(200, 40%, 10%) - Deep ocean blue */
+    --foreground: 180 20% 90%; /* hsl(180, 20%, 90%) - Light cyan text */
     --card: 200 35% 15%;
     --card-foreground: 180 20% 90%;
     --popover: 200 40% 5%;
     --popover-foreground: 180 20% 90%;
-    --primary: 350 90% 70%; /* Vibrant coral */
+    --primary: 350 90% 70%; /* hsl(350, 90%, 70%) - Vibrant coral */
     --primary-foreground: 350 90% 10%;
-    --secondary: 180 50% 30%; /* Teal */
+    --secondary: 180 50% 30%; /* hsl(180, 50%, 30%) - Teal */
     --secondary-foreground: 180 50% 90%;
     --muted: 200 35% 20%;
     --muted-foreground: 180 10% 60%;
-    --accent: 45 100% 60%; /* Sunny yellow */
+    --accent: 45 100% 60%; /* hsl(45, 100%, 60%) - Sunny yellow */
     --accent-foreground: 45 100% 10%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
