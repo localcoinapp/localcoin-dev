@@ -137,7 +137,6 @@ export default function MerchantPage() {
 
  const handleMessageMerchant = async () => {
     if (!user || !merchantId) {
-      // This guard should technically be redundant if button is hidden, but good practice.
       toast({ title: "Error", description: "You must be logged in to start a chat.", variant: "destructive" });
       return;
     }
@@ -370,5 +369,3 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
-
-    
