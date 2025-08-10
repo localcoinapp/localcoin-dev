@@ -1,3 +1,4 @@
+
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
@@ -23,6 +24,18 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/_next/image',
+        destination: '/_next/image',
+      },
+      {
+        source: '/:path*',
+        destination: 'http://localhost:9000/:path*',
+      },
+    ];
   },
   // Add the experimental.allowedDevOrigins for the prototype view
   experimental: {
