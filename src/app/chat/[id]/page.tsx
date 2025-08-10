@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ArrowLeft, Send, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, ShieldAlert } from 'lucide-react'
 import { Message, Chat, ChatParticipant } from '@/types'
 import { ChatBubble } from '@/components/chat/chat-bubble'
 import Link from 'next/link';
@@ -31,42 +31,72 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ChatPage({ params }: { params: { id: string } }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const chatId = params.id;
 
   useEffect(() => {
-    if (!chatId) return;
+    if (authLoading) return; // Wait for authentication to resolve
+
+    if (!user) {
+        setLoading(false);
+        // Auth hook will redirect, but we can show a message as well
+        return;
+    }
+
+    if (!chatId) {
+        setLoading(false);
+        setAccessDenied(true);
+        return;
+    }
 
     // Fetch chat details
     const chatDocRef = doc(db, 'chats', chatId);
     const unsubscribeChat = onSnapshot(chatDocRef, (doc) => {
       if (doc.exists()) {
-        setChat({ id: doc.id, ...doc.data() } as Chat);
+        const chatData = { id: doc.id, ...doc.data() } as Chat;
+        // Security Check: Is the current user part of this chat?
+        if (!chatData.participantIds.includes(user.id)) {
+            setAccessDenied(true);
+            setLoading(false);
+        } else {
+            setChat(chatData);
+            setAccessDenied(false);
+        }
       } else {
-        // Handle chat not found
+        setAccessDenied(true);
+        setLoading(false);
       }
     });
 
-    // Fetch messages
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'asc'));
-    const unsubscribeMessages = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-      setMessages(msgs);
-      setLoading(false);
-    });
+    // Fetch messages only if user has access
+    if (!accessDenied) {
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+        const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+            const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+            setMessages(msgs);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching messages:", error);
+            setLoading(false);
+        });
+        
+        return () => {
+            unsubscribeChat();
+            unsubscribeMessages();
+        };
+    }
 
     return () => {
       unsubscribeChat();
-      unsubscribeMessages();
     };
-  }, [chatId]);
+  }, [chatId, user, authLoading]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -80,7 +110,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim() === '' || !user || !chatId) return;
+    if (newMessage.trim() === '' || !user || !chatId || accessDenied) return;
 
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     const chatDocRef = doc(db, 'chats', chatId);
@@ -112,17 +142,34 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
   const otherUser = chat?.participants.find(p => p.id !== user?.id);
 
-  if (loading) {
+  if (loading || authLoading) {
     return <ChatPageSkeleton />;
   }
 
-  if (!chat || !otherUser) {
-    return <div className="text-center p-8">Chat not found or you do not have access.</div>;
+  if (!user) {
+    return (
+        <div className="flex justify-center items-center h-full p-4 text-center">
+            <Card className="w-full max-w-md p-8">
+                <ShieldAlert className="h-12 w-12 mx-auto text-destructive mb-4" />
+                <h2 className="text-xl font-bold">Authentication Required</h2>
+                <p className="text-muted-foreground mt-2">Please <Link href="/login" className="underline">sign in</Link> to view this chat.</p>
+            </Card>
+        </div>
+    );
   }
-
-  // Determine if the current user is a merchant in this specific chat
-  const isUserTheMerchantInThisChat = chat.participantIds.includes(user?.id || '') && chat.participants.find(p => p.id === user?.id)?.name === chat.participants.find(p => p.id !== user?.id)?.name;
-
+  
+  if (accessDenied || !chat || !otherUser) {
+    return (
+        <div className="flex justify-center items-center h-full p-4 text-center">
+            <Card className="w-full max-w-md p-8">
+                <ShieldAlert className="h-12 w-12 mx-auto text-destructive mb-4" />
+                <h2 className="text-xl font-bold">Access Denied</h2>
+                <p className="text-muted-foreground mt-2">You do not have permission to view this chat, or the chat does not exist.</p>
+                <Button asChild className="mt-4"><Link href="/chat">Return to Chats</Link></Button>
+            </Card>
+        </div>
+    );
+  }
 
   return (
     <div className="flex justify-center items-center h-full p-4">
@@ -198,5 +245,3 @@ const ChatPageSkeleton = () => (
         </Card>
     </div>
 );
-
-    

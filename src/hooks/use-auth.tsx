@@ -19,7 +19,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
-const protectedRoutes = ['/wallet', '/dashboard', '/chat', '/profile', '/settings'];
+const protectedRoutes = ['/wallet', '/dashboard', '/profile', '/settings', '/cart'];
+// Note: /chat and /chat/[id] are now handled separately
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -34,24 +35,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
-            // Correctly merge the document data with essential info from firebaseUser
             const docData = docSnap.data();
             setUser({
-              id: firebaseUser.uid, // Explicitly set the id from firebaseUser
+              id: firebaseUser.uid, 
               name: firebaseUser.displayName || docData.name,
               email: firebaseUser.email,
               avatar: firebaseUser.photoURL || docData.avatar,
-              ...docData, // Spread the rest of the data from Firestore
+              ...docData,
             });
           } else {
-             // This case might happen if Firestore doc creation is delayed
-             // We still set a minimal user object to keep the app functional
             setUser({
               id: firebaseUser.uid,
               name: firebaseUser.displayName,
               email: firebaseUser.email,
               avatar: firebaseUser.photoURL,
-              role: 'user', // default role
+              role: 'user',
             });
           }
           setLoading(false);
@@ -60,7 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return () => unsubscribeSnapshot();
       } else {
         setUser(null);
-        if (protectedRoutes.includes(pathname)) {
+        // Redirect logic for protected routes
+        if (protectedRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
           router.push('/login');
         }
         setLoading(false);
