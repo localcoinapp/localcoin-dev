@@ -35,7 +35,7 @@ import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
 import { useAuth } from "@/hooks/use-auth"
-import { auth, db, storage, ref, uploadBytesResumable, getDownloadURL, updateProfile } from "@/lib/firebase"
+import { auth, db, updateProfile } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import React, { useRef, useState } from "react"
@@ -111,35 +111,33 @@ export default function ProfilePage() {
     if (!file || !user) return;
 
     setIsUploading(true);
-    const storageRef = ref(storage, `avatars/${user.id}/${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('userId', user.id);
 
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => { /* Optional: Handle progress */ },
-      (error) => {
-        console.error("Upload failed:", error);
-        toast({ title: "Upload Failed", description: "Could not upload the image.", variant: "destructive" });
-        setIsUploading(false);
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          const currentUser = auth.currentUser;
-          if (currentUser) {
-            await updateProfile(currentUser, { photoURL: downloadURL });
-            const userDocRef = doc(db, "users", currentUser.uid);
-            await setDoc(userDocRef, { avatar: downloadURL }, { merge: true });
-            toast({ title: "Avatar Updated", description: "Your new avatar has been saved." });
-          }
-        } catch (error) {
-           console.error("Error updating profile:", error);
-           toast({ title: "Error", description: "Failed to update profile picture.", variant: "destructive" });
-        } finally {
-            setIsUploading(false);
+    try {
+        const response = await fetch('/api/user/avatar', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Upload failed');
         }
-      }
-    );
+
+        const { url } = await response.json();
+        
+        // The API route now handles updating Firebase, so the client just needs to show success.
+        // We rely on the onSnapshot listener in useAuth to update the UI with the new avatar URL.
+        toast({ title: "Avatar Updated", description: "Your new avatar has been saved." });
+    } catch (error) {
+        console.error("Upload failed:", error);
+        toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
+    } finally {
+        setIsUploading(false);
+    }
   };
 
   async function onSubmit(data: ProfileFormValues) {
