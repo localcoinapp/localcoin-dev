@@ -21,16 +21,15 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
-import { useTheme } from "next-themes"
+import { useTheme } from "@/components/theme-provider"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const settingsFormSchema = z.object({
-  theme: z.enum(["light", "dark"], {
-    required_error: "Please select a theme.",
-  }),
+  theme: z.string(),
+  mode: z.enum(["light", "dark", "system"]),
   notifications: z.object({
     email: z.boolean().default(false).optional(),
     inApp: z.boolean().default(true).optional(),
@@ -39,7 +38,6 @@ const settingsFormSchema = z.object({
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>
 
-// This can be fetched from a user's settings in a database.
 const defaultValues: Partial<SettingsFormValues> = {
   notifications: {
     email: true,
@@ -49,23 +47,26 @@ const defaultValues: Partial<SettingsFormValues> = {
 
 export default function SettingsPage() {
     const { toast } = useToast()
-    const { theme, setTheme } = useTheme()
+    const { theme, setTheme, mode, setMode } = useTheme()
 
     const form = useForm<SettingsFormValues>({
         resolver: zodResolver(settingsFormSchema),
         defaultValues: {
             ...defaultValues,
-            theme: theme,
+            theme: theme || "default-eco",
+            mode: mode || "system",
         },
     })
     
     React.useEffect(() => {
-        form.setValue("theme", theme || "light");
-    }, [theme, form]);
+        form.setValue("theme", theme || "default-eco");
+        form.setValue("mode", mode || "system");
+    }, [theme, mode, form]);
 
 
     function onSubmit(data: SettingsFormValues) {
         setTheme(data.theme);
+        setMode(data.mode);
         toast({
             title: "Settings Saved",
             description: "Your preferences have been updated.",
@@ -85,42 +86,61 @@ export default function SettingsPage() {
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                            <FormField
-                                control={form.control}
-                                name="theme"
-                                render={({ field }) => (
-                                    <FormItem className="space-y-3">
-                                    <FormLabel className="text-lg font-semibold">Appearance</FormLabel>
-                                    <FormDescription>
-                                        Select the theme for the application.
-                                    </FormDescription>
-                                    <FormControl>
-                                        <RadioGroup
-                                            onValueChange={field.onChange}
-                                            value={field.value}
-                                            className="flex flex-col space-y-1"
-                                        >
-                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                            
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold">Appearance</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Customize the look and feel of the application.
+                                </p>
+                                <FormField
+                                    control={form.control}
+                                    name="theme"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Theme</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
-                                                    <RadioGroupItem value="light" />
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a theme" />
+                                                </SelectTrigger>
                                                 </FormControl>
-                                                <FormLabel className="font-normal">
-                                                    Light
-                                                </FormLabel>
-                                            </FormItem>
-                                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                                <SelectContent>
+                                                    <SelectItem value="theme-default-eco">Default</SelectItem>
+                                                    <SelectItem value="theme-tropics">Tropics</SelectItem>
+                                                    <SelectItem value="theme-berlin">Berlin</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>Select your color theme.</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="mode"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Mode</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
-                                                    <RadioGroupItem value="dark" />
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a mode" />
+                                                </SelectTrigger>
                                                 </FormControl>
-                                                <FormLabel className="font-normal">
-                                                    Dark
-                                                </FormLabel>
-                                            </FormItem>
-                                        </RadioGroup>
-                                    </FormControl>
-                                    </FormItem>
-                                )}
-                            />
+                                                <SelectContent>
+                                                    <SelectItem value="light">Light</SelectItem>
+                                                    <SelectItem value="dark">Dark</SelectItem>
+                                                    <SelectItem value="system">System</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>
+                                                Choose between light, dark, or system default mode.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
                             
                             <Separator />
                             
