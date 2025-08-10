@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -10,6 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
+import { googleAI } from '@genkit-ai/googleai';
 
 const TranslateChatMessageInputSchema = z.object({
   message: z.string().describe('The message to translate.'),
@@ -29,6 +31,7 @@ const translateChatMessagePrompt = ai.definePrompt({
   input: {schema: TranslateChatMessageInputSchema},
   output: {schema: TranslateChatMessageOutputSchema},
   prompt: `Translate the following message to {{targetLanguage}}:\n\n{{message}}`,
+  model: googleAI('gemini-pro'),
 });
 
 const translateChatMessageFlow = ai.defineFlow(
