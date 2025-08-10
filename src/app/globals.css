@@ -19,27 +19,27 @@
     Theme: Default Eco (Original)
   ================================================================= */
   .theme-default-eco {
-    --background: 45 85% 91%; /* #fcefd2 */
-    --foreground: 30 14% 25%; /* #4d4133 */
-    --card: 39 100% 96%; /* #fff8ed */
-    --card-foreground: 30 14% 25%;
-    --popover: 39 100% 96%; /* #fff8ed */
-    --popover-foreground: 30 14% 25%;
+    --background: 45 85% 91%;          /* Default page background */
+    --foreground: 30 14% 25%;          /* Default text color */
+    --card: 39 100% 96%;               /* Card component background */
+    --card-foreground: 30 14% 25%;     /* Text color inside cards */
+    --popover: 39 100% 96%;            /* Popover & dropdown background */
+    --popover-foreground: 30 14% 25%;  /* Text color inside popovers */
     --gold: 45 85% 50%;
-    --primary: var(--gold);
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --accent: 125 39% 53%; /* #53ad5b */
-    --accent-foreground: 210 20% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: var(--gold);
-    --radius: 0.5rem;
+    --primary: var(--gold);            /* Primary interactive elements (buttons, links) */
+    --primary-foreground: 210 20% 98%; /* Text on primary elements */
+    --secondary: 220 14.3% 95.9%;      /* Secondary interactive elements */
+    --secondary-foreground: 220.9 39.3% 11%; /* Text on secondary elements */
+    --muted: 220 14.3% 95.9%;          /* Muted backgrounds or dividers */
+    --muted-foreground: 220 8.9% 46.1%;/* Text on muted elements */
+    --accent: 125 39% 53%;             /* Accent color for highlights */
+    --accent-foreground: 210 20% 98%;  /* Text on accent elements */
+    --destructive: 0 84.2% 60.2%;      /* Destructive actions (e.g., delete) */
+    --destructive-foreground: 210 20% 98%; /* Text on destructive elements */
+    --border: 220 13% 91%;             /* Component borders */
+    --input: 220 13% 91%;              /* Input field background */
+    --ring: var(--gold);               /* Focus ring color */
+    --radius: 0.5rem;                  /* Component border radius */
   }
   .dark.theme-default-eco {
     --background: 30 14% 15%;
@@ -67,43 +67,43 @@
     Theme: Tropics
   ================================================================= */
   .theme-tropics {
-    --background: 200 100% 98%; /* #cfeefc - very light blue */
-    --foreground: 195 18% 24%; /* #31424a - dark slate blue */
-    --card: 0 0% 100%;
-    --card-foreground: 195 18% 24%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 195 18% 24%;
-    --primary: 202 100% 62%; /* #3eb5ff - bright blue */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 185 14% 75%; /* #b5c4c6 - grayish blue */
-    --secondary-foreground: 195 18% 24%;
-    --muted: 185 14% 95%; /* #f0f2f3 */
-    --muted-foreground: 195 18% 44%;
-    --accent: 110 37% 42%; /* #385737 - dark green */
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%; /* #e54848 */
-    --destructive-foreground: 0 0% 100%;
-    --border: 185 14% 90%; /* #e1e5e6 */
-    --input: 185 14% 90%;
-    --ring: 202 100% 62%;
-    --radius: 0.75rem; /* More rounded */
+    --background: 200 100% 98%;       /* Default page background */
+    --foreground: 195 18% 24%;       /* Default text color */
+    --card: 0 0% 100%;                /* Card component background */
+    --card-foreground: 195 18% 24%;  /* Text color inside cards */
+    --popover: 0 0% 100%;             /* Popover & dropdown background */
+    --popover-foreground: 195 18% 24%;/* Text color inside popovers */
+    --primary: 202 100% 62%;          /* Primary interactive elements (buttons, links) */
+    --primary-foreground: 0 0% 100%;  /* Text on primary elements */
+    --secondary: 185 14% 75%;         /* Secondary interactive elements */
+    --secondary-foreground: 195 18% 24%; /* Text on secondary elements */
+    --muted: 185 14% 95%;             /* Muted backgrounds or dividers */
+    --muted-foreground: 195 18% 44%; /* Text on muted elements */
+    --accent: 110 37% 42%;            /* Accent color for highlights */
+    --accent-foreground: 0 0% 100%;   /* Text on accent elements */
+    --destructive: 0 72% 51%;         /* Destructive actions (e.g., delete) */
+    --destructive-foreground: 0 0% 100%; /* Text on destructive elements */
+    --border: 185 14% 90%;            /* Component borders */
+    --input: 185 14% 90%;             /* Input field background */
+    --ring: 202 100% 62%;             /* Focus ring color */
+    --radius: 0.75rem;                /* Component border radius */
   }
   .dark.theme-tropics {
-    --background: 195 25% 15%; /* #1d2b30 - deep sea blue */
+    --background: 195 25% 15%;
     --foreground: 200 100% 98%;
-    --card: 195 25% 20%; /* #253840 */
+    --card: 195 25% 20%;
     --card-foreground: 200 100% 98%;
     --popover: 195 25% 10%;
     --popover-foreground: 200 100% 98%;
-    --primary: 205 90% 70%; /* #82c8ff - lighter bright blue */
+    --primary: 205 90% 70%;
     --primary-foreground: 195 25% 10%;
-    --secondary: 185 15% 30%; /* #414c4e - dark grayish blue */
+    --secondary: 185 15% 30%;
     --secondary-foreground: 0 0% 100%;
     --muted: 185 15% 25%;
     --muted-foreground: 200 100% 90%;
-    --accent: 110 40% 60%; /* #6aa869 - lighter green */
+    --accent: 110 40% 60%;
     --accent-foreground: 0 0% 0%;
-    --destructive: 0 72% 61%; /* #ec6363 */
+    --destructive: 0 72% 61%;
     --destructive-foreground: 0 0% 100%;
     --border: 185 15% 25%;
     --input: 185 15% 25%;
@@ -114,41 +114,41 @@
     Theme: Berlin
   ================================================================= */
   .theme-berlin {
-    --background: 0 0% 96%; /* Off-white / light concrete */
-    --foreground: 0 0% 10%; /* Almost black */
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 60 95% 55%; /* Safety yellow */
-    --primary-foreground: 0 0% 5%;
-    --secondary: 0 0% 90%; /* Light grey */
-    --secondary-foreground: 0 0% 10%;
-    --muted: 0 0% 90%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 0 85% 60%; /* Signal red */
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 85% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 85%;
-    --input: 0 0% 85%;
-    --ring: 60 95% 55%;
-    --radius: 0rem; /* Sharp corners */
+    --background: 0 0% 96%;            /* Default page background */
+    --foreground: 0 0% 10%;            /* Default text color */
+    --card: 0 0% 100%;                 /* Card component background */
+    --card-foreground: 0 0% 10%;       /* Text color inside cards */
+    --popover: 0 0% 100%;              /* Popover & dropdown background */
+    --popover-foreground: 0 0% 10%;    /* Text color inside popovers */
+    --primary: 60 95% 55%;             /* Primary interactive elements (buttons, links) */
+    --primary-foreground: 0 0% 5%;     /* Text on primary elements */
+    --secondary: 0 0% 90%;             /* Secondary interactive elements */
+    --secondary-foreground: 0 0% 10%;  /* Text on secondary elements */
+    --muted: 0 0% 90%;                 /* Muted backgrounds or dividers */
+    --muted-foreground: 0 0% 40%;      /* Text on muted elements */
+    --accent: 0 85% 60%;               /* Accent color for highlights */
+    --accent-foreground: 0 0% 100%;    /* Text on accent elements */
+    --destructive: 0 85% 60%;          /* Destructive actions (e.g., delete) */
+    --destructive-foreground: 0 0% 100%; /* Text on destructive elements */
+    --border: 0 0% 85%;                /* Component borders */
+    --input: 0 0% 85%;                 /* Input field background */
+    --ring: 60 95% 55%;                /* Focus ring color */
+    --radius: 0rem;                    /* Component border radius */
   }
   .dark.theme-berlin {
-    --background: 0 0% 10%; /* Dark charcoal */
-    --foreground: 0 0% 95%; /* Off-white text */
+    --background: 0 0% 10%;
+    --foreground: 0 0% 95%;
     --card: 0 0% 14%;
     --card-foreground: 0 0% 95%;
     --popover: 0 0% 8%;
     --popover-foreground: 0 0% 95%;
-    --primary: 200 100% 50%; /* Electric blue */
+    --primary: 200 100% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 95%;
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 60%;
-    --accent: 300 100% 60%; /* Hot pink/magenta */
+    --accent: 300 100% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 85% 60%;
     --destructive-foreground: 0 0% 100%;
