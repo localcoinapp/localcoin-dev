@@ -34,6 +34,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const { user, loading: authLoading } = useAuth();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -96,7 +97,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     return () => {
       unsubscribeChat();
     };
-  }, [chatId, user, authLoading]);
+  }, [chatId, user, authLoading, accessDenied]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -245,3 +246,6 @@ const ChatPageSkeleton = () => (
         </Card>
     </div>
 );
+
+
+    
