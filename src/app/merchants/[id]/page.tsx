@@ -150,8 +150,9 @@ export default function MerchantPage() {
         if (!merchantDocSnap.exists()) {
             throw new Error("Merchant details could not be found.");
         }
+        
         const merchantData = merchantDocSnap.data() as Merchant;
-        const ownerId = merchantData.ownerId;
+        const ownerId = merchantData.owner;
 
         if (!ownerId) {
             throw new Error("Merchant owner information is missing.");
@@ -372,3 +373,5 @@ const MerchantPageSkeleton = () => (
     </div>
   </div>
 );
+
+    

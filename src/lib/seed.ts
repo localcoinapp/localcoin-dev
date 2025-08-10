@@ -37,7 +37,7 @@ export async function seedDatabase() {
     const merchantPosition = { lat: 52.517, lng: 13.453 };
     const merchant = {
       companyName: 'Katari Farms',
-      ownerId: 'user-merchant-003', // Corresponds to katarifarms22@gmail.com
+      owner: 'user-merchant-003', // Corresponds to katarifarms22@gmail.com
       listings: [],
       position: merchantPosition,
       geohash: geohashForLocation([merchantPosition.lat, merchantPosition.lng]),
@@ -63,3 +63,5 @@ export async function seedDatabase() {
     throw error;
   }
 }
+
+    

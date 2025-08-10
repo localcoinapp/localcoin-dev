@@ -20,7 +20,7 @@ export type MerchantItem = {
 
 export type Merchant = {
   id: string
-  ownerId: string;
+  owner: string;
   companyName: string;
   category: string
   rating: number
@@ -113,3 +113,5 @@ export type CartItem = {
   userName: string;
   category: string;
 }
+
+    
