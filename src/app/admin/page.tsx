@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [applications, setApplications] = useState<MerchantApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<MerchantApplication | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -95,6 +96,11 @@ export default function AdminPage() {
         toast({ title: 'Error', description: 'Could not deny the application.', variant: 'destructive' });
      }
   };
+  
+  const handleViewApp = (app: MerchantApplication) => {
+    setViewingApp(app);
+    setIsViewModalOpen(true);
+  }
 
 
   if (authLoading || loading) {
@@ -118,7 +124,7 @@ export default function AdminPage() {
   const pendingApplications = applications.filter(a => a.status === 'pending');
 
   return (
-    <Dialog onOpenChange={() => setViewingApp(null)}>
+    <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
@@ -154,11 +160,9 @@ export default function AdminPage() {
                           <TableCell>{app.submittedAt ? new Date(app.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</TableCell>
                           <TableCell><Badge variant="outline">{app.status}</Badge></TableCell>
                           <TableCell className="text-right space-x-2">
-                             <DialogTrigger asChild>
-                                <Button size="sm" variant="ghost" onClick={() => setViewingApp(app)}>
-                                    <Eye className="mr-2 h-4 w-4" /> View
-                                </Button>
-                             </DialogTrigger>
+                             <Button size="sm" variant="ghost" onClick={() => handleViewApp(app)}>
+                                 <Eye className="mr-2 h-4 w-4" /> View
+                             </Button>
                              <Button size="sm" onClick={() => handleApprove(app)}>Approve</Button>
                              <Button size="sm" variant="destructive" onClick={() => handleDeny(app.id)}>Deny</Button>
                           </TableCell>
@@ -194,36 +198,38 @@ export default function AdminPage() {
           </TabsContent>
         </Tabs>
       </div>
-
-       {viewingApp && (
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Application: {viewingApp.companyName}</DialogTitle>
-            <DialogDescription>
-              Submitted by {viewingApp.userEmail} on {viewingApp.submittedAt ? new Date(viewingApp.submittedAt.seconds * 1000).toLocaleString() : 'N/A'}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-                <div><p className="font-semibold">Company Name</p><p>{viewingApp.companyName}</p></div>
-                <div><p className="font-semibold">Contact Email</p><p>{viewingApp.contactEmail}</p></div>
-                <div><p className="font-semibold">Phone</p><p>{viewingApp.phone}</p></div>
-                <div><p className="font-semibold">Website</p><p><a href={viewingApp.website} target="_blank" rel="noreferrer" className="underline">{viewingApp.website}</a></p></div>
-                <div><p className="font-semibold">Instagram</p><p>{viewingApp.instagram}</p></div>
+      
+       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+         {viewingApp && (
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Application: {viewingApp.companyName}</DialogTitle>
+              <DialogDescription>
+                Submitted by {viewingApp.userEmail} on {viewingApp.submittedAt ? new Date(viewingApp.submittedAt.seconds * 1000).toLocaleString() : 'N/A'}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                  <div><p className="font-semibold">Company Name</p><p>{viewingApp.companyName}</p></div>
+                  <div><p className="font-semibold">Contact Email</p><p>{viewingApp.contactEmail}</p></div>
+                  <div><p className="font-semibold">Phone</p><p>{viewingApp.phone}</p></div>
+                  <div><p className="font-semibold">Website</p><p><a href={viewingApp.website} target="_blank" rel="noreferrer" className="underline">{viewingApp.website}</a></p></div>
+                  <div><p className="font-semibold">Instagram</p><p>{viewingApp.instagram}</p></div>
+              </div>
+               <div className="border-t pt-4 mt-2">
+                  <p className="font-semibold">Address</p>
+                  <p>{viewingApp.houseNumber} {viewingApp.street}</p>
+                  <p>{viewingApp.city}, {viewingApp.state} {viewingApp.zipCode}</p>
+                  <p>{viewingApp.country}</p>
+               </div>
+               <div className="border-t pt-4 mt-2">
+                  <p className="font-semibold">Description</p>
+                  <p className="text-sm text-muted-foreground">{viewingApp.description}</p>
+               </div>
             </div>
-             <div className="border-t pt-4">
-                <p className="font-semibold">Address</p>
-                <p>{viewingApp.houseNumber} {viewingApp.street}</p>
-                <p>{viewingApp.city}, {viewingApp.state} {viewingApp.zipCode}</p>
-                <p>{viewingApp.country}</p>
-             </div>
-             <div className="border-t pt-4">
-                <p className="font-semibold">Description</p>
-                <p className="text-sm text-muted-foreground">{viewingApp.description}</p>
-             </div>
-          </div>
-        </DialogContent>
-      )}
-    </Dialog>
+          </DialogContent>
+        )}
+       </Dialog>
+    </>
   );
 }
