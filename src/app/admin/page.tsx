@@ -12,10 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye } from 'lucide-react';
-import type { MerchantApplication } from '@/types';
+import { Loader2, ShieldAlert, Eye, Users } from 'lucide-react';
+import type { MerchantApplication, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { geohashForLocation } from 'geofire-common';
+import Link from 'next/link';
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -23,6 +24,7 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [applications, setApplications] = useState<MerchantApplication[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<MerchantApplication | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -35,7 +37,7 @@ export default function AdminPage() {
     }
 
     const appsRef = collection(db, 'merchant_applications');
-    const unsubscribe = onSnapshot(appsRef, (snapshot) => {
+    const unsubscribeApps = onSnapshot(appsRef, (snapshot) => {
       const appsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MerchantApplication));
       setApplications(appsData);
       setLoading(false);
@@ -45,7 +47,20 @@ export default function AdminPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const usersRef = collection(db, 'users');
+    const unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
+        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as User));
+        setUsers(usersData);
+    }, (error) => {
+        console.error("Failed to fetch users:", error);
+        toast({ title: 'Error', description: 'Could not load users.', variant: 'destructive' });
+    });
+
+
+    return () => {
+        unsubscribeApps();
+        unsubscribeUsers();
+    };
   }, [user, authLoading, router, toast]);
 
   const handleApprove = async (app: MerchantApplication) => {
@@ -58,23 +73,20 @@ export default function AdminPage() {
 
     const batch = writeBatch(db);
     
-    // 1. Create new merchant document
     const merchantRef = doc(collection(db, 'merchants'));
     const merchantData = {
         ...applicationData,
         owner: userId,
         listings: [],
-        rating: 0, // Initial rating
+        rating: 0,
         geohash: geohashForLocation([app.position.lat, app.position.lng]),
         createdAt: new Date(),
     };
     batch.set(merchantRef, merchantData);
 
-    // 2. Update user's role and add merchantId
     const userRef = doc(db, 'users', userId);
     batch.update(userRef, { role: 'merchant', merchantId: merchantRef.id });
 
-    // 3. Update application status
     const appRef = doc(db, 'merchant_applications', app.id);
     batch.update(appRef, { status: 'approved' });
 
@@ -130,7 +142,7 @@ export default function AdminPage() {
         <Tabs defaultValue="applications">
           <TabsList>
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="users">User Management ({users.length})</TabsTrigger>
             <TabsTrigger value="merchants">Merchant Management</TabsTrigger>
             <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
           </TabsList>
@@ -180,8 +192,46 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="users">
               <Card>
-                  <CardHeader><CardTitle>User Management</CardTitle></CardHeader>
-                  <CardContent><p className="text-muted-foreground">User management features coming soon.</p></CardContent>
+                  <CardHeader>
+                    <CardTitle>User Management</CardTitle>
+                    <CardDescription>View and manage all registered users.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>User</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Wallet Balance</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {users.length > 0 ? (
+                                users.map((u) => (
+                                    <TableRow key={u.id}>
+                                        <TableCell className="font-medium">{u.name || 'N/A'}</TableCell>
+                                        <TableCell>{u.email}</TableCell>
+                                        <TableCell><Badge variant={u.role === 'admin' ? 'destructive' : 'secondary'}>{u.role}</Badge></TableCell>
+                                        <TableCell>{(u.walletBalance || 0).toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Link href={`/admin/users/${u.id}`} passHref>
+                                                <Button size="sm" variant="outline">
+                                                    <Users className="mr-2 h-4 w-4" /> View Details
+                                                </Button>
+                                            </Link>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center h-24">No users found.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                  </CardContent>
               </Card>
           </TabsContent>
           <TabsContent value="merchants">

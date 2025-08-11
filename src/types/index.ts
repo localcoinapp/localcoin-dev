@@ -65,6 +65,7 @@ export type User = {
   province?: string;
   merchantId?: string;
   walletAddress?: string;
+  walletBalance?: number;
   seedPhrase?: string; // Should be encrypted
   cart?: CartItem[];
   profileComplete?: boolean;
