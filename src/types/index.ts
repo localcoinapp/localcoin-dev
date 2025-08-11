@@ -36,7 +36,7 @@ export type Merchant = {
   listings: MerchantItem[]
   pendingOrders?: CartItem[];
   walletAddress?: string;
-  merchantWalletBalance?: number; // Legacy, to be removed
+  seedPhrase?: string; // Should be encrypted
   street?: string;
   houseNumber?: string;
   city?: string;
@@ -65,7 +65,6 @@ export type User = {
   province?: string;
   merchantId?: string;
   walletAddress?: string;
-  walletBalance?: number; // Legacy, to be removed
   seedPhrase?: string; // Should be encrypted
   cart?: CartItem[];
 };

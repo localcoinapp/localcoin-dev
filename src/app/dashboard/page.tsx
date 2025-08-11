@@ -41,7 +41,10 @@ import {
   X,
   History,
   Edit,
-  Trash2
+  Trash2,
+  KeyRound,
+  Loader2,
+  Eye
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -52,13 +55,18 @@ import {
   onSnapshot,
   updateDoc,
   arrayRemove,
-  runTransaction
+  runTransaction,
+  setDoc,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
 import type { MerchantItem, CartItem } from "@/types";
+import { Keypair } from "@solana/web3.js";
+import * as bip39 from "bip39";
+import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
+
 
 // --- Helper function to find and update inventory ---
 const updateInventory = (listings: MerchantItem[], itemId: string, quantityChange: number): MerchantItem[] => {
@@ -90,6 +98,11 @@ export default function DashboardPage() {
   
   const [activeOrders, setActiveOrders] = useState<CartItem[]>([]);
 
+  // Wallet State
+  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  const [showSeedPhrase, setShowSeedPhrase] = useState(false);
+  const [newSeedPhrase, setNewSeedPhrase] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (user && (user.role === 'merchant' || user.role === 'admin') && user.merchantId) {
@@ -117,6 +130,29 @@ export default function DashboardPage() {
       setMerchantData(null);
     }
   }, [user]);
+
+  const handleCreateWallet = async () => {
+    if (!user || !user.merchantId) return;
+    setIsCreatingWallet(true);
+    try {
+        const mnemonic = bip39.generateMnemonic();
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        const keypair = Keypair.fromSeed(seed.slice(0, 32));
+        const address = keypair.publicKey.toBase58();
+
+        const merchantDocRef = doc(db, "merchants", user.merchantId);
+        // In a real app, this should be encrypted before storing
+        await setDoc(merchantDocRef, { walletAddress: address, seedPhrase: mnemonic }, { merge: true });
+
+        setNewSeedPhrase(mnemonic);
+        toast({ title: "Wallet Created!", description: "Your new Solana wallet is ready."});
+    } catch(e) {
+        console.error("Wallet creation failed", e);
+        toast({ title: "Error", description: "Failed to create a new wallet.", variant: "destructive"});
+    } finally {
+        setIsCreatingWallet(false);
+    }
+  }
 
   const handleListingStatusChange = async (listing: MerchantItem) => {
     if (!user || !user.merchantId) return;
@@ -337,7 +373,7 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], walletAddress } = merchantData;
+  const { listings = [], walletAddress, seedPhrase } = merchantData;
 
   return (
     <>
@@ -361,12 +397,29 @@ export default function DashboardPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Wallet Address</CardTitle>
+              <CardTitle className="text-sm font-medium">Wallet</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-sm font-bold font-mono break-all">{walletAddress || "No wallet created"}</div>
-              {walletAddress && <p className="text-xs text-muted-foreground pt-2">Balance: 0.00 SOL</p> }
+              {walletAddress ? (
+                  <div className="space-y-4">
+                      <div className="text-sm font-bold font-mono break-all">{walletAddress}</div>
+                      <p className="text-xs text-muted-foreground pt-2">Balance: 0.00 SOL</p>
+                       <div className="flex gap-2 mt-4">
+                          <Button variant="secondary" onClick={() => setShowSeedPhrase(true)}>
+                              <Eye className="mr-2" /> Show Seed Phrase
+                          </Button>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="flex flex-col items-start gap-4">
+                      <p className="text-muted-foreground">You have not created a wallet yet.</p>
+                      <Button onClick={handleCreateWallet} disabled={isCreatingWallet}>
+                          {isCreatingWallet ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
+                          Create Wallet
+                      </Button>
+                  </div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -453,7 +506,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Modals & Dialogs */}
       <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{listingToDelete?.name}".</AlertDialogDescription></AlertDialogHeader>
@@ -463,6 +516,48 @@ export default function DashboardPage() {
 
       {editingListing && <EditListingModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} listing={editingListing} merchantId={user?.merchantId} />}
       {redeemingOrder && <RedeemModal isOpen={isRedeemModalOpen} onClose={() => setIsRedeemModalOpen(false)} redeemCode={redeemingOrder.redeemCode} onRedeem={() => handleRedeemOrder(redeemingOrder)} />}
+    
+      {/* Dialog for displaying NEWLY created seed phrase */}
+      <AlertDialog open={!!newSeedPhrase} onOpenChange={() => setNewSeedPhrase(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Wallet Created Successfully!</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Please save this seed phrase in a secure location. It is the ONLY way to recover your wallet.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Alert variant="destructive" className="text-center">
+                  <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
+                    {newSeedPhrase}
+                  </AlertDescriptionComponent>
+              </Alert>
+              <AlertDialogFooter>
+                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(newSeedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
+                  <AlertDialogCancel onClick={() => setNewSeedPhrase(null)}>I've saved it</AlertDialogCancel>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog for showing EXISTING seed phrase */}
+      <AlertDialog open={showSeedPhrase} onOpenChange={setShowSeedPhrase}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Your Secret Seed Phrase</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Do not share this with anyone! Anyone with this phrase can take your assets.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Alert variant="destructive" className="text-center">
+                  <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
+                    {seedPhrase || "No seed phrase found."}
+                  </AlertDescriptionComponent>
+              </Alert>
+              <AlertDialogFooter>
+                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(seedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
+                  <AlertDialogCancel onClick={() => setShowSeedPhrase(false)}>Close</AlertDialogCancel>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
