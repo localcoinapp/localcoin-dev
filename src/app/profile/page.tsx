@@ -10,6 +10,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,7 +31,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Camera, Loader2 } from "lucide-react"
+import { Camera, Loader2, KeyRound, Eye } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
@@ -39,6 +40,21 @@ import { auth, db, updateProfile } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import React, { useRef, useState } from "react"
+import { Keypair } from "@solana/web3.js";
+import * as bip39 from "bip39";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertTitle, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert"
+
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -62,6 +78,9 @@ export default function ProfilePage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [isUploading, setIsUploading] = useState(false);
+  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  const [showSeedPhrase, setShowSeedPhrase] = useState(false);
+  const [newSeedPhrase, setNewSeedPhrase] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormValues>({
@@ -71,11 +90,7 @@ export default function ProfilePage() {
       email: "",
       bio: "",
       country: "",
-      address: {
-        street: "",
-        houseNumber: "",
-        postcode: "",
-      },
+      address: { street: "", houseNumber: "", postcode: "" },
       state: "",
       province: "",
     },
@@ -128,7 +143,6 @@ export default function ProfilePage() {
         }
 
         toast({ title: "Avatar Updated", description: "Your new avatar has been saved." });
-        // Force a reload to ensure the new avatar is displayed.
         window.location.reload();
 
     } catch (error) {
@@ -139,13 +153,34 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCreateWallet = async () => {
+    if (!user) return;
+    setIsCreatingWallet(true);
+    try {
+        const mnemonic = bip39.generateMnemonic();
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        const keypair = Keypair.fromSeed(seed.slice(0, 32));
+        const address = keypair.publicKey.toBase58();
+
+        const userDocRef = doc(db, "users", user.id);
+        // In a real app, this should be encrypted before storing
+        await setDoc(userDocRef, { walletAddress: address, seedPhrase: mnemonic }, { merge: true });
+
+        setNewSeedPhrase(mnemonic);
+        toast({ title: "Wallet Created!", description: "Your new Solana wallet is ready."});
+    } catch(e) {
+        console.error("Wallet creation failed", e);
+        toast({ title: "Error", description: "Failed to create a new wallet.", variant: "destructive"});
+    } finally {
+        setIsCreatingWallet(false);
+    }
+  }
+
   async function onSubmit(data: ProfileFormValues) {
     try {
       const currentUser = auth.currentUser
       if (currentUser) {
-        await updateProfile(currentUser, {
-          displayName: data.name,
-        })
+        await updateProfile(currentUser, { displayName: data.name })
 
         const userDocRef = doc(db, "users", currentUser.uid)
         await setDoc(userDocRef, {
@@ -158,21 +193,15 @@ export default function ProfilePage() {
           province: data.province,
         }, { merge: true })
       }
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-      })
+      toast({ title: "Profile updated", description: "Your profile has been updated successfully." })
     } catch (error) {
       console.error("Error updating profile:", error)
-      toast({
-        title: "Error",
-        description: "There was an error updating your profile.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "There was an error updating your profile.", variant: "destructive" })
     }
   }
 
   return (
+    <>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
       <Card className="w-full max-w-2xl text-left shadow-lg">
         <CardHeader>
@@ -377,7 +406,79 @@ export default function ProfilePage() {
             </form>
           </Form>
         </CardContent>
+         <Separator className="my-6" />
+        <CardHeader>
+            <CardTitle>Wallet Management</CardTitle>
+            <CardDescription>
+              Your Solana wallet for all transactions on the platform.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            {user?.walletAddress ? (
+                <div className="space-y-4">
+                    <div>
+                        <FormLabel>Your Solana Wallet Address</FormLabel>
+                        <p className="font-mono text-sm text-muted-foreground break-all">{user.walletAddress}</p>
+                    </div>
+                     <Button variant="secondary" onClick={() => setShowSeedPhrase(true)}>
+                        <Eye className="mr-2" /> Show Seed Phrase
+                    </Button>
+                </div>
+            ) : (
+                <div className="flex flex-col items-start gap-4">
+                    <p className="text-muted-foreground">You do not have a wallet yet.</p>
+                    <Button onClick={handleCreateWallet} disabled={isCreatingWallet}>
+                        {isCreatingWallet ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
+                        Create Wallet
+                    </Button>
+                </div>
+            )}
+        </CardContent>
       </Card>
     </div>
+
+    {/* Dialog for displaying NEWLY created seed phrase */}
+    <AlertDialog open={!!newSeedPhrase} onOpenChange={() => setNewSeedPhrase(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Wallet Created Successfully!</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Please save this seed phrase in a secure location. It is the ONLY way to recover your wallet.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Alert variant="destructive" className="text-center">
+                 <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
+                   {newSeedPhrase}
+                </AlertDescriptionComponent>
+            </Alert>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => { navigator.clipboard.writeText(newSeedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
+                <AlertDialogCancel onClick={() => setNewSeedPhrase(null)}>I've saved it</AlertDialogCancel>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Dialog for showing EXISTING seed phrase */}
+    <AlertDialog open={showSeedPhrase} onOpenChange={setShowSeedPhrase}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Your Secret Seed Phrase</AlertDialogTitle>
+                <AlertDialogDescription>
+                   Do not share this with anyone! Anyone with this phrase can take your assets.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Alert variant="destructive" className="text-center">
+                 <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
+                   {user?.seedPhrase || "No seed phrase found."}
+                </AlertDescriptionComponent>
+            </Alert>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => { navigator.clipboard.writeText(user?.seedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
+                <AlertDialogCancel onClick={() => setShowSeedPhrase(false)}>Close</AlertDialogCancel>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    </>
   )
 }

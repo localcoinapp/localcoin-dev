@@ -35,7 +35,8 @@ export type Merchant = {
   description: string
   listings: MerchantItem[]
   pendingOrders?: CartItem[];
-  merchantWalletBalance?: number;
+  walletAddress?: string;
+  merchantWalletBalance?: number; // Legacy, to be removed
   street?: string;
   houseNumber?: string;
   city?: string;
@@ -48,7 +49,7 @@ export type UserRole = 'admin' | 'merchant' | 'user';
 
 export type User = {
   id: string;
-  uid?: string; // Keep uid for backwards compatibility if needed, but prefer id
+  uid?: string;
   name: string | null;
   email: string | null;
   avatar: string | null;
@@ -63,7 +64,9 @@ export type User = {
   state?: string;
   province?: string;
   merchantId?: string;
-  walletBalance?: number;
+  walletAddress?: string;
+  walletBalance?: number; // Legacy, to be removed
+  seedPhrase?: string; // Should be encrypted
   cart?: CartItem[];
 };
 
