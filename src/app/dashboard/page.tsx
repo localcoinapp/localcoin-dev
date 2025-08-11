@@ -403,8 +403,10 @@ export default function DashboardPage() {
             <CardContent>
               {walletAddress ? (
                   <div className="space-y-4">
-                      <div className="text-2xl font-bold font-headline break-all">{walletAddress}</div>
-                      <p className="text-xs text-muted-foreground pt-2">Balance: 0.00 SOL</p>
+                      <div className="text-2xl font-bold font-headline">0.00 SOL</div>
+                      <p className="text-xs text-muted-foreground pt-2 break-all">
+                        Address: {walletAddress}
+                      </p>
                        <div className="flex gap-2 mt-4">
                           <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
                               <Eye className="mr-2" /> Show Seed Phrase
