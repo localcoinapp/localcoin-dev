@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, writeBatch, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users } from 'lucide-react';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck } from 'lucide-react';
 import type { MerchantApplication, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { geohashForLocation } from 'geofire-common';
@@ -25,6 +25,7 @@ export default function AdminPage() {
 
   const [applications, setApplications] = useState<MerchantApplication[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<MerchantApplication | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -40,7 +41,7 @@ export default function AdminPage() {
     const unsubscribeApps = onSnapshot(appsRef, (snapshot) => {
       const appsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MerchantApplication));
       setApplications(appsData);
-      setLoading(false);
+      if(loading) setLoading(false);
     }, (error) => {
       console.error("Failed to fetch applications:", error);
       toast({ title: 'Error', description: 'Could not load merchant applications.', variant: 'destructive' });
@@ -51,17 +52,27 @@ export default function AdminPage() {
     const unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
         const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as User));
         setUsers(usersData);
+        if(loading) setLoading(false);
     }, (error) => {
         console.error("Failed to fetch users:", error);
         toast({ title: 'Error', description: 'Could not load users.', variant: 'destructive' });
     });
-
+    
+    const blockedUsersRef = collection(db, 'blocked_users');
+    const unsubscribeBlockedUsers = onSnapshot(blockedUsersRef, (snapshot) => {
+        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as User));
+        setBlockedUsers(usersData);
+    }, (error) => {
+        console.error("Failed to fetch blocked users:", error);
+        toast({ title: 'Error', description: 'Could not load blocked users.', variant: 'destructive' });
+    });
 
     return () => {
         unsubscribeApps();
         unsubscribeUsers();
+        unsubscribeBlockedUsers();
     };
-  }, [user, authLoading, router, toast]);
+  }, [user, authLoading, router, toast, loading]);
 
   const handleApprove = async (app: MerchantApplication) => {
     const { userId, ...applicationData } = app;
@@ -113,6 +124,39 @@ export default function AdminPage() {
     setViewingApp(app);
     setIsViewModalOpen(true);
   }
+  
+  const moveUser = async (userId: string, fromCollection: string, toCollection: string) => {
+    const fromDocRef = doc(db, fromCollection, userId);
+    const toDocRef = doc(db, toCollection, userId);
+
+    try {
+        const docSnap = await getDoc(fromDocRef);
+        if(docSnap.exists()){
+            const batch = writeBatch(db);
+            batch.set(toDocRef, docSnap.data());
+            batch.delete(fromDocRef);
+            await batch.commit();
+            toast({ title: "Success", description: `User has been moved.`});
+        } else {
+            throw new Error("User document not found.");
+        }
+    } catch (error) {
+        console.error("Error moving user:", error);
+        toast({ title: "Error", description: "Could not move the user document.", variant: "destructive" });
+    }
+  };
+
+  const handleBlockUser = (userId: string) => {
+    if (userId === user?.id) {
+      toast({ title: "Error", description: "You cannot block yourself.", variant: "destructive" });
+      return;
+    }
+    moveUser(userId, 'users', 'blocked_users');
+  };
+
+  const handleUnblockUser = (userId: string) => {
+    moveUser(userId, 'blocked_users', 'users');
+  };
 
 
   if (authLoading || loading) {
@@ -142,7 +186,8 @@ export default function AdminPage() {
         <Tabs defaultValue="applications">
           <TabsList>
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
-            <TabsTrigger value="users">User Management ({users.length})</TabsTrigger>
+            <TabsTrigger value="users">Active Users ({users.length})</TabsTrigger>
+            <TabsTrigger value="blocked_users">Blocked Users ({blockedUsers.length})</TabsTrigger>
             <TabsTrigger value="merchants">Merchant Management</TabsTrigger>
             <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
           </TabsList>
@@ -193,7 +238,7 @@ export default function AdminPage() {
           <TabsContent value="users">
               <Card>
                   <CardHeader>
-                    <CardTitle>User Management</CardTitle>
+                    <CardTitle>Active User Management</CardTitle>
                     <CardDescription>View and manage all registered users.</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -213,20 +258,71 @@ export default function AdminPage() {
                                     <TableRow key={u.id}>
                                         <TableCell className="font-medium">{u.name || 'N/A'}</TableCell>
                                         <TableCell>{u.email}</TableCell>
-                                        <TableCell><Badge variant={u.role === 'admin' ? 'destructive' : 'secondary'}>{u.role}</Badge></TableCell>
+                                        <TableCell>
+                                            <Badge variant={
+                                                u.role === 'admin' ? 'destructive' :
+                                                u.role === 'merchant' ? 'default' :
+                                                'secondary'
+                                            } className={u.role === 'merchant' ? 'bg-green-600' : ''}>
+                                                {u.role}
+                                            </Badge>
+                                        </TableCell>
                                         <TableCell>{(u.walletBalance || 0).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right space-x-2">
                                             <Link href={`/admin/users/${u.id}`} passHref>
                                                 <Button size="sm" variant="outline">
-                                                    <Users className="mr-2 h-4 w-4" /> View Details
+                                                    <Users className="mr-2 h-4 w-4" /> View
                                                 </Button>
                                             </Link>
+                                            <Button size="sm" variant="destructive" onClick={() => handleBlockUser(u.id)}>
+                                                <ShieldX className="mr-2 h-4 w-4"/> Block
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24">No users found.</TableCell>
+                                    <TableCell colSpan={5} className="text-center h-24">No active users found.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                  </CardContent>
+              </Card>
+          </TabsContent>
+           <TabsContent value="blocked_users">
+              <Card>
+                  <CardHeader>
+                    <CardTitle>Blocked User Management</CardTitle>
+                    <CardDescription>View and manage all blocked users.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>User</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {blockedUsers.length > 0 ? (
+                                blockedUsers.map((u) => (
+                                    <TableRow key={u.id}>
+                                        <TableCell className="font-medium">{u.name || 'N/A'}</TableCell>
+                                        <TableCell>{u.email}</TableCell>
+                                        <TableCell><Badge variant="destructive">{u.role}</Badge></TableCell>
+                                        <TableCell className="text-right">
+                                            <Button size="sm" variant="outline" onClick={() => handleUnblockUser(u.id)}>
+                                               <UserCheck className="mr-2 h-4 w-4"/> Unblock
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center h-24">No blocked users found.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -283,3 +379,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    

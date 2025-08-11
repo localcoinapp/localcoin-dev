@@ -7,7 +7,7 @@ import { auth, db } from '@/lib/firebase';
 import type { User, UserRole } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, usePathname } from 'next/navigation';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -29,10 +29,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Check if user is in the 'blocked_users' collection
+        const blockedUserDocRef = doc(db, "blocked_users", firebaseUser.uid);
+        const blockedDocSnap = await getDoc(blockedUserDocRef);
+
+        if (blockedDocSnap.exists()) {
+          // If user is blocked, sign them out and treat as logged out
+          auth.signOut();
+          setUser(null);
+          setLoading(false);
+          // Optional: redirect to a "you are blocked" page or show a toast
+          if (protectedRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
+            router.push('/login');
+          }
+          return;
+        }
+
+        // If not blocked, proceed with fetching user data from 'users' collection
         const userDocRef = doc(db, "users", firebaseUser.uid);
-        
         const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const docData = docSnap.data();
@@ -44,21 +60,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               ...docData,
             });
           } else {
-            setUser({
-              id: firebaseUser.uid,
-              name: firebaseUser.displayName,
-              email: firebaseUser.email,
-              avatar: firebaseUser.photoURL,
-              role: 'user',
-            });
+             // This case might happen if a user is created in Auth but not in Firestore,
+             // or if their document was deleted.
+            setUser(null); // Treat as not logged in if no Firestore doc exists
           }
           setLoading(false);
+        }, (error) => {
+           console.error("Error fetching user snapshot:", error);
+           setUser(null);
+           setLoading(false);
         });
 
         return () => unsubscribeSnapshot();
       } else {
         setUser(null);
-        // Redirect logic for protected routes
         if (protectedRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
           router.push('/login');
         }
@@ -95,3 +110,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
