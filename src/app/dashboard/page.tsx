@@ -276,16 +276,7 @@ export default function DashboardPage() {
         if (!orderToRedeem) return; // Already processed
 
         // --- Wallet Balance Transfer ---
-        const itemPrice = orderToRedeem.price;
-        const currentUserBalance = userData.walletBalance || 0;
-        const currentMerchantBalance = merchantData.merchantWalletBalance || 0;
-
-        if (currentUserBalance < itemPrice) {
-          throw new Error("Insufficient user funds.");
-        }
-
-        const newUserBalance = currentUserBalance - itemPrice;
-        const newMerchantBalance = currentMerchantBalance + itemPrice;
+        // This is now handled on-chain. We remove the Firestore balance updates.
         // --- End Wallet Balance Transfer ---
 
 
@@ -307,11 +298,9 @@ export default function DashboardPage() {
           pendingOrders: updatedPendingOrders,
           recentTransactions: updatedTransactions,
           reserved: updatedReserved,
-          merchantWalletBalance: newMerchantBalance // Update merchant balance
         });
         transaction.update(userDocRef, { 
             cart: updatedUserCart,
-            walletBalance: newUserBalance // Update user balance
         });
       });
 
@@ -321,9 +310,7 @@ export default function DashboardPage() {
 
     } catch (error: any) {
       console.error("Error redeeming order:", error);
-      const errorMessage = error.message === "Insufficient user funds." 
-        ? "Redemption failed: The user has insufficient funds."
-        : "There was a problem completing the redemption.";
+      const errorMessage = "There was a problem completing the redemption.";
       toast({ title: "Redemption Failed", description: errorMessage, variant: "destructive" });
     }
   };
@@ -350,7 +337,7 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], merchantWalletBalance = 0 } = merchantData;
+  const { listings = [], walletAddress } = merchantData;
 
   return (
     <>
@@ -374,11 +361,12 @@ export default function DashboardPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
+              <CardTitle className="text-sm font-medium">Wallet Address</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{merchantWalletBalance.toFixed(2)} {siteConfig.token.symbol}</div>
+              <div className="text-sm font-bold font-mono break-all">{walletAddress || "No wallet created"}</div>
+              {walletAddress && <p className="text-xs text-muted-foreground pt-2">Balance: 0.00 SOL</p> }
             </CardContent>
           </Card>
           <Card>
