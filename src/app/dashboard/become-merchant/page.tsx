@@ -32,7 +32,7 @@ import { geocodeAddress } from "@/ai/flows/geocode-address";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, where, query, onSnapshot } from "firebase/firestore";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -67,17 +67,19 @@ export default function BecomeMerchantPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [applicationStatus, setApplicationStatus] = useState<'idle' | 'pending' | 'approved' | 'loading'>('loading');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      const appRef = doc(db, "merchant_applications", user.id);
-      const unsubscribe = onSnapshot(appRef, (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
+    if (user && user.id) {
+      const appRefQuery = collection(db, "merchant_applications");
+      const q = query(appRefQuery, where("userId", "==", user.id));
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        if (!querySnapshot.empty) {
+          const appDoc = querySnapshot.docs[0];
+          const data = appDoc.data();
           if(data.status === 'pending') {
             setApplicationStatus('pending');
           } else if (data.status === 'approved') {
-            // Should be a merchant now, redirect
             router.push('/dashboard');
           } else {
             setApplicationStatus('idle');
@@ -85,10 +87,18 @@ export default function BecomeMerchantPage() {
         } else {
           setApplicationStatus('idle');
         }
+        setIsSubmitting(false);
+      }, (error) => {
+         console.error("Error fetching application status:", error);
+         setApplicationStatus('idle');
+         setIsSubmitting(false);
       });
       return () => unsubscribe();
+    } else if (!user) {
+        setIsSubmitting(false);
     }
   }, [user, router]);
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -124,7 +134,7 @@ export default function BecomeMerchantPage() {
         return;
     }
     
-    setApplicationStatus('loading'); // Show loader while submitting
+    setIsSubmitting(true);
 
     try {
       const position = await geocodeAddress({
@@ -144,7 +154,6 @@ export default function BecomeMerchantPage() {
         submittedAt: serverTimestamp(),
       };
       
-      // Use the user's ID as the document ID for easy lookup
       await addDoc(collection(db, 'merchant_applications'), applicationData);
 
       toast({
@@ -162,6 +171,8 @@ export default function BecomeMerchantPage() {
         variant: "destructive",
       });
       setApplicationStatus('idle');
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
@@ -204,7 +215,7 @@ export default function BecomeMerchantPage() {
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a province" />
-                  </Trigger>
+                  </SelectTrigger>
                 </FormControl>
                 <SelectContent>
                   {provinces.map((province) => (
@@ -410,8 +421,15 @@ export default function BecomeMerchantPage() {
                     )}
                   />
                   <div className="text-center pt-4">
-                    <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
-                      {form.formState.isSubmitting ? 'Submitting...' : 'Submit Application'}
+                    <Button type="submit" size="lg" disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        'Submit Application'
+                      )}
                     </Button>
                   </div>
                 </form>
@@ -429,5 +447,3 @@ export default function BecomeMerchantPage() {
     </div>
   )
 }
-
-    
