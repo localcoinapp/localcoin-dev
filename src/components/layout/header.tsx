@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard, ShoppingCart } from "lucide-react"
+import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard, ShoppingCart, Briefcase } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { Logo } from "@/components/logo"
 import { MainNav } from "./main-nav"
@@ -99,14 +99,23 @@ export function AppHeader() {
                           <span>Messages</span>
                         </Link>
                       </DropdownMenuItem>
-                      {isMerchantOrAdmin && (
+                      
+                      {isMerchantOrAdmin ? (
                         <DropdownMenuItem asChild>
                           <Link href="/dashboard">
                             <LayoutDashboard className="mr-2 h-4 w-4" />
                             <span>Dashboard</span>
                           </Link>
                         </DropdownMenuItem>
+                      ) : (
+                         <DropdownMenuItem asChild>
+                          <Link href="/dashboard/become-merchant">
+                            <Briefcase className="mr-2 h-4 w-4" />
+                            <span>Become a Merchant</span>
+                          </Link>
+                        </DropdownMenuItem>
                       )}
+
                       <DropdownMenuItem asChild>
                         <Link href="/settings">
                           <Settings className="mr-2 h-4 w-4" />

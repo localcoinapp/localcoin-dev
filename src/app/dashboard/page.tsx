@@ -44,7 +44,8 @@ import {
   Trash2,
   KeyRound,
   Loader2,
-  Eye
+  Eye,
+  Briefcase
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -358,9 +359,10 @@ export default function DashboardPage() {
   if (!user || !merchantData) {
     return (
       <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
-        <Card className="w-full max-w-lg text-center">
+        <Card className="w-full max-w-lg text-center p-8">
           <CardHeader>
-            <CardTitle>Become a Merchant</CardTitle>
+            <Briefcase className="mx-auto h-12 w-12 text-primary mb-4" />
+            <CardTitle className="text-2xl font-headline">Become a Merchant</CardTitle>
             <CardDescription>Start selling your services and items on our platform.</CardDescription>
           </CardHeader>
           <CardContent>
