@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, updateDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Loader2, ShieldAlert, Eye } from 'lucide-react';
 import type { MerchantApplication } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { geohashForLocation } from 'geofire-common';
@@ -23,6 +24,7 @@ export default function AdminPage() {
 
   const [applications, setApplications] = useState<MerchantApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewingApp, setViewingApp] = useState<MerchantApplication | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -116,77 +118,112 @@ export default function AdminPage() {
   const pendingApplications = applications.filter(a => a.status === 'pending');
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
-      <Tabs defaultValue="applications">
-        <TabsList>
-          <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
-          <TabsTrigger value="users">User Management</TabsTrigger>
-          <TabsTrigger value="merchants">Merchant Management</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
-        </TabsList>
-        <TabsContent value="applications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Merchant Applications</CardTitle>
-              <CardDescription>Review and approve or deny new merchant requests.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Applicant</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingApplications.length > 0 ? (
-                    pendingApplications.map((app) => (
-                      <TableRow key={app.id}>
-                        <TableCell className="font-medium">{app.companyName}</TableCell>
-                        <TableCell>{app.userEmail}</TableCell>
-                        <TableCell>{app.submittedAt ? new Date(app.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</TableCell>
-                        <TableCell><Badge variant="outline">{app.status}</Badge></TableCell>
-                        <TableCell className="text-right space-x-2">
-                           <Button size="sm" onClick={() => handleApprove(app)}>Approve</Button>
-                           <Button size="sm" variant="destructive" onClick={() => handleDeny(app.id)}>Deny</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
+    <Dialog onOpenChange={() => setViewingApp(null)}>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
+        <Tabs defaultValue="applications">
+          <TabsList>
+            <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
+            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="merchants">Merchant Management</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
+          </TabsList>
+          <TabsContent value="applications">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Merchant Applications</CardTitle>
+                <CardDescription>Review and approve or deny new merchant requests.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center h-24">No pending applications.</TableCell>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Applicant</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="users">
-            <Card>
-                <CardHeader><CardTitle>User Management</CardTitle></CardHeader>
-                <CardContent><p className="text-muted-foreground">User management features coming soon.</p></CardContent>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingApplications.length > 0 ? (
+                      pendingApplications.map((app) => (
+                        <TableRow key={app.id}>
+                          <TableCell className="font-medium">{app.companyName}</TableCell>
+                          <TableCell>{app.userEmail}</TableCell>
+                          <TableCell>{app.submittedAt ? new Date(app.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</TableCell>
+                          <TableCell><Badge variant="outline">{app.status}</Badge></TableCell>
+                          <TableCell className="text-right space-x-2">
+                             <DialogTrigger asChild>
+                                <Button size="sm" variant="ghost" onClick={() => setViewingApp(app)}>
+                                    <Eye className="mr-2 h-4 w-4" /> View
+                                </Button>
+                             </DialogTrigger>
+                             <Button size="sm" onClick={() => handleApprove(app)}>Approve</Button>
+                             <Button size="sm" variant="destructive" onClick={() => handleDeny(app.id)}>Deny</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center h-24">No pending applications.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
             </Card>
-        </TabsContent>
-        <TabsContent value="merchants">
-            <Card>
-                <CardHeader><CardTitle>Merchant Management</CardTitle></CardHeader>
-                <CardContent><p className="text-muted-foreground">Merchant management features coming soon.</p></CardContent>
-            </Card>
-        </TabsContent>
-         <TabsContent value="analytics">
-            <Card>
-                <CardHeader><CardTitle>Analytics Overview</CardTitle></CardHeader>
-                <CardContent><p className="text-muted-foreground">Analytics dashboard coming soon.</p></CardContent>
-            </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+          </TabsContent>
+          <TabsContent value="users">
+              <Card>
+                  <CardHeader><CardTitle>User Management</CardTitle></CardHeader>
+                  <CardContent><p className="text-muted-foreground">User management features coming soon.</p></CardContent>
+              </Card>
+          </TabsContent>
+          <TabsContent value="merchants">
+              <Card>
+                  <CardHeader><CardTitle>Merchant Management</CardTitle></CardHeader>
+                  <CardContent><p className="text-muted-foreground">Merchant management features coming soon.</p></CardContent>
+              </Card>
+          </TabsContent>
+           <TabsContent value="analytics">
+              <Card>
+                  <CardHeader><CardTitle>Analytics Overview</CardTitle></CardHeader>
+                  <CardContent><p className="text-muted-foreground">Analytics dashboard coming soon.</p></CardContent>
+              </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+       {viewingApp && (
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Application: {viewingApp.companyName}</DialogTitle>
+            <DialogDescription>
+              Submitted by {viewingApp.userEmail} on {viewingApp.submittedAt ? new Date(viewingApp.submittedAt.seconds * 1000).toLocaleString() : 'N/A'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+                <div><p className="font-semibold">Company Name</p><p>{viewingApp.companyName}</p></div>
+                <div><p className="font-semibold">Contact Email</p><p>{viewingApp.contactEmail}</p></div>
+                <div><p className="font-semibold">Phone</p><p>{viewingApp.phone}</p></div>
+                <div><p className="font-semibold">Website</p><p><a href={viewingApp.website} target="_blank" rel="noreferrer" className="underline">{viewingApp.website}</a></p></div>
+                <div><p className="font-semibold">Instagram</p><p>{viewingApp.instagram}</p></div>
+            </div>
+             <div className="border-t pt-4">
+                <p className="font-semibold">Address</p>
+                <p>{viewingApp.houseNumber} {viewingApp.street}</p>
+                <p>{viewingApp.city}, {viewingApp.state} {viewingApp.zipCode}</p>
+                <p>{viewingApp.country}</p>
+             </div>
+             <div className="border-t pt-4">
+                <p className="font-semibold">Description</p>
+                <p className="text-sm text-muted-foreground">{viewingApp.description}</p>
+             </div>
+          </div>
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }
-
-    
