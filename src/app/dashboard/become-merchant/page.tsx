@@ -28,13 +28,13 @@ import { Activity, CheckCircle, Loader2 } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
-import { geocodeAddress } from "@/ai/flows/geocode-address";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, doc, where, query, onSnapshot } from "firebase/firestore";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { geohashForLocation } from "geofire-common";
 
 
 const formSchema = z.object({
@@ -60,6 +60,49 @@ const formSchema = z.object({
     message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
     path: ["phone"],
 });
+
+type Position = { lat: number; lng: number };
+
+// ---------- OpenStreetMap (Nominatim) geocoder ----------
+async function geocodeAddressOSM({
+  street,
+  houseNumber,
+  city,
+  zipCode,
+  country,
+}: {
+  street: string;
+  houseNumber: string;
+  city: string;
+  zipCode: string;
+  country: string;
+}): Promise<Position | null> {
+  const query = `${houseNumber} ${street}, ${zipCode} ${city}, ${country}`;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+    query
+  )}&limit=1&addressdetails=1`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "LocalCoin/1.0 (fresh@katari.farm)",
+      "Accept": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Geocoding API request failed");
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  const lat = parseFloat(data[0].lat);
+  const lng = parseFloat(data[0].lon);
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+  return { lat, lng };
+}
+// --------------------------------------------------------
 
 
 export default function BecomeMerchantPage() {
@@ -137,7 +180,7 @@ export default function BecomeMerchantPage() {
     setIsSubmitting(true);
 
     try {
-      const position = await geocodeAddress({
+      const position = await geocodeAddressOSM({
         street: values.street,
         houseNumber: values.houseNumber,
         city: values.city,
@@ -145,9 +188,14 @@ export default function BecomeMerchantPage() {
         country: values.country,
       });
 
+      if (!position) {
+          throw new Error("Could not geocode the address. Please check it and try again.");
+      }
+
       const applicationData = {
         ...values,
         position,
+        geohash: geohashForLocation([position.lat, position.lng]),
         userId: user.id,
         userEmail: user.email,
         status: 'pending',
@@ -167,7 +215,7 @@ export default function BecomeMerchantPage() {
       console.error("Error during application submission:", error);
       toast({
         title: "Submission Error",
-        description: "Could not geocode the address. Please check it and try again.",
+        description: (error as Error).message || "An unexpected error occurred.",
         variant: "destructive",
       });
       setApplicationStatus('idle');
@@ -447,3 +495,5 @@ export default function BecomeMerchantPage() {
     </div>
   )
 }
+
+    
