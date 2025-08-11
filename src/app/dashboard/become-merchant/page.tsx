@@ -24,14 +24,21 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Activity, CheckCircle } from "lucide-react"
+import { Activity, CheckCircle, Loader2 } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
 import { geocodeAddress } from "@/ai/flows/geocode-address";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { db } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 
 const formSchema = z.object({
+  companyName: z.string().min(2, { message: "Please enter a company name." }),
   country: z.string().min(1, { message: "Please select a country." }),
   street: z.string().min(3, { message: "Please enter a street name." }),
   houseNumber: z.string().min(1, { message: "Please enter a house number." }),
@@ -56,30 +63,69 @@ const formSchema = z.object({
 
 
 export default function BecomeMerchantPage() {
-  const [applicationStatus, setApplicationStatus] = useState<'idle' | 'pending' | 'approved'>('idle');
+  const { user } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
+  const [applicationStatus, setApplicationStatus] = useState<'idle' | 'pending' | 'approved' | 'loading'>('loading');
+
+  useEffect(() => {
+    if (user) {
+      const appRef = doc(db, "merchant_applications", user.id);
+      const unsubscribe = onSnapshot(appRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          if(data.status === 'pending') {
+            setApplicationStatus('pending');
+          } else if (data.status === 'approved') {
+            // Should be a merchant now, redirect
+            router.push('/dashboard');
+          } else {
+            setApplicationStatus('idle');
+          }
+        } else {
+          setApplicationStatus('idle');
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [user, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      companyName: "",
       country: "",
       street: "",
       houseNumber: "",
       city: "",
       state: "",
       zipCode: "",
-      contactEmail: "",
+      contactEmail: user?.email || "",
       phone: "",
       website: "",
       instagram: "",
       description: "",
     },
-  })
+  });
+  
+  // Set user's email as default when user data is available
+  useEffect(() => {
+    if(user?.email) {
+      form.setValue('contactEmail', user.email);
+    }
+  }, [user, form]);
+
 
   const selectedCountry = form.watch("country");
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setApplicationStatus('pending');
+    if (!user) {
+        toast({ title: "Error", description: "You must be logged in to apply.", variant: "destructive" });
+        return;
+    }
+    
+    setApplicationStatus('loading'); // Show loader while submitting
+
     try {
       const position = await geocodeAddress({
         street: values.street,
@@ -91,15 +137,22 @@ export default function BecomeMerchantPage() {
 
       const applicationData = {
         ...values,
-        position, // Add coordinates to the application data
+        position,
+        userId: user.id,
+        userEmail: user.email,
+        status: 'pending',
+        submittedAt: serverTimestamp(),
       };
+      
+      // Use the user's ID as the document ID for easy lookup
+      await addDoc(collection(db, 'merchant_applications'), applicationData);
 
-      console.log("Application submitted for review:", applicationData);
-      // In a real application, you would send this data to your backend.
-      // We'll simulate the review process with a timeout.
-      setTimeout(() => {
-          setApplicationStatus('approved');
-      }, 3000);
+      toast({
+          title: "Application Submitted!",
+          description: "Your application is now under review. We'll notify you of the outcome."
+      });
+
+      setApplicationStatus('pending');
 
     } catch (error) {
       console.error("Error during application submission:", error);
@@ -151,7 +204,7 @@ export default function BecomeMerchantPage() {
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a province" />
-                  </SelectTrigger>
+                  </Trigger>
                 </FormControl>
                 <SelectContent>
                   {provinces.map((province) => (
@@ -167,6 +220,11 @@ export default function BecomeMerchantPage() {
     }
     return null;
   }
+  
+  if (applicationStatus === 'loading') {
+    return <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-12 w-12 animate-spin" /></div>;
+  }
+
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -181,6 +239,19 @@ export default function BecomeMerchantPage() {
           {applicationStatus === 'idle' && (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                 <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., SunnySide Cafe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="country"
@@ -339,8 +410,8 @@ export default function BecomeMerchantPage() {
                     )}
                   />
                   <div className="text-center pt-4">
-                    <Button type="submit" size="lg" disabled={applicationStatus === 'pending'}>
-                      {applicationStatus === 'pending' ? 'Submitting...' : 'Submit Application'}
+                    <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>
+                      {form.formState.isSubmitting ? 'Submitting...' : 'Submit Application'}
                     </Button>
                   </div>
                 </form>
@@ -348,16 +419,9 @@ export default function BecomeMerchantPage() {
           )}
           {applicationStatus === 'pending' && (
               <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px]">
-                  <Activity className="h-16 w-16 mx-auto text-primary mb-4 animate-spin"/>
+                  <Activity className="h-16 w-16 mx-auto text-primary mb-4"/>
                   <p className="text-xl font-semibold">Application Under Review</p>
                   <p className="text-muted-foreground mt-2">Thank you for submitting. We are currently reviewing your application and this may take a few days.</p>
-              </div>
-          )}
-          {applicationStatus === 'approved' && (
-              <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px]">
-                  <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4"/>
-                  <p className="text-xl font-semibold">Congratulations! You're Approved!</p>
-                  <p className="text-muted-foreground mt-2">Your merchant application has been approved. You can now access the full merchant dashboard to list your services.</p>
               </div>
           )}
         </CardContent>
@@ -365,3 +429,5 @@ export default function BecomeMerchantPage() {
     </div>
   )
 }
+
+    

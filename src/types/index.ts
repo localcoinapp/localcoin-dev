@@ -117,3 +117,16 @@ export type CartItem = {
   userName: string;
   category: string;
 }
+
+export interface MerchantApplication {
+  id: string;
+  userId: string;
+  userEmail: string;
+  companyName: string;
+  description: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: Timestamp;
+  [key: string]: any; // for other form fields
+}
+
+    

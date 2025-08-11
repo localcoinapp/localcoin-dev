@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard, ShoppingCart, Briefcase } from "lucide-react"
+import { CreditCard, LogOut, MessageCircle, Settings, User as UserIcon, LayoutDashboard, ShoppingCart, Briefcase, ShieldCheck } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { Logo } from "@/components/logo"
 import { MainNav } from "./main-nav"
@@ -38,7 +38,8 @@ export function AppHeader() {
     await auth.signOut();
   }
   
-  const isMerchantOrAdmin = user?.role === 'merchant' || user?.role === 'admin';
+  const isMerchant = user?.role === 'merchant';
+  const isAdmin = user?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-card">
@@ -75,6 +76,14 @@ export function AppHeader() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
+                      {isAdmin && (
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin">
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem asChild>
                         <Link href="/profile">
                           <UserIcon className="mr-2 h-4 w-4" />
@@ -100,14 +109,14 @@ export function AppHeader() {
                         </Link>
                       </DropdownMenuItem>
                       
-                      {isMerchantOrAdmin ? (
+                      {isMerchant ? (
                         <DropdownMenuItem asChild>
                           <Link href="/dashboard">
                             <LayoutDashboard className="mr-2 h-4 w-4" />
                             <span>Dashboard</span>
                           </Link>
                         </DropdownMenuItem>
-                      ) : (
+                      ) : !isAdmin && (
                          <DropdownMenuItem asChild>
                           <Link href="/dashboard/become-merchant">
                             <Briefcase className="mr-2 h-4 w-4" />
@@ -146,3 +155,5 @@ export function AppHeader() {
     </header>
   )
 }
+
+    
