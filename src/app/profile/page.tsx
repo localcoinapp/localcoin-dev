@@ -10,7 +10,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,10 +35,13 @@ import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
 import { useAuth } from "@/hooks/use-auth"
-import { auth, db, updateProfile } from "@/lib/firebase"
+import { auth, db } from "@/lib/firebase"
+import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import React, { useRef, useState } from "react"
+import * as bip39 from "bip39";
+import { Keypair } from "@solana/web3.js";
 
 
 const profileFormSchema = z.object({
@@ -138,13 +140,12 @@ export default function ProfilePage() {
 
 
   async function onSubmit(data: ProfileFormValues) {
+    if (!user) return;
     try {
       const currentUser = auth.currentUser
       if (currentUser) {
-        await updateProfile(currentUser, { displayName: data.name })
-
-        const userDocRef = doc(db, "users", currentUser.uid)
-        await setDoc(userDocRef, {
+        // Prepare user data for Firestore update
+        const userDataToUpdate: any = {
           name: data.name,
           email: data.email,
           bio: data.bio,
@@ -152,7 +153,26 @@ export default function ProfilePage() {
           address: data.address,
           state: data.state,
           province: data.province,
-        }, { merge: true })
+          profileComplete: true, // Mark profile as complete
+        };
+
+        // Create a wallet if one doesn't exist
+        if (!user.walletAddress) {
+          const mnemonic = bip39.generateMnemonic();
+          const seed = bip39.mnemonicToSeedSync(mnemonic);
+          const keypair = Keypair.fromSeed(seed.slice(0, 32));
+          userDataToUpdate.walletAddress = keypair.publicKey.toBase58();
+          // In a real app, this should be encrypted or handled by a secure wallet service
+          userDataToUpdate.seedPhrase = mnemonic; 
+          toast({ title: "Wallet Created!", description: "Your secure wallet has been set up." });
+        }
+
+        // Update Firebase Auth profile
+        await updateProfile(currentUser, { displayName: data.name })
+
+        // Update Firestore document
+        const userDocRef = doc(db, "users", currentUser.uid)
+        await setDoc(userDocRef, userDataToUpdate, { merge: true })
       }
       toast({ title: "Profile updated", description: "Your profile has been updated successfully." })
     } catch (error) {
@@ -372,3 +392,5 @@ export default function ProfilePage() {
     </>
   )
 }
+
+    

@@ -67,6 +67,7 @@ export type User = {
   walletAddress?: string;
   seedPhrase?: string; // Should be encrypted
   cart?: CartItem[];
+  profileComplete?: boolean;
 };
 
 

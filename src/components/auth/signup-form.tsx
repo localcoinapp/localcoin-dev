@@ -6,9 +6,9 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, getDoc, query, where, collection, getDocs } from "firebase/firestore"
+import { setDoc, doc, getDoc } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -54,16 +54,26 @@ export function SignupForm() {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const user = userCredential.user;
+
+        // Send verification email
+        await sendEmailVerification(user);
+
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
           id: user.uid,
           email: values.email,
           country: values.country,
           role: 'user',
-          walletBalance: 0,
+          profileComplete: false, // Add this flag
         });
-      toast({ title: "Success", description: "Your account has been created." });
-      router.push('/');
+
+      toast({ 
+        title: "Almost there!", 
+        description: "Your account has been created. Please check your email to verify your account and then log in.",
+        duration: 9000,
+      });
+
+      router.push('/login');
     } catch (error: any) {
       console.error("Signup Error:", error);
       toast({
@@ -90,11 +100,11 @@ export function SignupForm() {
             name: user.displayName,
             avatar: user.photoURL,
             role: 'user',
-            walletBalance: 0,
             country: 'US', // Default country, can be improved later
+            profileComplete: true, // Social sign-ins are considered complete
         });
       }
-      toast({ title: "Success", description: "Your account has been created." });
+      toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
       console.error("Social Sign-Up Error:", error);
@@ -105,6 +115,7 @@ export function SignupForm() {
       });
     }
   }
+
 
   const handleGoogleSignIn = () => {
     const provider = new GoogleAuthProvider();
@@ -209,3 +220,5 @@ export function SignupForm() {
     </Card>
   )
 }
+
+    
