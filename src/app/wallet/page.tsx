@@ -88,12 +88,12 @@ export default function WalletPage() {
               <CardContent>
                   {user?.walletAddress ? (
                     <div className="space-y-4">
-                      <div className="text-3xl font-bold font-mono text-sm break-all">{user.walletAddress}</div>
+                      <div className="text-2xl font-bold font-headline break-all">{user.walletAddress}</div>
                       <p className="text-xs text-muted-foreground">
                         Balance: {walletBalance.toFixed(2)} SOL
                       </p>
                       <div className="flex gap-2 mt-4">
-                          <Button variant="secondary" onClick={() => setShowSeedPhrase(true)}>
+                          <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
                               <Eye className="mr-2" /> Show Seed Phrase
                           </Button>
                       </div>
