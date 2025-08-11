@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, updateDoc, writeBatch, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -12,11 +12,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck } from 'lucide-react';
-import type { MerchantApplication, User } from '@/types';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShoppingBag, UserCog, ShieldOff } from 'lucide-react';
+import type { MerchantApplication, User, Merchant } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { geohashForLocation } from 'geofire-common';
 import Link from 'next/link';
+import { Timestamp } from 'firebase/firestore';
+
+const formatDate = (timestamp: Timestamp | Date | undefined) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
+    return date.toLocaleDateString();
+};
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -26,6 +33,8 @@ export default function AdminPage() {
   const [applications, setApplications] = useState<MerchantApplication[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [blockedMerchants, setBlockedMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<MerchantApplication | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -37,41 +46,34 @@ export default function AdminPage() {
       return;
     }
 
-    const appsRef = collection(db, 'merchant_applications');
-    const unsubscribeApps = onSnapshot(appsRef, (snapshot) => {
-      const appsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MerchantApplication));
-      setApplications(appsData);
-      if(loading) setLoading(false);
-    }, (error) => {
-      console.error("Failed to fetch applications:", error);
-      toast({ title: 'Error', description: 'Could not load merchant applications.', variant: 'destructive' });
-      setLoading(false);
-    });
-
-    const usersRef = collection(db, 'users');
-    const unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
-        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as User));
-        setUsers(usersData);
-        if(loading) setLoading(false);
-    }, (error) => {
-        console.error("Failed to fetch users:", error);
-        toast({ title: 'Error', description: 'Could not load users.', variant: 'destructive' });
-    });
+    const collectionsToMonitor = [
+        { name: 'merchant_applications', setter: setApplications },
+        { name: 'users', setter: setUsers },
+        { name: 'blocked_users', setter: setBlockedUsers },
+        { name: 'merchants', setter: setMerchants },
+        { name: 'blocked_merchants', setter: setBlockedMerchants },
+    ];
     
-    const blockedUsersRef = collection(db, 'blocked_users');
-    const unsubscribeBlockedUsers = onSnapshot(blockedUsersRef, (snapshot) => {
-        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as User));
-        setBlockedUsers(usersData);
-    }, (error) => {
-        console.error("Failed to fetch blocked users:", error);
-        toast({ title: 'Error', description: 'Could not load blocked users.', variant: 'destructive' });
+    let activeSubscriptions = collectionsToMonitor.length;
+
+    const unsubscribes = collectionsToMonitor.map(({ name, setter }) => {
+        const ref = collection(db, name);
+        return onSnapshot(ref, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            setter(data);
+            if (loading && --activeSubscriptions === 0) {
+                 setLoading(false);
+            }
+        }, (error) => {
+            console.error(`Failed to fetch ${name}:`, error);
+            toast({ title: 'Error', description: `Could not load ${name}.`, variant: 'destructive' });
+            if (loading && --activeSubscriptions === 0) {
+                 setLoading(false);
+            }
+        });
     });
 
-    return () => {
-        unsubscribeApps();
-        unsubscribeUsers();
-        unsubscribeBlockedUsers();
-    };
+    return () => unsubscribes.forEach(unsub => unsub());
   }, [user, authLoading, router, toast, loading]);
 
   const handleApprove = async (app: MerchantApplication) => {
@@ -113,7 +115,7 @@ export default function AdminPage() {
   const handleDeny = async (appId: string) => {
      const appRef = doc(db, 'merchant_applications', appId);
      try {
-        await updateDoc(appRef, { status: 'rejected' });
+        await writeBatch(db).update(appRef, { status: 'rejected' }).commit();
         toast({ title: 'Application Denied', variant: 'destructive' });
      } catch (error) {
         toast({ title: 'Error', description: 'Could not deny the application.', variant: 'destructive' });
@@ -125,9 +127,9 @@ export default function AdminPage() {
     setIsViewModalOpen(true);
   }
   
-  const moveUser = async (userId: string, fromCollection: string, toCollection: string) => {
-    const fromDocRef = doc(db, fromCollection, userId);
-    const toDocRef = doc(db, toCollection, userId);
+  const moveDoc = async (id: string, fromCollection: string, toCollection: string) => {
+    const fromDocRef = doc(db, fromCollection, id);
+    const toDocRef = doc(db, toCollection, id);
 
     try {
         const docSnap = await getDoc(fromDocRef);
@@ -136,13 +138,14 @@ export default function AdminPage() {
             batch.set(toDocRef, docSnap.data());
             batch.delete(fromDocRef);
             await batch.commit();
-            toast({ title: "Success", description: `User has been moved.`});
+            toast({ title: "Success", description: `Document has been moved.`});
         } else {
-            throw new Error("User document not found.");
+            throw new Error("Document not found.");
         }
     } catch (error) {
-        console.error("Error moving user:", error);
-        toast({ title: "Error", description: "Could not move the user document.", variant: "destructive" });
+        console.error("Error moving document:", error);
+        toast({ title: "Error", description: "Could not move the document.", variant: "destructive" });
+        throw error; // Re-throw to handle in calling function
     }
   };
 
@@ -151,12 +154,37 @@ export default function AdminPage() {
       toast({ title: "Error", description: "You cannot block yourself.", variant: "destructive" });
       return;
     }
-    moveUser(userId, 'users', 'blocked_users');
+    moveDoc(userId, 'users', 'blocked_users');
   };
 
   const handleUnblockUser = (userId: string) => {
-    moveUser(userId, 'blocked_users', 'users');
+    moveDoc(userId, 'blocked_users', 'users');
   };
+
+  const handleBlockMerchant = async (merchant: Merchant) => {
+      try {
+        // Move merchant doc and user doc in parallel
+        await Promise.all([
+            moveDoc(merchant.id, 'merchants', 'blocked_merchants'),
+            moveDoc(merchant.owner, 'users', 'blocked_users')
+        ]);
+        toast({ title: "Merchant Blocked", description: `${merchant.companyName} and its owner have been blocked.`});
+      } catch(error) {
+        toast({ title: "Blocking Failed", description: "An error occurred while blocking the merchant. Some operations may not have completed.", variant: "destructive" });
+      }
+  }
+
+  const handleUnblockMerchant = async (merchant: Merchant) => {
+      try {
+        await Promise.all([
+            moveDoc(merchant.id, 'blocked_merchants', 'merchants'),
+            moveDoc(merchant.owner, 'blocked_users', 'users')
+        ]);
+        toast({ title: "Merchant Unblocked", description: `${merchant.companyName} has been reinstated.`});
+      } catch(error) {
+        toast({ title: "Unblocking Failed", description: "An error occurred while unblocking the merchant.", variant: "destructive" });
+      }
+  }
 
 
   if (authLoading || loading) {
@@ -184,163 +212,125 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList>
+          <TabsList className="grid grid-cols-1 sm:grid-cols-5">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
-            <TabsTrigger value="users">Active Users ({users.length})</TabsTrigger>
-            <TabsTrigger value="blocked_users">Blocked Users ({blockedUsers.length})</TabsTrigger>
-            <TabsTrigger value="merchants">Merchant Management</TabsTrigger>
+            <TabsTrigger value="user_management">User Management</TabsTrigger>
+            <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
             <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
           </TabsList>
+
           <TabsContent value="applications">
             <Card>
-              <CardHeader>
-                <CardTitle>Pending Merchant Applications</CardTitle>
-                <CardDescription>Review and approve or deny new merchant requests.</CardDescription>
-              </CardHeader>
+              <CardHeader><CardTitle>Pending Merchant Applications</CardTitle><CardDescription>Review and approve or deny new merchant requests.</CardDescription></CardHeader>
               <CardContent>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Applicant</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Applicant</TableHead><TableHead>Submitted</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {pendingApplications.length > 0 ? (
                       pendingApplications.map((app) => (
                         <TableRow key={app.id}>
                           <TableCell className="font-medium">{app.companyName}</TableCell>
                           <TableCell>{app.userEmail}</TableCell>
-                          <TableCell>{app.submittedAt ? new Date(app.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</TableCell>
+                          <TableCell>{formatDate(app.submittedAt)}</TableCell>
                           <TableCell><Badge variant="outline">{app.status}</Badge></TableCell>
                           <TableCell className="text-right space-x-2">
-                             <Button size="sm" variant="ghost" onClick={() => handleViewApp(app)}>
-                                 <Eye className="mr-2 h-4 w-4" /> View
-                             </Button>
+                             <Button size="sm" variant="ghost" onClick={() => handleViewApp(app)}><Eye className="mr-2 h-4 w-4" /> View</Button>
                              <Button size="sm" onClick={() => handleApprove(app)}>Approve</Button>
                              <Button size="sm" variant="destructive" onClick={() => handleDeny(app.id)}>Deny</Button>
                           </TableCell>
                         </TableRow>
                       ))
                     ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center h-24">No pending applications.</TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center h-24">No pending applications.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="users">
-              <Card>
-                  <CardHeader>
-                    <CardTitle>Active User Management</CardTitle>
-                    <CardDescription>View and manage all registered users.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Role</TableHead>
-                                <TableHead>Wallet Balance</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
+
+          <TabsContent value="user_management">
+            <Tabs defaultValue="active_users" className="w-full">
+                <TabsList><TabsTrigger value="active_users">Active Users ({users.length})</TabsTrigger><TabsTrigger value="blocked_users">Blocked Users ({blockedUsers.length})</TabsTrigger></TabsList>
+                <TabsContent value="active_users">
+                    <Card><CardHeader><CardTitle>Active User Management</CardTitle><CardDescription>View and manage all registered users.</CardDescription></CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Wallet Balance</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {users.map((u) => (
+                                        <TableRow key={u.id}>
+                                            <TableCell className="font-medium">{u.name || 'N/A'}</TableCell><TableCell>{u.email}</TableCell>
+                                            <TableCell><Badge variant={ u.role === 'admin' ? 'destructive' : u.role === 'merchant' ? 'default' : 'secondary'} className={u.role === 'merchant' ? 'bg-green-600 text-white' : ''}>{u.role}</Badge></TableCell>
+                                            <TableCell>{(u.walletBalance || 0).toFixed(2)}</TableCell>
+                                            <TableCell className="text-right space-x-2">
+                                                <Link href={`/admin/users/${u.id}`} passHref><Button size="sm" variant="outline"><Users className="mr-2 h-4 w-4" /> View</Button></Link>
+                                                <Button size="sm" variant="destructive" onClick={() => handleBlockUser(u.id)} disabled={u.id === user.id}><ShieldX className="mr-2 h-4 w-4"/> Block</Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="blocked_users">
+                    <Card><CardHeader><CardTitle>Blocked User Management</CardTitle><CardDescription>View and manage all blocked users.</CardDescription></CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {blockedUsers.map((u) => (
+                                        <TableRow key={u.id}><TableCell className="font-medium">{u.name || 'N/A'}</TableCell><TableCell>{u.email}</TableCell><TableCell><Badge variant="destructive">{u.role}</Badge></TableCell>
+                                            <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => handleUnblockUser(u.id)}><UserCheck className="mr-2 h-4 w-4"/> Unblock</Button></TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          <TabsContent value="merchant_management">
+             <Tabs defaultValue="active_merchants" className="w-full">
+                <TabsList><TabsTrigger value="active_merchants">Active Merchants ({merchants.length})</TabsTrigger><TabsTrigger value="blocked_merchants">Blocked Merchants ({blockedMerchants.length})</TabsTrigger></TabsList>
+                <TabsContent value="active_merchants">
+                  <Card><CardHeader><CardTitle>Active Merchant Management</CardTitle></CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Owner Email</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
-                            {users.length > 0 ? (
-                                users.map((u) => (
-                                    <TableRow key={u.id}>
-                                        <TableCell className="font-medium">{u.name || 'N/A'}</TableCell>
-                                        <TableCell>{u.email}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={
-                                                u.role === 'admin' ? 'destructive' :
-                                                u.role === 'merchant' ? 'default' :
-                                                'secondary'
-                                            } className={u.role === 'merchant' ? 'bg-green-600' : ''}>
-                                                {u.role}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>{(u.walletBalance || 0).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right space-x-2">
-                                            <Link href={`/admin/users/${u.id}`} passHref>
-                                                <Button size="sm" variant="outline">
-                                                    <Users className="mr-2 h-4 w-4" /> View
-                                                </Button>
-                                            </Link>
-                                            <Button size="sm" variant="destructive" onClick={() => handleBlockUser(u.id)}>
-                                                <ShieldX className="mr-2 h-4 w-4"/> Block
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24">No active users found.</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                  </CardContent>
-              </Card>
-          </TabsContent>
-           <TabsContent value="blocked_users">
-              <Card>
-                  <CardHeader>
-                    <CardTitle>Blocked User Management</CardTitle>
-                    <CardDescription>View and manage all blocked users.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Role</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                          {merchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell><TableCell>{formatDate(m.createdAt)}</TableCell>
+                              <TableCell className="text-right"><Button size="sm" variant="destructive" onClick={() => handleBlockMerchant(m)} disabled={m.owner === user.id}><ShieldX className="mr-2 h-4 w-4" /> Block</Button></TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {blockedUsers.length > 0 ? (
-                                blockedUsers.map((u) => (
-                                    <TableRow key={u.id}>
-                                        <TableCell className="font-medium">{u.name || 'N/A'}</TableCell>
-                                        <TableCell>{u.email}</TableCell>
-                                        <TableCell><Badge variant="destructive">{u.role}</Badge></TableCell>
-                                        <TableCell className="text-right">
-                                            <Button size="sm" variant="outline" onClick={() => handleUnblockUser(u.id)}>
-                                               <UserCheck className="mr-2 h-4 w-4"/> Unblock
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center h-24">No blocked users found.</TableCell>
-                                </TableRow>
-                            )}
+                          )}
                         </TableBody>
-                    </Table>
-                  </CardContent>
-              </Card>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                <TabsContent value="blocked_merchants">
+                  <Card><CardHeader><CardTitle>Blocked Merchant Management</CardTitle></CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Owner Email</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {blockedMerchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell>
+                              <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => handleUnblockMerchant(m)}><ShieldOff className="mr-2 h-4 w-4"/> Unblock</Button></TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
           </TabsContent>
-          <TabsContent value="merchants">
-              <Card>
-                  <CardHeader><CardTitle>Merchant Management</CardTitle></CardHeader>
-                  <CardContent><p className="text-muted-foreground">Merchant management features coming soon.</p></CardContent>
-              </Card>
-          </TabsContent>
+
            <TabsContent value="analytics">
-              <Card>
-                  <CardHeader><CardTitle>Analytics Overview</CardTitle></CardHeader>
-                  <CardContent><p className="text-muted-foreground">Analytics dashboard coming soon.</p></CardContent>
-              </Card>
+              <Card><CardHeader><CardTitle>Analytics Overview</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Analytics dashboard coming soon.</p></CardContent></Card>
           </TabsContent>
         </Tabs>
       </div>
@@ -348,11 +338,8 @@ export default function AdminPage() {
        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
          {viewingApp && (
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Application: {viewingApp.companyName}</DialogTitle>
-              <DialogDescription>
-                Submitted by {viewingApp.userEmail} on {viewingApp.submittedAt ? new Date(viewingApp.submittedAt.seconds * 1000).toLocaleString() : 'N/A'}.
-              </DialogDescription>
+            <DialogHeader><DialogTitle>Application: {viewingApp.companyName}</DialogTitle>
+              <DialogDescription>Submitted by {viewingApp.userEmail} on {formatDate(viewingApp.submittedAt)}.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
@@ -362,16 +349,8 @@ export default function AdminPage() {
                   <div><p className="font-semibold">Website</p><p><a href={viewingApp.website} target="_blank" rel="noreferrer" className="underline">{viewingApp.website}</a></p></div>
                   <div><p className="font-semibold">Instagram</p><p>{viewingApp.instagram}</p></div>
               </div>
-               <div className="border-t pt-4 mt-2">
-                  <p className="font-semibold">Address</p>
-                  <p>{viewingApp.houseNumber} {viewingApp.street}</p>
-                  <p>{viewingApp.city}, {viewingApp.state} {viewingApp.zipCode}</p>
-                  <p>{viewingApp.country}</p>
-               </div>
-               <div className="border-t pt-4 mt-2">
-                  <p className="font-semibold">Description</p>
-                  <p className="text-sm text-muted-foreground">{viewingApp.description}</p>
-               </div>
+               <div className="border-t pt-4 mt-2"><p className="font-semibold">Address</p><p>{viewingApp.houseNumber} {viewingApp.street}</p><p>{viewingApp.city}, {viewingApp.state} {viewingApp.zipCode}</p><p>{viewingApp.country}</p></div>
+               <div className="border-t pt-4 mt-2"><p className="font-semibold">Description</p><p className="text-sm text-muted-foreground">{viewingApp.description}</p></div>
             </div>
           </DialogContent>
         )}
@@ -379,5 +358,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    

@@ -43,6 +43,8 @@ export type Merchant = {
   zipCode?: string;
   website?: string;
   instagram?: string;
+  userEmail?: string;
+  createdAt?: Timestamp;
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
@@ -128,7 +130,6 @@ export interface MerchantApplication {
   description: string;
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: Timestamp;
+  position: { lat: number; lng: number };
   [key: string]: any; // for other form fields
 }
-
-    
