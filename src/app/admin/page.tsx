@@ -58,8 +58,9 @@ export default function AdminPage() {
     const unsubscribes = collectionsToMonitor.map(({ name, setter }) => {
         const ref = collection(db, name);
         return onSnapshot(ref, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-            setter(data);
+            // FIX: Use a different name for the doc ID to avoid collision with a field named 'id'
+            const data = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() } as any));
+            setter(data.map(({ docId, ...rest }) => ({ id: docId, ...rest })));
             if (loading && --activeSubscriptions === 0) {
                  setLoading(false);
             }
@@ -164,7 +165,6 @@ export default function AdminPage() {
   };
 
   const handleBlockMerchant = async (merchant: Merchant) => {
-    console.log("Attempting to block merchant:", merchant); // <-- DEBUG LOG
     if (!merchant.id || !merchant.owner) {
         toast({ title: "Error", description: "Merchant ID or Owner ID is missing.", variant: "destructive" });
         return;
