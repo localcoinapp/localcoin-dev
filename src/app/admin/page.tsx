@@ -136,7 +136,7 @@ export default function AdminPage() {
         const docSnap = await getDoc(fromDocRef);
         if(docSnap.exists()){
             const batch = writeBatch(db);
-            const { id: docId, ...dataToMove } = { ...docSnap.data(), ...addData };
+            const dataToMove = { ...docSnap.data(), ...addData };
             batch.set(toDocRef, dataToMove);
             batch.delete(fromDocRef);
             await batch.commit();
@@ -164,8 +164,9 @@ export default function AdminPage() {
   };
 
   const handleBlockMerchant = async (merchant: Merchant) => {
-    if (!merchant.owner) {
-        toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
+    console.log("Attempting to block merchant:", merchant); // <-- DEBUG LOG
+    if (!merchant.id || !merchant.owner) {
+        toast({ title: "Error", description: "Merchant ID or Owner ID is missing.", variant: "destructive" });
         return;
     }
 
@@ -174,7 +175,7 @@ export default function AdminPage() {
     try {
         const merchantFromRef = doc(db, 'merchants', merchant.id);
         const merchantSnap = await getDoc(merchantFromRef);
-        if (!merchantSnap.exists()) throw new Error("Merchant document not found.");
+        if (!merchantSnap.exists()) throw new Error("Merchant document not found in 'merchants' collection.");
         
         const merchantToRef = doc(db, 'blocked_merchants', merchant.id);
         batch.set(merchantToRef, { ...merchantSnap.data(), blockedAt: serverTimestamp() });
@@ -197,8 +198,8 @@ export default function AdminPage() {
   };
 
   const handleUnblockMerchant = async (merchant: Merchant) => {
-    if (!merchant.owner) {
-        toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
+    if (!merchant.id || !merchant.owner) {
+        toast({ title: "Error", description: "Merchant ID or owner ID is missing.", variant: "destructive" });
         return;
     }
     
