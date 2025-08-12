@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -47,11 +47,11 @@ export default function AdminPage() {
     }
 
     const collectionsToMonitor = [
-        { name: 'merchant_applications', setter: setApplications },
-        { name: 'users', setter: setUsers },
-        { name: 'blocked_users', setter: setBlockedUsers },
-        { name: 'merchants', setter: setMerchants },
-        { name: 'blocked_merchants', setter: setBlockedMerchants },
+        { name: 'merchant_applications', setter: setApplications, isQuery: false },
+        { name: 'users', setter: setUsers, isQuery: false },
+        { name: 'blocked_users', setter: setBlockedUsers, isQuery: false },
+        { name: 'merchants', setter: setMerchants, isQuery: false },
+        { name: 'blocked_merchants', setter: setBlockedMerchants, isQuery: false },
     ];
     
     let activeSubscriptions = collectionsToMonitor.length;
@@ -114,8 +114,10 @@ export default function AdminPage() {
 
   const handleDeny = async (appId: string) => {
      const appRef = doc(db, 'merchant_applications', appId);
+     const batch = writeBatch(db);
+     batch.update(appRef, { status: 'rejected' });
      try {
-        await writeBatch(db).update(appRef, { status: 'rejected' }).commit();
+        await batch.commit();
         toast({ title: 'Application Denied', variant: 'destructive' });
      } catch (error) {
         toast({ title: 'Error', description: 'Could not deny the application.', variant: 'destructive' });
@@ -161,18 +163,53 @@ export default function AdminPage() {
     moveDoc(userId, 'blocked_users', 'users');
   };
 
+  const performAtomicMove = async (
+    docId: string,
+    fromPath: string,
+    toPath: string,
+    secondaryDocId: string | null = null,
+    secondaryFromPath: string | null = null,
+    secondaryToPath: string | null = null,
+  ) => {
+      const fromDocRef = doc(db, fromPath, docId);
+      const toDocRef = doc(db, toPath, docId);
+
+      const batch = writeBatch(db);
+
+      try {
+          const fromDocSnap = await getDoc(fromDocRef);
+          if (!fromDocSnap.exists()) throw new Error(`Document to move (ID: ${docId}) not found in ${fromPath}.`);
+          
+          batch.set(toDocRef, fromDocSnap.data());
+          batch.delete(fromDocRef);
+
+          if (secondaryDocId && secondaryFromPath && secondaryToPath) {
+              const secondaryFromRef = doc(db, secondaryFromPath, secondaryDocId);
+              const secondaryToRef = doc(db, secondaryToPath, secondaryDocId);
+              const secondarySnap = await getDoc(secondaryFromRef);
+              if (!secondarySnap.exists()) throw new Error(`Secondary document (ID: ${secondaryDocId}) not found in ${secondaryFromPath}.`);
+
+              batch.set(secondaryToRef, secondarySnap.data());
+              batch.delete(secondaryFromRef);
+          }
+          
+          await batch.commit();
+          toast({ title: "Success", description: "The operation was completed successfully." });
+      } catch (error) {
+          console.error("Atomic move failed:", error);
+          toast({ title: "Operation Failed", description: (error as Error).message, variant: "destructive" });
+      }
+  };
+
   const handleBlockMerchant = async (merchant: Merchant) => {
     if (!merchant.owner) {
         toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
         return;
     }
-    try {
-        await moveDoc(merchant.id, 'merchants', 'blocked_merchants');
-        await moveDoc(merchant.owner, 'users', 'blocked_users');
-        toast({ title: "Merchant Blocked", description: `${merchant.companyName} and its owner have been blocked.`});
-    } catch(error) {
-      toast({ title: "Blocking Failed", description: "An error occurred while blocking the merchant. Some operations may not have completed.", variant: "destructive" });
-    }
+    await performAtomicMove(
+        merchant.id, 'merchants', 'blocked_merchants',
+        merchant.owner, 'users', 'blocked_users'
+    );
   };
 
   const handleUnblockMerchant = async (merchant: Merchant) => {
@@ -180,13 +217,10 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
         return;
     }
-    try {
-        await moveDoc(merchant.id, 'blocked_merchants', 'merchants');
-        await moveDoc(merchant.owner, 'blocked_users', 'users');
-        toast({ title: "Merchant Unblocked", description: `${merchant.companyName} has been reinstated.`});
-    } catch(error) {
-      toast({ title: "Unblocking Failed", description: "An error occurred while unblocking the merchant.", variant: "destructive" });
-    }
+    await performAtomicMove(
+        merchant.id, 'blocked_merchants', 'merchants',
+        merchant.owner, 'blocked_users', 'users'
+    );
   };
 
 
@@ -360,3 +394,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
