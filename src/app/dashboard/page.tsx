@@ -45,7 +45,8 @@ import {
   KeyRound,
   Loader2,
   Eye,
-  Briefcase
+  Briefcase,
+  ShieldAlert
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<any>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<any>(null);
@@ -106,18 +108,27 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    if (user && (user.role === 'merchant' || user.role === 'admin') && user.merchantId) {
+    if (user && user.role === 'merchant' && user.merchantId) {
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
       const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
           setMerchantData(data);
+          setIsBlocked(false);
           const active = (data.pendingOrders || []).filter((order: any) => 
               !['completed', 'rejected', 'cancelled'].includes(order.status)
           );
           setActiveOrders(active);
         } else {
-          setMerchantData(null);
+          // If the merchant doc is not in the 'merchants' collection, check 'blocked_merchants'
+          const blockedMerchantDocRef = doc(db, 'blocked_merchants', user.merchantId!);
+          onSnapshot(blockedMerchantDocRef, (blockedDoc) => {
+              if (blockedDoc.exists()) {
+                  setIsBlocked(true);
+              } else {
+                  setMerchantData(null);
+              }
+          });
           setActiveOrders([]);
         }
         setIsLoading(false);
@@ -354,6 +365,20 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return <div className="container text-center"><p>Loading dashboard...</p></div>;
+  }
+
+  if (isBlocked) {
+    return (
+       <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
+         <Card className="w-full max-w-lg text-center p-8 border-destructive">
+          <CardHeader>
+            <ShieldAlert className="mx-auto h-12 w-12 text-destructive mb-4" />
+            <CardTitle className="text-2xl font-headline">Shop Blocked</CardTitle>
+            <CardDescription>Your merchant account has been blocked. Please contact support for further information.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
   }
 
   if (!user || !merchantData) {

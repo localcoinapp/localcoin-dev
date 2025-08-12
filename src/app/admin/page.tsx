@@ -162,6 +162,10 @@ export default function AdminPage() {
   };
 
   const handleBlockMerchant = async (merchant: Merchant) => {
+      if (!merchant.owner) {
+          toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
+          return;
+      }
       try {
         // Move merchant doc and user doc in parallel
         await Promise.all([
@@ -175,6 +179,10 @@ export default function AdminPage() {
   }
 
   const handleUnblockMerchant = async (merchant: Merchant) => {
+      if (!merchant.owner) {
+          toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
+          return;
+      }
       try {
         await Promise.all([
             moveDoc(merchant.id, 'blocked_merchants', 'merchants'),
@@ -212,7 +220,7 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-5">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-4 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
@@ -251,18 +259,17 @@ export default function AdminPage() {
 
           <TabsContent value="user_management">
             <Tabs defaultValue="active_users" className="w-full">
-                <TabsList><TabsTrigger value="active_users">Active Users ({users.length})</TabsTrigger><TabsTrigger value="blocked_users">Blocked Users ({blockedUsers.length})</TabsTrigger></TabsList>
+                <TabsList className="grid grid-cols-2 w-full"><TabsTrigger value="active_users">Active Users ({users.length})</TabsTrigger><TabsTrigger value="blocked_users">Blocked Users ({blockedUsers.length})</TabsTrigger></TabsList>
                 <TabsContent value="active_users">
                     <Card><CardHeader><CardTitle>Active User Management</CardTitle><CardDescription>View and manage all registered users.</CardDescription></CardHeader>
                         <CardContent>
                             <Table>
-                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Wallet Balance</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {users.map((u) => (
                                         <TableRow key={u.id}>
                                             <TableCell className="font-medium">{u.name || 'N/A'}</TableCell><TableCell>{u.email}</TableCell>
                                             <TableCell><Badge variant={ u.role === 'admin' ? 'destructive' : u.role === 'merchant' ? 'default' : 'secondary'} className={u.role === 'merchant' ? 'bg-green-600 text-white' : ''}>{u.role}</Badge></TableCell>
-                                            <TableCell>{(u.walletBalance || 0).toFixed(2)}</TableCell>
                                             <TableCell className="text-right space-x-2">
                                                 <Link href={`/admin/users/${u.id}`} passHref><Button size="sm" variant="outline"><Users className="mr-2 h-4 w-4" /> View</Button></Link>
                                                 <Button size="sm" variant="destructive" onClick={() => handleBlockUser(u.id)} disabled={u.id === user.id}><ShieldX className="mr-2 h-4 w-4"/> Block</Button>
@@ -295,7 +302,7 @@ export default function AdminPage() {
 
           <TabsContent value="merchant_management">
              <Tabs defaultValue="active_merchants" className="w-full">
-                <TabsList><TabsTrigger value="active_merchants">Active Merchants ({merchants.length})</TabsTrigger><TabsTrigger value="blocked_merchants">Blocked Merchants ({blockedMerchants.length})</TabsTrigger></TabsList>
+                <TabsList className="grid grid-cols-2 w-full"><TabsTrigger value="active_merchants">Active Merchants ({merchants.length})</TabsTrigger><TabsTrigger value="blocked_merchants">Blocked Merchants ({blockedMerchants.length})</TabsTrigger></TabsList>
                 <TabsContent value="active_merchants">
                   <Card><CardHeader><CardTitle>Active Merchant Management</CardTitle></CardHeader>
                     <CardContent>
@@ -303,7 +310,7 @@ export default function AdminPage() {
                         <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Owner Email</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
                           {merchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell><TableCell>{formatDate(m.createdAt)}</TableCell>
-                              <TableCell className="text-right"><Button size="sm" variant="destructive" onClick={() => handleBlockMerchant(m)} disabled={m.owner === user.id}><ShieldX className="mr-2 h-4 w-4" /> Block</Button></TableCell>
+                              <TableCell className="text-right"><Button size="sm" variant="destructive" onClick={() => handleBlockMerchant(m)} disabled={m.owner === user?.id}><ShieldX className="mr-2 h-4 w-4" /> Block</Button></TableCell>
                             </TableRow>
                           )}
                         </TableBody>
