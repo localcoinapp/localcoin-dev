@@ -31,7 +31,7 @@ import { provinces } from "@/data/provinces"
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, doc, where, query, onSnapshot } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, where, query, onSnapshot, updateDoc, getDocs } from "firebase/firestore";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { geohashForLocation } from "geofire-common";
@@ -114,31 +114,33 @@ export default function BecomeMerchantPage() {
 
   useEffect(() => {
     if (user && user.id) {
-      const appRefQuery = collection(db, "merchant_applications");
-      const q = query(appRefQuery, where("userId", "==", user.id));
+      const merchantsRef = collection(db, "merchants");
+      const q = query(merchantsRef, where("owner", "==", user.id));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         if (!querySnapshot.empty) {
-          const appDoc = querySnapshot.docs[0];
-          const data = appDoc.data();
+          const merchantDoc = querySnapshot.docs[0];
+          const data = merchantDoc.data();
           if(data.status === 'pending') {
             setApplicationStatus('pending');
           } else if (data.status === 'approved') {
             router.push('/dashboard');
           } else {
+             // covers 'rejected' or 'blocked'
             setApplicationStatus('idle');
           }
         } else {
           setApplicationStatus('idle');
         }
-        setIsSubmitting(false);
+        setIsSubmitting(false); // also applies to loading state
       }, (error) => {
-         console.error("Error fetching application status:", error);
+         console.error("Error fetching merchant status:", error);
          setApplicationStatus('idle');
          setIsSubmitting(false);
       });
       return () => unsubscribe();
     } else if (!user) {
         setIsSubmitting(false);
+        setApplicationStatus('idle'); // No user, no application
     }
   }, [user, router]);
 
@@ -196,13 +198,16 @@ export default function BecomeMerchantPage() {
         ...values,
         position,
         geohash: geohashForLocation([position.lat, position.lng]),
-        userId: user.id,
+        owner: user.id,
         userEmail: user.email,
         status: 'pending',
         submittedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        listings: [],
+        rating: 0,
       };
       
-      await addDoc(collection(db, 'merchant_applications'), applicationData);
+      await addDoc(collection(db, 'merchants'), applicationData);
 
       toast({
           title: "Application Submitted!",

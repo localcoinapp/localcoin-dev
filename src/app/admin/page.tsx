@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -13,9 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff } from 'lucide-react';
-import type { MerchantApplication, User, Merchant } from '@/types';
+import type { User, Merchant } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { geohashForLocation } from 'geofire-common';
 import Link from 'next/link';
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
@@ -29,13 +28,11 @@ export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [applications, setApplications] = useState<MerchantApplication[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
-  const [blockedMerchants, setBlockedMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewingApp, setViewingApp] = useState<MerchantApplication | null>(null);
+  const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   useEffect(() => {
@@ -46,11 +43,9 @@ export default function AdminPage() {
     }
 
     const collectionsToMonitor = [
-        { name: 'merchant_applications', setter: setApplications },
         { name: 'users', setter: setUsers },
         { name: 'blocked_users', setter: setBlockedUsers },
         { name: 'merchants', setter: setMerchants },
-        { name: 'blocked_merchants', setter: setBlockedMerchants },
     ];
     
     let activeSubscriptions = collectionsToMonitor.length;
@@ -58,7 +53,7 @@ export default function AdminPage() {
     const unsubscribes = collectionsToMonitor.map(({ name, setter }) => {
         const ref = collection(db, name);
         return onSnapshot(ref, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as any);
             setter(data);
             if (loading && --activeSubscriptions === 0) {
                  setLoading(false);
@@ -75,92 +70,83 @@ export default function AdminPage() {
     return () => unsubscribes.forEach(unsub => unsub());
   }, [user, authLoading, router, toast, loading]);
 
-  const handleApprove = async (app: MerchantApplication) => {
-    const { userId, ...applicationData } = app;
-    
-    if (!userId) {
-        toast({ title: 'Error', description: 'Application is missing a user ID.', variant: 'destructive' });
+  const handleApprove = async (merchant: Merchant) => {
+    if (!merchant.id || !merchant.owner) {
+        toast({ title: 'Error', description: 'Application is missing merchant or user ID.', variant: 'destructive' });
         return;
     }
 
     const batch = writeBatch(db);
     
-    const merchantRef = doc(collection(db, 'merchants'));
-    const merchantData = {
-        ...applicationData,
-        owner: userId,
-        listings: [],
-        rating: 0,
-        geohash: geohashForLocation([app.position.lat, app.position.lng]),
-        createdAt: new Date(),
-    };
-    batch.set(merchantRef, merchantData);
+    const merchantRef = doc(db, 'merchants', merchant.id);
+    batch.update(merchantRef, { status: 'approved' });
 
-    const userRef = doc(db, 'users', userId);
-    batch.update(userRef, { role: 'merchant', merchantId: merchantRef.id });
-
-    const appRef = doc(db, 'merchant_applications', app.id);
-    batch.update(appRef, { status: 'approved' });
+    const userRef = doc(db, 'users', merchant.owner);
+    batch.update(userRef, { role: 'merchant', merchantId: merchant.id });
 
     try {
         await batch.commit();
-        toast({ title: 'Success', description: `${app.companyName} has been approved.` });
+        toast({ title: 'Success', description: `${merchant.companyName} has been approved.` });
     } catch (error) {
         console.error("Error approving application:", error);
         toast({ title: 'Approval Failed', description: 'Could not approve the application.', variant: 'destructive' });
     }
   };
 
-  const handleDeny = async (appId: string) => {
-     const appRef = doc(db, 'merchant_applications', appId);
-     const batch = writeBatch(db);
-     batch.update(appRef, { status: 'rejected' });
+  const handleDeny = async (merchantId: string) => {
+     const merchantRef = doc(db, 'merchants', merchantId);
      try {
-        await batch.commit();
+        await updateDoc(merchantRef, { status: 'rejected' });
         toast({ title: 'Application Denied', variant: 'destructive' });
      } catch (error) {
         toast({ title: 'Error', description: 'Could not deny the application.', variant: 'destructive' });
      }
   };
   
-  const handleViewApp = (app: MerchantApplication) => {
-    setViewingApp(app);
+  const handleViewApp = (merchant: Merchant) => {
+    setViewingApp(merchant);
     setIsViewModalOpen(true);
   }
-  
-  const moveDoc = async (id: string, fromCollection: string, toCollection: string, addData?: object) => {
-    const fromDocRef = doc(db, fromCollection, id);
-    const toDocRef = doc(db, toCollection, id);
-
-    try {
-        const docSnap = await getDoc(fromDocRef);
-        if(docSnap.exists()){
-            const batch = writeBatch(db);
-            const dataToMove = { ...docSnap.data(), ...addData };
-            batch.set(toDocRef, dataToMove);
-            batch.delete(fromDocRef);
-            await batch.commit();
-            toast({ title: "Success", description: `Document has been moved.`});
-        } else {
-            throw new Error("Document not found.");
-        }
-    } catch (error) {
-        console.error("Error moving document:", error);
-        toast({ title: "Error", description: "Could not move the document.", variant: "destructive" });
-        throw error;
-    }
-  };
 
   const handleBlockUser = async (userToBlock: User) => {
     if (userToBlock.id === user?.id) {
       toast({ title: "Error", description: "You cannot block yourself.", variant: "destructive" });
       return;
     }
-    await moveDoc(userToBlock.id, 'users', 'blocked_users', { blockedAt: serverTimestamp() });
+    const fromDocRef = doc(db, 'users', userToBlock.id);
+    const toDocRef = doc(db, 'blocked_users', userToBlock.id);
+
+    try {
+        const docSnap = await getDoc(fromDocRef);
+        if(docSnap.exists()){
+            const batch = writeBatch(db);
+            const dataToMove = { ...docSnap.data(), blockedAt: serverTimestamp() };
+            batch.set(toDocRef, dataToMove);
+            batch.delete(fromDocRef);
+            await batch.commit();
+            toast({ title: "Success", description: `User has been blocked.`});
+        }
+    } catch (error) {
+        toast({ title: "Error", description: "Could not block the user.", variant: "destructive" });
+    }
   };
 
-  const handleUnblockUser = (userId: string) => {
-    moveDoc(userId, 'blocked_users', 'users');
+  const handleUnblockUser = async (userId: string) => {
+    const fromDocRef = doc(db, 'blocked_users', userId);
+    const toDocRef = doc(db, 'users', userId);
+    try {
+        const docSnap = await getDoc(fromDocRef);
+        if(docSnap.exists()){
+            const batch = writeBatch(db);
+            const { blockedAt, ...dataToMove } = docSnap.data();
+            batch.set(toDocRef, dataToMove);
+            batch.delete(fromDocRef);
+            await batch.commit();
+            toast({ title: "Success", description: `User has been unblocked.`});
+        }
+    } catch (error) {
+        toast({ title: "Error", description: "Could not unblock the user.", variant: "destructive" });
+    }
   };
 
   const handleBlockMerchant = async (merchant: Merchant) => {
@@ -168,26 +154,24 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Merchant ID or Owner ID is missing.", variant: "destructive" });
         return;
     }
-
-    const batch = writeBatch(db);
     
-    try {
-        const merchantFromRef = doc(db, 'merchants', merchant.id);
-        const merchantSnap = await getDoc(merchantFromRef);
-        if (!merchantSnap.exists()) throw new Error("Merchant document not found in 'merchants' collection.");
-        
-        const merchantToRef = doc(db, 'blocked_merchants', merchant.id);
-        batch.set(merchantToRef, { ...merchantSnap.data(), blockedAt: serverTimestamp() });
-        batch.delete(merchantFromRef);
+    const batch = writeBatch(db);
 
-        const userFromRef = doc(db, 'users', merchant.owner);
+    // Block merchant
+    const merchantRef = doc(db, 'merchants', merchant.id);
+    batch.update(merchantRef, { status: 'blocked' });
+
+    // Block owner user
+    const userFromRef = doc(db, 'users', merchant.owner);
+    const userToRef = doc(db, 'blocked_users', merchant.owner);
+
+    try {
         const userSnap = await getDoc(userFromRef);
         if (userSnap.exists()) {
-            const userToRef = doc(db, 'blocked_users', merchant.owner);
             batch.set(userToRef, { ...userSnap.data(), blockedAt: serverTimestamp() });
             batch.delete(userFromRef);
         }
-        
+
         await batch.commit();
         toast({ title: "Success", description: `Merchant ${merchant.companyName} and their owner have been blocked.` });
     } catch(error) {
@@ -203,21 +187,18 @@ export default function AdminPage() {
     }
     
     const batch = writeBatch(db);
+
+    // Unblock merchant
+    const merchantRef = doc(db, 'merchants', merchant.id);
+    batch.update(merchantRef, { status: 'approved' });
+
+    // Unblock owner user
+    const userFromRef = doc(db, 'blocked_users', merchant.owner);
+    const userToRef = doc(db, 'users', merchant.owner);
     
     try {
-        const merchantFromRef = doc(db, 'blocked_merchants', merchant.id);
-        const merchantSnap = await getDoc(merchantFromRef);
-        if (!merchantSnap.exists()) throw new Error("Blocked merchant document not found.");
-        
-        const merchantToRef = doc(db, 'merchants', merchant.id);
-        const { blockedAt, ...merchantData } = merchantSnap.data();
-        batch.set(merchantToRef, merchantData);
-        batch.delete(merchantFromRef);
-
-        const userFromRef = doc(db, 'blocked_users', merchant.owner);
         const userSnap = await getDoc(userFromRef);
         if (userSnap.exists()) {
-            const userToRef = doc(db, 'users', merchant.owner);
             const { blockedAt, ...userData } = userSnap.data();
             batch.set(userToRef, userData);
             batch.delete(userFromRef);
@@ -250,7 +231,9 @@ export default function AdminPage() {
     );
   }
 
-  const pendingApplications = applications.filter(a => a.status === 'pending');
+  const pendingApplications = merchants.filter(m => m.status === 'pending');
+  const activeMerchants = merchants.filter(m => m.status === 'approved');
+  const blockedMerchants = merchants.filter(m => m.status === 'blocked');
 
   return (
     <>
@@ -339,14 +322,14 @@ export default function AdminPage() {
 
           <TabsContent value="merchant_management">
              <Tabs defaultValue="active_merchants" className="w-full">
-                <TabsList className="grid grid-cols-2 w-full"><TabsTrigger value="active_merchants">Active Merchants ({merchants.length})</TabsTrigger><TabsTrigger value="blocked_merchants">Blocked Merchants ({blockedMerchants.length})</TabsTrigger></TabsList>
+                <TabsList className="grid grid-cols-2 w-full"><TabsTrigger value="active_merchants">Active Merchants ({activeMerchants.length})</TabsTrigger><TabsTrigger value="blocked_merchants">Blocked Merchants ({blockedMerchants.length})</TabsTrigger></TabsList>
                 <TabsContent value="active_merchants">
                   <Card><CardHeader><CardTitle>Active Merchant Management</CardTitle></CardHeader>
                     <CardContent>
                       <Table>
                         <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Owner Email</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
-                          {merchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell><TableCell>{formatDate(m.createdAt)}</TableCell>
+                          {activeMerchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell><TableCell>{formatDate(m.createdAt)}</TableCell>
                               <TableCell className="text-right"><Button size="sm" variant="destructive" onClick={() => handleBlockMerchant(m)} disabled={m.owner === user?.id}><ShieldX className="mr-2 h-4 w-4" /> Block</Button></TableCell>
                             </TableRow>
                           )}

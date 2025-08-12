@@ -19,6 +19,8 @@ export type MerchantItem = {
   active?: boolean;
 }
 
+export type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
+
 export type Merchant = {
   id: string
   owner: string;
@@ -45,6 +47,9 @@ export type Merchant = {
   instagram?: string;
   userEmail?: string;
   createdAt?: Timestamp;
+  submittedAt?: Timestamp;
+  status: MerchantStatus;
+  [key: string]: any; // for other form fields
 }
 
 export type UserRole = 'admin' | 'merchant' | 'user';
@@ -122,14 +127,15 @@ export type CartItem = {
   category: string;
 }
 
-export interface MerchantApplication {
-  id: string;
-  userId: string;
-  userEmail: string;
-  companyName: string;
-  description: string;
-  status: 'pending' | 'approved' | 'rejected';
-  submittedAt: Timestamp;
-  position: { lat: number; lng: number };
-  [key: string]: any; // for other form fields
-}
+// This type is no longer needed as we use a status on the Merchant type.
+// export interface MerchantApplication {
+//   id: string;
+//   userId: string;
+//   userEmail: string;
+//   companyName: string;
+//   description: string;
+//   status: 'pending' | 'approved' | 'rejected';
+//   submittedAt: Timestamp;
+//   position: { lat: number; lng: number };
+//   [key: string]: any; // for other form fields
+// }
