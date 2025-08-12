@@ -33,6 +33,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  experimental: {
+    allowedDevOrigins: [
+      'https://6000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev',
+      'https://9000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev',
+    ],
+  },
 };
 
 // Forcing a server restart to clear the cache.
