@@ -157,11 +157,11 @@ export default function AdminPage() {
     
     const batch = writeBatch(db);
 
-    // Block merchant
+    // Update merchant status to 'blocked'
     const merchantRef = doc(db, 'merchants', merchant.id);
     batch.update(merchantRef, { status: 'blocked' });
 
-    // Block owner user
+    // Move owner user to 'blocked_users'
     const userFromRef = doc(db, 'users', merchant.owner);
     const userToRef = doc(db, 'blocked_users', merchant.owner);
 
@@ -188,11 +188,11 @@ export default function AdminPage() {
     
     const batch = writeBatch(db);
 
-    // Unblock merchant
+    // Update merchant status back to 'approved'
     const merchantRef = doc(db, 'merchants', merchant.id);
     batch.update(merchantRef, { status: 'approved' });
 
-    // Unblock owner user
+    // Move owner user back to 'users'
     const userFromRef = doc(db, 'blocked_users', merchant.owner);
     const userToRef = doc(db, 'users', merchant.owner);
     

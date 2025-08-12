@@ -126,16 +126,3 @@ export type CartItem = {
   userName: string;
   category: string;
 }
-
-// This type is no longer needed as we use a status on the Merchant type.
-// export interface MerchantApplication {
-//   id: string;
-//   userId: string;
-//   userEmail: string;
-//   companyName: string;
-//   description: string;
-//   status: 'pending' | 'approved' | 'rejected';
-//   submittedAt: Timestamp;
-//   position: { lat: number; lng: number };
-//   [key: string]: any; // for other form fields
-// }
