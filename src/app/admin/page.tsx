@@ -162,37 +162,32 @@ export default function AdminPage() {
   };
 
   const handleBlockMerchant = async (merchant: Merchant) => {
-      if (!merchant.owner) {
-          toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
-          return;
-      }
-      try {
-        // Move merchant doc and user doc in parallel
-        await Promise.all([
-            moveDoc(merchant.id, 'merchants', 'blocked_merchants'),
-            moveDoc(merchant.owner, 'users', 'blocked_users')
-        ]);
+    if (!merchant.owner) {
+        toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
+        return;
+    }
+    try {
+        await moveDoc(merchant.id, 'merchants', 'blocked_merchants');
+        await moveDoc(merchant.owner, 'users', 'blocked_users');
         toast({ title: "Merchant Blocked", description: `${merchant.companyName} and its owner have been blocked.`});
-      } catch(error) {
-        toast({ title: "Blocking Failed", description: "An error occurred while blocking the merchant. Some operations may not have completed.", variant: "destructive" });
-      }
-  }
+    } catch(error) {
+      toast({ title: "Blocking Failed", description: "An error occurred while blocking the merchant. Some operations may not have completed.", variant: "destructive" });
+    }
+  };
 
   const handleUnblockMerchant = async (merchant: Merchant) => {
-      if (!merchant.owner) {
-          toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
-          return;
-      }
-      try {
-        await Promise.all([
-            moveDoc(merchant.id, 'blocked_merchants', 'merchants'),
-            moveDoc(merchant.owner, 'blocked_users', 'users')
-        ]);
+    if (!merchant.owner) {
+        toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
+        return;
+    }
+    try {
+        await moveDoc(merchant.id, 'blocked_merchants', 'merchants');
+        await moveDoc(merchant.owner, 'blocked_users', 'users');
         toast({ title: "Merchant Unblocked", description: `${merchant.companyName} has been reinstated.`});
-      } catch(error) {
-        toast({ title: "Unblocking Failed", description: "An error occurred while unblocking the merchant.", variant: "destructive" });
-      }
-  }
+    } catch(error) {
+      toast({ title: "Unblocking Failed", description: "An error occurred while unblocking the merchant.", variant: "destructive" });
+    }
+  };
 
 
   if (authLoading || loading) {
