@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -12,12 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShoppingBag, UserCog, ShieldOff } from 'lucide-react';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff } from 'lucide-react';
 import type { MerchantApplication, User, Merchant } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { geohashForLocation } from 'geofire-common';
 import Link from 'next/link';
-import { Timestamp } from 'firebase/firestore';
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
@@ -47,11 +46,11 @@ export default function AdminPage() {
     }
 
     const collectionsToMonitor = [
-        { name: 'merchant_applications', setter: setApplications, isQuery: false },
-        { name: 'users', setter: setUsers, isQuery: false },
-        { name: 'blocked_users', setter: setBlockedUsers, isQuery: false },
-        { name: 'merchants', setter: setMerchants, isQuery: false },
-        { name: 'blocked_merchants', setter: setBlockedMerchants, isQuery: false },
+        { name: 'merchant_applications', setter: setApplications },
+        { name: 'users', setter: setUsers },
+        { name: 'blocked_users', setter: setBlockedUsers },
+        { name: 'merchants', setter: setMerchants },
+        { name: 'blocked_merchants', setter: setBlockedMerchants },
     ];
     
     let activeSubscriptions = collectionsToMonitor.length;
@@ -171,22 +170,23 @@ export default function AdminPage() {
     }
 
     const batch = writeBatch(db);
-    const merchantFromRef = doc(db, 'merchants', merchant.id);
-    const merchantToRef = doc(db, 'blocked_merchants', merchant.id);
-    const userFromRef = doc(db, 'users', merchant.owner);
-    const userToRef = doc(db, 'blocked_users', merchant.owner);
-
+    
     try {
-        const [merchantSnap, userSnap] = await Promise.all([getDoc(merchantFromRef), getDoc(userFromRef)]);
-
+        const merchantFromRef = doc(db, 'merchants', merchant.id);
+        const merchantSnap = await getDoc(merchantFromRef);
         if (!merchantSnap.exists()) throw new Error("Merchant document not found.");
-        if (!userSnap.exists()) throw new Error("Owner's user document not found.");
-
+        
+        const merchantToRef = doc(db, 'blocked_merchants', merchant.id);
         batch.set(merchantToRef, { ...merchantSnap.data(), blockedAt: serverTimestamp() });
         batch.delete(merchantFromRef);
 
-        batch.set(userToRef, { ...userSnap.data(), blockedAt: serverTimestamp() });
-        batch.delete(userFromRef);
+        const userFromRef = doc(db, 'users', merchant.owner);
+        const userSnap = await getDoc(userFromRef);
+        if (userSnap.exists()) {
+            const userToRef = doc(db, 'blocked_users', merchant.owner);
+            batch.set(userToRef, { ...userSnap.data(), blockedAt: serverTimestamp() });
+            batch.delete(userFromRef);
+        }
         
         await batch.commit();
         toast({ title: "Success", description: `Merchant ${merchant.companyName} and their owner have been blocked.` });
@@ -201,24 +201,27 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
         return;
     }
-
+    
     const batch = writeBatch(db);
-    const merchantFromRef = doc(db, 'blocked_merchants', merchant.id);
-    const merchantToRef = doc(db, 'merchants', merchant.id);
-    const userFromRef = doc(db, 'blocked_users', merchant.owner);
-    const userToRef = doc(db, 'users', merchant.owner);
-
+    
     try {
-        const [merchantSnap, userSnap] = await Promise.all([getDoc(merchantFromRef), getDoc(userFromRef)]);
-
+        const merchantFromRef = doc(db, 'blocked_merchants', merchant.id);
+        const merchantSnap = await getDoc(merchantFromRef);
         if (!merchantSnap.exists()) throw new Error("Blocked merchant document not found.");
-        if (!userSnap.exists()) throw new Error("Blocked user document not found.");
-
-        batch.set(merchantToRef, merchantSnap.data());
+        
+        const merchantToRef = doc(db, 'merchants', merchant.id);
+        const { blockedAt, ...merchantData } = merchantSnap.data();
+        batch.set(merchantToRef, merchantData);
         batch.delete(merchantFromRef);
 
-        batch.set(userToRef, userSnap.data());
-        batch.delete(userFromRef);
+        const userFromRef = doc(db, 'blocked_users', merchant.owner);
+        const userSnap = await getDoc(userFromRef);
+        if (userSnap.exists()) {
+            const userToRef = doc(db, 'users', merchant.owner);
+            const { blockedAt, ...userData } = userSnap.data();
+            batch.set(userToRef, userData);
+            batch.delete(userFromRef);
+        }
         
         await batch.commit();
         toast({ title: "Success", description: `Merchant ${merchant.companyName} and their owner have been unblocked.` });
@@ -399,3 +402,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
