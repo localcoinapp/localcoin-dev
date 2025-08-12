@@ -31,10 +31,6 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      {
-        source: '/_next/image',
-        destination: '/_next/image',
-      },
        // This rule will proxy requests from /firebase-storage/... to the actual Firebase Storage API.
       {
         source: '/firebase-storage/:path*',

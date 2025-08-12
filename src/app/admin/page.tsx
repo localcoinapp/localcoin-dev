@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -129,7 +129,7 @@ export default function AdminPage() {
     setIsViewModalOpen(true);
   }
   
-  const moveDoc = async (id: string, fromCollection: string, toCollection: string) => {
+  const moveDoc = async (id: string, fromCollection: string, toCollection: string, addData?: object) => {
     const fromDocRef = doc(db, fromCollection, id);
     const toDocRef = doc(db, toCollection, id);
 
@@ -137,7 +137,8 @@ export default function AdminPage() {
         const docSnap = await getDoc(fromDocRef);
         if(docSnap.exists()){
             const batch = writeBatch(db);
-            batch.set(toDocRef, docSnap.data());
+            const dataToMove = { ...docSnap.data(), ...addData };
+            batch.set(toDocRef, dataToMove);
             batch.delete(fromDocRef);
             await batch.commit();
             toast({ title: "Success", description: `Document has been moved.`});
@@ -147,7 +148,7 @@ export default function AdminPage() {
     } catch (error) {
         console.error("Error moving document:", error);
         toast({ title: "Error", description: "Could not move the document.", variant: "destructive" });
-        throw error; // Re-throw to handle in calling function
+        throw error;
     }
   };
 
@@ -156,49 +157,11 @@ export default function AdminPage() {
       toast({ title: "Error", description: "You cannot block yourself.", variant: "destructive" });
       return;
     }
-    moveDoc(userId, 'users', 'blocked_users');
+    moveDoc(userId, 'users', 'blocked_users', { blockedAt: serverTimestamp() });
   };
 
   const handleUnblockUser = (userId: string) => {
     moveDoc(userId, 'blocked_users', 'users');
-  };
-
-  const performAtomicMove = async (
-    docId: string,
-    fromPath: string,
-    toPath: string,
-    secondaryDocId: string | null = null,
-    secondaryFromPath: string | null = null,
-    secondaryToPath: string | null = null,
-  ) => {
-      const fromDocRef = doc(db, fromPath, docId);
-      const toDocRef = doc(db, toPath, docId);
-
-      const batch = writeBatch(db);
-
-      try {
-          const fromDocSnap = await getDoc(fromDocRef);
-          if (!fromDocSnap.exists()) throw new Error(`Document to move (ID: ${docId}) not found in ${fromPath}.`);
-          
-          batch.set(toDocRef, fromDocSnap.data());
-          batch.delete(fromDocRef);
-
-          if (secondaryDocId && secondaryFromPath && secondaryToPath) {
-              const secondaryFromRef = doc(db, secondaryFromPath, secondaryDocId);
-              const secondaryToRef = doc(db, secondaryToPath, secondaryDocId);
-              const secondarySnap = await getDoc(secondaryFromRef);
-              if (!secondarySnap.exists()) throw new Error(`Secondary document (ID: ${secondaryDocId}) not found in ${secondaryFromPath}.`);
-
-              batch.set(secondaryToRef, secondarySnap.data());
-              batch.delete(secondaryFromRef);
-          }
-          
-          await batch.commit();
-          toast({ title: "Success", description: "The operation was completed successfully." });
-      } catch (error) {
-          console.error("Atomic move failed:", error);
-          toast({ title: "Operation Failed", description: (error as Error).message, variant: "destructive" });
-      }
   };
 
   const handleBlockMerchant = async (merchant: Merchant) => {
@@ -206,10 +169,31 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
         return;
     }
-    await performAtomicMove(
-        merchant.id, 'merchants', 'blocked_merchants',
-        merchant.owner, 'users', 'blocked_users'
-    );
+
+    const batch = writeBatch(db);
+    const merchantFromRef = doc(db, 'merchants', merchant.id);
+    const merchantToRef = doc(db, 'blocked_merchants', merchant.id);
+    const userFromRef = doc(db, 'users', merchant.owner);
+    const userToRef = doc(db, 'blocked_users', merchant.owner);
+
+    try {
+        const [merchantSnap, userSnap] = await Promise.all([getDoc(merchantFromRef), getDoc(userFromRef)]);
+
+        if (!merchantSnap.exists()) throw new Error("Merchant document not found.");
+        if (!userSnap.exists()) throw new Error("Owner's user document not found.");
+
+        batch.set(merchantToRef, { ...merchantSnap.data(), blockedAt: serverTimestamp() });
+        batch.delete(merchantFromRef);
+
+        batch.set(userToRef, { ...userSnap.data(), blockedAt: serverTimestamp() });
+        batch.delete(userFromRef);
+        
+        await batch.commit();
+        toast({ title: "Success", description: `Merchant ${merchant.companyName} and their owner have been blocked.` });
+    } catch(error) {
+        console.error("Error blocking merchant:", error);
+        toast({ title: "Blocking Failed", description: (error as Error).message, variant: "destructive" });
+    }
   };
 
   const handleUnblockMerchant = async (merchant: Merchant) => {
@@ -217,10 +201,31 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Merchant owner ID is missing.", variant: "destructive" });
         return;
     }
-    await performAtomicMove(
-        merchant.id, 'blocked_merchants', 'merchants',
-        merchant.owner, 'blocked_users', 'users'
-    );
+
+    const batch = writeBatch(db);
+    const merchantFromRef = doc(db, 'blocked_merchants', merchant.id);
+    const merchantToRef = doc(db, 'merchants', merchant.id);
+    const userFromRef = doc(db, 'blocked_users', merchant.owner);
+    const userToRef = doc(db, 'users', merchant.owner);
+
+    try {
+        const [merchantSnap, userSnap] = await Promise.all([getDoc(merchantFromRef), getDoc(userFromRef)]);
+
+        if (!merchantSnap.exists()) throw new Error("Blocked merchant document not found.");
+        if (!userSnap.exists()) throw new Error("Blocked user document not found.");
+
+        batch.set(merchantToRef, merchantSnap.data());
+        batch.delete(merchantFromRef);
+
+        batch.set(userToRef, userSnap.data());
+        batch.delete(userFromRef);
+        
+        await batch.commit();
+        toast({ title: "Success", description: `Merchant ${merchant.companyName} and their owner have been unblocked.` });
+    } catch(error) {
+        console.error("Error unblocking merchant:", error);
+        toast({ title: "Unblocking Failed", description: (error as Error).message, variant: "destructive" });
+    }
   };
 
 
