@@ -23,7 +23,6 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Merchant } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { seedDatabase } from '@/lib/seed';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { storeCategories } from '@/data/store-categories';
@@ -36,59 +35,32 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 export default function MarketplacePage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSeeding, setIsSeeding] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchMerchants = async () => {
       try {
+        setLoading(true);
         const merchantsCollection = collection(db, 'merchants');
         // Only fetch merchants that have been approved
         const q = query(merchantsCollection, where("status", "==", "approved"));
         const merchantSnapshot = await getDocs(q);
         const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
-        
-        if (merchantList.length === 0 && !isSeeding) {
-          handleSeed();
-        } else {
-          setMerchants(merchantList);
-          setLoading(false);
-        }
+        setMerchants(merchantList);
       } catch (error) {
         console.error("Error fetching merchants: ", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not fetch merchants from the database.",
+        });
+      } finally {
         setLoading(false);
       }
     };
 
     fetchMerchants();
-  }, [isSeeding]);
-
-  const handleSeed = async () => {
-    setIsSeeding(true);
-    try {
-      await seedDatabase();
-      toast({
-        title: "Success",
-        description: "Database has been seeded with initial data.",
-      });
-      // Re-fetch merchants to update the UI
-      const merchantsCollection = collection(db, 'merchants');
-      const q = query(merchantsCollection, where("status", "==", "approved"));
-      const merchantSnapshot = await getDocs(q);
-      const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
-      setMerchants(merchantList);
-    } catch (error) {
-      console.error("Error seeding database: ", error);
-      toast({
-        variant: "destructive",
-        title: "Seeding Failed",
-        description: "Could not seed the database. Check console for errors.",
-      })
-    } finally {
-      setIsSeeding(false);
-      setLoading(false);
-    }
-  };
+  }, [toast]);
   
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -145,10 +117,8 @@ export default function MarketplacePage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">Your database is empty. Click the button to add some sample data.</p>
-                <Button onClick={handleSeed} disabled={isSeeding}>
-                  {isSeeding ? 'Seeding...' : 'Seed Database'}
-                </Button>
+                <p className="text-muted-foreground mb-4">No approved merchants found.</p>
+                <p className="text-sm text-muted-foreground">New merchants will appear here once they are approved by an admin.</p>
               </div>
             )}
         </TabsContent>
