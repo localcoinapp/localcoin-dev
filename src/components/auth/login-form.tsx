@@ -48,16 +48,38 @@ export function LoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Check if user is in the 'blocked_users' collection
+      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
+      const blockedDocSnap = await getDoc(blockedUserDocRef);
+
+      if (blockedDocSnap.exists()) {
+        // If user is blocked, sign them out and show a specific error
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support for assistance.",
+          duration: 9000,
+        });
+        return; 
+      }
+
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
       console.error("Login Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: `Error: ${error.code} - ${error.message}`,
-      });
+      if (error.code !== 'auth/user-not-found' && error.code !== 'auth/wrong-password' && error.code !== 'auth/invalid-credential') {
+        // Avoid showing a generic error if we already showed the blocked message.
+        // This part runs for Firebase-specific errors like wrong password.
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: `Error: ${error.code} - ${error.message}`,
+        });
+      }
     }
   }
   
@@ -65,13 +87,27 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      
+      // Also check if social login user is blocked
+      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
+      const blockedDocSnap = await getDoc(blockedUserDocRef);
+      if (blockedDocSnap.exists()) {
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support for assistance.",
+          duration: 9000,
+        });
+        return;
+      }
 
-      // Check if user exists in Firestore
+      // Check if user exists in Firestore's 'users' collection
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        // Create user document if it doesn't exist
+        // Create user document if it doesn't exist (first time social login)
         await setDoc(userDocRef, {
           email: user.email,
           name: user.displayName,
