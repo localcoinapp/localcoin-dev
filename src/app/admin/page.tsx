@@ -58,9 +58,8 @@ export default function AdminPage() {
     const unsubscribes = collectionsToMonitor.map(({ name, setter }) => {
         const ref = collection(db, name);
         return onSnapshot(ref, (snapshot) => {
-            // FIX: Use a different name for the doc ID to avoid collision with a field named 'id'
-            const data = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() } as any));
-            setter(data.map(({ docId, ...rest }) => ({ id: docId, ...rest })));
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+            setter(data);
             if (loading && --activeSubscriptions === 0) {
                  setLoading(false);
             }
