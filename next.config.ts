@@ -34,10 +34,8 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    allowedDevOrigins: [
-      'https://6000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev',
-      'https://9000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev',
-    ],
+    // This section can be removed or kept for other experimental features,
+    // but the allowedDevOrigins is moved to the top level for consistency.
   },
 };
 
