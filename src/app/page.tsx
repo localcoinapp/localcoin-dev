@@ -19,7 +19,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import MerchantCard from '@/components/merchant-card';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Merchant } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,7 +43,9 @@ export default function MarketplacePage() {
     const fetchMerchants = async () => {
       try {
         const merchantsCollection = collection(db, 'merchants');
-        const merchantSnapshot = await getDocs(merchantsCollection);
+        // Only fetch merchants that have been approved
+        const q = query(merchantsCollection, where("status", "==", "approved"));
+        const merchantSnapshot = await getDocs(q);
         const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
         
         if (merchantList.length === 0 && !isSeeding) {
@@ -71,7 +73,8 @@ export default function MarketplacePage() {
       });
       // Re-fetch merchants to update the UI
       const merchantsCollection = collection(db, 'merchants');
-      const merchantSnapshot = await getDocs(merchantsCollection);
+      const q = query(merchantsCollection, where("status", "==", "approved"));
+      const merchantSnapshot = await getDocs(q);
       const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
       setMerchants(merchantList);
     } catch (error) {
