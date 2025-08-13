@@ -27,6 +27,23 @@ import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
 import { useTheme } from "@/components/theme-provider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
+import { useAuth } from "@/hooks/use-auth"
+import { auth, db } from "@/lib/firebase"
+import { deleteUser } from "firebase/auth"
+import { doc, deleteDoc } from "firebase/firestore"
+import { useRouter } from "next/navigation"
 
 const settingsFormSchema = z.object({
   theme: z.string(),
@@ -49,6 +66,10 @@ const defaultValues: Partial<SettingsFormValues> = {
 export default function SettingsPage() {
     const { toast } = useToast()
     const { theme, setTheme, mode, setMode } = useTheme()
+    const { user } = useAuth()
+    const router = useRouter()
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+    const [deleteConfirmation, setDeleteConfirmation] = React.useState("")
 
     const form = useForm<SettingsFormValues>({
         resolver: zodResolver(settingsFormSchema),
@@ -73,6 +94,48 @@ export default function SettingsPage() {
             description: "Your preferences have been updated.",
         })
         console.log("Settings data:", data)
+    }
+
+    const handleDeleteAccount = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser || !user) {
+            toast({ title: "Error", description: "You must be logged in to delete your account.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            // --- Wallet Transfer and Destruction Logic ---
+            // In a real application, this is where you would securely:
+            // 1. Load the user's wallet using their (hopefully encrypted) seed phrase.
+            // 2. Transfer any remaining balance to an admin wallet.
+            // 3. This logic is highly sensitive and requires a secure backend service.
+            console.log("Placeholder: Transferring wallet balance for user:", user.id);
+
+            // Delete Firestore document
+            const userDocRef = doc(db, "users", currentUser.uid);
+            await deleteDoc(userDocRef);
+
+            // Delete Firebase Auth user
+            await deleteUser(currentUser);
+            
+            toast({ title: "Account Deleted", description: "Your account has been permanently deleted." });
+            router.push('/'); // Redirect to homepage after deletion
+        } catch (error: any) {
+            console.error("Error deleting account:", error);
+            // This can happen if the user needs to re-authenticate for security reasons
+            if (error.code === 'auth/requires-recent-login') {
+                toast({
+                    title: "Re-authentication Required",
+                    description: "Please log out and log back in again before deleting your account.",
+                    variant: "destructive",
+                    duration: 9000,
+                });
+            } else {
+                toast({ title: "Deletion Failed", description: error.message, variant: "destructive" });
+            }
+        } finally {
+            setIsDeleteDialogOpen(false);
+        }
     }
 
     return (
@@ -199,6 +262,53 @@ export default function SettingsPage() {
                             </div>
                         </form>
                     </Form>
+                    
+                    <Separator className="my-8" />
+
+                    <div className="space-y-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Be careful, these actions are not reversible.
+                            </p>
+                        </div>
+                         <Card className="border-destructive">
+                             <CardHeader className="flex-row items-center justify-between">
+                                 <div className="space-y-1">
+                                    <CardTitle className="text-base">Close Account</CardTitle>
+                                    <CardDescription>Permanently delete your account and all associated data.</CardDescription>
+                                 </div>
+                                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                                     <AlertDialogTrigger asChild>
+                                        <Button variant="destructive">Close My Account</Button>
+                                     </AlertDialogTrigger>
+                                     <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action is irreversible. It will permanently delete your account, wallet, and all associated data. To confirm, please type <strong className="text-foreground">yes i am aware</strong> in the box below.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <Input 
+                                            value={deleteConfirmation}
+                                            onChange={(e) => setDeleteConfirmation(e.target.value)}
+                                            placeholder="yes i am aware"
+                                        />
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction 
+                                                onClick={handleDeleteAccount}
+                                                disabled={deleteConfirmation !== 'yes i am aware'}
+                                                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                            >
+                                                Yes, completely delete my account
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                     </AlertDialogContent>
+                                 </AlertDialog>
+                             </CardHeader>
+                         </Card>
+                    </div>
                 </CardContent>
             </Card>
         </div>
