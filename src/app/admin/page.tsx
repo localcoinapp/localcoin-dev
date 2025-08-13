@@ -79,14 +79,14 @@ export default function AdminPage() {
     const batch = writeBatch(db);
     
     const merchantRef = doc(db, 'merchants', merchant.id);
-    batch.update(merchantRef, { status: 'approved' });
+    batch.update(merchantRef, { status: 'approved', storeStatus: 'paused' });
 
     const userRef = doc(db, 'users', merchant.owner);
     batch.update(userRef, { role: 'merchant', merchantId: merchant.id });
 
     try {
         await batch.commit();
-        toast({ title: 'Success', description: `${merchant.companyName} has been approved.` });
+        toast({ title: 'Success', description: `${merchant.companyName} has been approved. They can now go live from their dashboard.` });
     } catch (error) {
         console.error("Error approving application:", error);
         toast({ title: 'Approval Failed', description: 'Could not approve the application.', variant: 'destructive' });
@@ -159,7 +159,7 @@ export default function AdminPage() {
 
     // Update merchant status to 'blocked'
     const merchantRef = doc(db, 'merchants', merchant.id);
-    batch.update(merchantRef, { status: 'blocked' });
+    batch.update(merchantRef, { status: 'blocked', storeStatus: 'paused' });
 
     // Move owner user to 'blocked_users'
     const userFromRef = doc(db, 'users', merchant.owner);

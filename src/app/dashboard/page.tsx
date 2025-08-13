@@ -46,7 +46,9 @@ import {
   Loader2,
   Eye,
   Briefcase,
-  ShieldAlert
+  ShieldAlert,
+  Power,
+  PowerOff
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -64,7 +66,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
-import type { MerchantItem, CartItem } from "@/types";
+import type { MerchantItem, CartItem, MerchantStoreStatus } from "@/types";
 import { Keypair } from "@solana/web3.js";
 import * as bip39 from "bip39";
 import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
@@ -165,6 +167,18 @@ export default function DashboardPage() {
         setIsCreatingWallet(false);
     }
   }
+
+  const handleStoreStatusChange = async (newStatus: MerchantStoreStatus) => {
+    if (!user || !user.merchantId) return;
+    const merchantDocRef = doc(db, 'merchants', user.merchantId);
+    try {
+      await updateDoc(merchantDocRef, { storeStatus: newStatus });
+      toast({ title: `Store is now ${newStatus}`, description: `Your store is now ${newStatus === 'live' ? 'visible in the marketplace' : 'hidden from the marketplace'}.` });
+    } catch (error) {
+      console.error("Error updating store status:", error);
+      toast({ title: "Error", description: "Could not update store status.", variant: "destructive" });
+    }
+  };
 
   const handleListingStatusChange = async (listing: MerchantItem) => {
     if (!user || !user.merchantId) return;
@@ -400,14 +414,15 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], walletAddress, seedPhrase } = merchantData;
+  const { listings = [], walletAddress, seedPhrase, storeStatus } = merchantData;
+  const isStoreLive = storeStatus === 'live';
 
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-4">
           <h1 className="text-3xl font-bold font-headline">Merchant Dashboard</h1>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href="/dashboard/add-listing" passHref>
               <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add New Item</Button>
             </Link>
@@ -420,6 +435,25 @@ export default function DashboardPage() {
           </div>
         </div>
         <p className="text-muted-foreground mb-8">Manage listings, view transactions, and handle incoming orders.</p>
+
+        <Alert className={cn("mb-8", isStoreLive ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50")}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isStoreLive ? <Power className="h-5 w-5 text-green-600"/> : <PowerOff className="h-5 w-5 text-amber-600"/>}
+              <div>
+                <AlertDescriptionComponent className={cn("font-semibold", isStoreLive ? "text-green-800" : "text-amber-800")}>
+                  Your store is currently {isStoreLive ? 'Live' : 'Paused'}.
+                </AlertDescriptionComponent>
+                <p className="text-xs text-muted-foreground">{isStoreLive ? "It is visible to customers in the marketplace." : "Customers cannot see your store."}</p>
+              </div>
+            </div>
+            <Switch
+              checked={isStoreLive}
+              onCheckedChange={(checked) => handleStoreStatusChange(checked ? 'live' : 'paused')}
+              aria-label="Toggle store status"
+            />
+          </div>
+        </Alert>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card>

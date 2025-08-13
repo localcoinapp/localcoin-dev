@@ -20,6 +20,7 @@ export type MerchantItem = {
 }
 
 export type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
+export type MerchantStoreStatus = 'live' | 'paused';
 
 export type Merchant = {
   id: string
@@ -49,6 +50,7 @@ export type Merchant = {
   createdAt?: Timestamp;
   submittedAt?: Timestamp;
   status: MerchantStatus;
+  storeStatus?: MerchantStoreStatus;
   [key: string]: any; // for other form fields
 }
 

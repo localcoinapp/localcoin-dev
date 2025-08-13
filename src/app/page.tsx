@@ -42,10 +42,10 @@ export default function MarketplacePage() {
       try {
         setLoading(true);
         const merchantsCollection = collection(db, 'merchants');
-        // Only fetch merchants that have been approved
-        const q = query(merchantsCollection, where("status", "==", "approved"));
+        // Only fetch merchants that have a "live" status
+        const q = query(merchantsCollection, where("storeStatus", "==", "live"));
         const merchantSnapshot = await getDocs(q);
-        const merchantList = merchantSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Merchant));
+        const merchantList = merchantSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Merchant));
         setMerchants(merchantList);
       } catch (error) {
         console.error("Error fetching merchants: ", error);
@@ -117,8 +117,8 @@ export default function MarketplacePage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No approved merchants found.</p>
-                <p className="text-sm text-muted-foreground">New merchants will appear here once they are approved by an admin.</p>
+                <p className="text-muted-foreground mb-4">No live merchants found.</p>
+                <p className="text-sm text-muted-foreground">Merchants will appear here once they go live.</p>
               </div>
             )}
         </TabsContent>
