@@ -76,14 +76,6 @@ export function AppHeader() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
-                      {isAdmin && (
-                        <DropdownMenuItem asChild>
-                          <Link href="/admin">
-                            <ShieldCheck className="mr-2 h-4 w-4" />
-                            <span>Admin Dashboard</span>
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
                       <DropdownMenuItem asChild>
                         <Link href="/profile">
                           <UserIcon className="mr-2 h-4 w-4" />
@@ -109,14 +101,21 @@ export function AppHeader() {
                         </Link>
                       </DropdownMenuItem>
                       
-                      {isMerchant ? (
+                      {isAdmin ? (
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin">
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      ) : isMerchant ? (
                         <DropdownMenuItem asChild>
                           <Link href="/dashboard">
                             <LayoutDashboard className="mr-2 h-4 w-4" />
                             <span>Dashboard</span>
                           </Link>
                         </DropdownMenuItem>
-                      ) : !isAdmin && (
+                      ) : (
                          <DropdownMenuItem asChild>
                           <Link href="/dashboard/become-merchant">
                             <Briefcase className="mr-2 h-4 w-4" />
@@ -155,5 +154,3 @@ export function AppHeader() {
     </header>
   )
 }
-
-    
