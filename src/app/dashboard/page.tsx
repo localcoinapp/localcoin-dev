@@ -104,7 +104,7 @@ export default function DashboardPage() {
   const [activeOrders, setActiveOrders] = useState<CartItem[]>([]);
 
   // Wallet State
-  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
   const [showSeedPhrase, setShowSeedPhrase] = useState(false);
   const [newSeedPhrase, setNewSeedPhrase] = useState<string | null>(null);
 
@@ -135,31 +135,9 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  const handleCreateWallet = async () => {
+  const handleStatusToggle = async (isLive: boolean) => {
     if (!user || !user.merchantId) return;
-    setIsCreatingWallet(true);
-    try {
-        const mnemonic = bip39.generateMnemonic();
-        const seed = bip39.mnemonicToSeedSync(mnemonic);
-        const keypair = Keypair.fromSeed(seed.slice(0, 32));
-        const address = keypair.publicKey.toBase58();
-
-        const merchantDocRef = doc(db, "merchants", user.merchantId);
-        // In a real app, this should be encrypted before storing
-        await setDoc(merchantDocRef, { walletAddress: address, seedPhrase: mnemonic }, { merge: true });
-
-        setNewSeedPhrase(mnemonic);
-        toast({ title: "Wallet Created!", description: "Your new Solana wallet is ready."});
-    } catch(e) {
-        console.error("Wallet creation failed", e);
-        toast({ title: "Error", description: "Failed to create a new wallet.", variant: "destructive"});
-    } finally {
-        setIsCreatingWallet(false);
-    }
-  }
-
-  const handleStatusChange = async (newStatus: MerchantStatus) => {
-    if (!user || !user.merchantId) return;
+    const newStatus = isLive ? 'live' : 'paused';
     const merchantDocRef = doc(db, 'merchants', user.merchantId);
     try {
       await updateDoc(merchantDocRef, { status: newStatus });
@@ -169,6 +147,34 @@ export default function DashboardPage() {
       toast({ title: "Error", description: "Could not update store status.", variant: "destructive" });
     }
   };
+
+  const handleLaunchStore = async () => {
+    if (!user || !user.merchantId) return;
+    setIsLaunching(true);
+
+    try {
+        const mnemonic = bip39.generateMnemonic();
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        const keypair = Keypair.fromSeed(seed.slice(0, 32));
+        const address = keypair.publicKey.toBase58();
+
+        const merchantDocRef = doc(db, "merchants", user.merchantId);
+        await updateDoc(merchantDocRef, { 
+            status: 'live',
+            walletAddress: address, 
+            seedPhrase: mnemonic 
+        });
+
+        setNewSeedPhrase(mnemonic);
+        toast({ title: "Store Launched & Wallet Created!", description: "Your store is now live and your wallet is ready."});
+    } catch(e) {
+        console.error("Store launch failed", e);
+        toast({ title: "Error", description: "Failed to launch your store or create a wallet.", variant: "destructive"});
+    } finally {
+        setIsLaunching(false);
+    }
+  }
+
 
   const handleListingStatusChange = async (listing: MerchantItem) => {
     if (!user || !user.merchantId || !merchantData) return;
@@ -421,7 +427,7 @@ export default function DashboardPage() {
                 </div>
                 <Switch
                     checked={isStoreLive}
-                    onCheckedChange={(checked) => handleStatusChange(checked ? 'live' : 'paused')}
+                    onCheckedChange={(checked) => handleStatusToggle(checked)}
                     aria-label="Toggle store status"
                 />
                 </div>
@@ -450,10 +456,11 @@ export default function DashboardPage() {
                    </div>
                     <Button 
                         size="lg" 
-                        onClick={() => handleStatusChange('live')} 
-                        disabled={!canLaunch}
+                        onClick={handleLaunchStore} 
+                        disabled={!canLaunch || isLaunching}
                         className="w-full"
                     >
+                        {isLaunching ? <Loader2 className="animate-spin mr-2" /> : null}
                         {canLaunch ? 'Launch My Store!' : 'Complete the steps above to launch'}
                     </Button>
                 </CardContent>
@@ -486,35 +493,34 @@ export default function DashboardPage() {
         {renderDashboardHeader()}
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Wallet</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {walletAddress ? (
-                  <div className="space-y-4">
-                      <div className="text-2xl font-bold font-headline">0.00 SOL</div>
-                      <p className="text-xs text-muted-foreground pt-2 break-all">
-                        Address: {walletAddress}
-                      </p>
-                       <div className="flex gap-2 mt-4">
-                          <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
-                              <Eye className="mr-2" /> Show Seed Phrase
-                          </Button>
-                      </div>
-                  </div>
-              ) : (
-                  <div className="flex flex-col items-start gap-4">
-                      <p className="text-muted-foreground">You have not created a wallet yet.</p>
-                      <Button onClick={handleCreateWallet} disabled={isCreatingWallet}>
-                          {isCreatingWallet ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
-                          Create Wallet
-                      </Button>
-                  </div>
-              )}
-            </CardContent>
-          </Card>
+         {(status === 'live' || status === 'paused') && (
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Wallet</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                {walletAddress ? (
+                    <div className="space-y-4">
+                        <div className="text-2xl font-bold font-headline">0.00 SOL</div>
+                        <p className="text-xs text-muted-foreground pt-2 break-all">
+                            Address: {walletAddress}
+                        </p>
+                        <div className="flex gap-2 mt-4">
+                            <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
+                                <Eye className="mr-2" /> Show Seed Phrase
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    // This case should ideally not be hit if wallet is created on launch
+                    <div className="flex flex-col items-start gap-4">
+                        <p className="text-muted-foreground">Wallet not found.</p>
+                    </div>
+                )}
+                </CardContent>
+            </Card>
+         )}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Listings</CardTitle>
