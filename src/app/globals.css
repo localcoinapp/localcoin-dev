@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@400;700&family=Open+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@400;700&family=Open+Sans:ital,wght@0,400;0,700;1,400;700&family=Nerko+One&family=Montserrat:wght@400;700&family=Belanosima:wght@400;600;700&family=Exo+2:wght@600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,6 +7,11 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-bold, .font-semibold, .font-medium {
+    font-family: var(--font-header);
   }
 }
 
@@ -19,6 +24,8 @@
     Theme: Default Eco (Original)
   ================================================================= */
   .theme-default-eco {
+    --font-header: 'Bitter', serif;
+    --font-body: 'Open Sans', sans-serif;
     --background: 45 85% 91%;          /* Default page background */
     --foreground: 30 14% 25%;          /* Default text color */
     --card: 39 100% 96%;               /* Card component background */
@@ -67,6 +74,8 @@
     Theme: Tropics
   ================================================================= */
   .theme-tropics {
+    --font-header: 'Nerko One', cursive;
+    --font-body: 'Montserrat', sans-serif;
     --background: 200 100% 98%;       /* Default page background */
     --foreground: 195 18% 24%;       /* Default text color */
     --card: 0 0% 100%;                /* Card component background */
@@ -114,6 +123,8 @@
     Theme: Berlin
   ================================================================= */
   .theme-berlin {
+    --font-header: 'Belanosima', sans-serif;
+    --font-body: 'Raleway', sans-serif;
     --background: 0 0% 96%;            /* Default page background */
     --foreground: 0 0% 10%;            /* Default text color */
     --card: 0 0% 100%;                 /* Card component background */
@@ -136,6 +147,8 @@
     --radius: 0rem;                    /* Component border radius */
   }
   .dark.theme-berlin {
+    --font-header: 'Belanosima', sans-serif;
+    --font-body: 'Exo+2', sans-serif;
     --background: 0 0% 10%;
     --foreground: 0 0% 95%;
     --card: 0 0% 14%;

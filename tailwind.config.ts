@@ -17,9 +17,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['"Open Sans"', 'sans-serif'],
-        headline: ['"Bitter"', 'serif'],
-        code: ['monospace'],
+        sans: ["var(--font-body)"],
+        serif: ["var(--font-header)"],
       },
       colors: {
         background: 'hsl(var(--background))',
