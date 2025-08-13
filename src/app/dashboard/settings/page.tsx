@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Loader2, Sparkles } from "lucide-react";
+import { Camera, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { countries } from "@/data/countries";
 import { states } from "@/data/states";
 import { provinces } from "@/data/provinces";
@@ -37,6 +37,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { geohashForLocation } from "geofire-common";
 import { storeCategories } from "@/data/store-categories";
 import { enhanceDescription } from "@/ai/flows/enhance-description";
+import { generateImage } from "@/ai/flows/generate-image";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
 
 type Position = { lat: number; lng: number };
 
@@ -112,6 +123,78 @@ const storeSettingsSchema = z.object({
 
 type StoreSettingsValues = z.infer<typeof storeSettingsSchema>;
 
+const GenerateImageDialog = ({ onGenerate, fileType }: { onGenerate: (file: File) => void, fileType: 'logo' | 'banner' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [prompt, setPrompt] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
+    const { toast } = useToast();
+
+    // Function to convert data URI to File object
+    const dataUriToFiIe = (dataURI: string, filename: string): File => {
+        const [meta, base64Data] = dataURI.split(',');
+        const mimeType = meta.split(';')[0].split(':')[1];
+        const binary = atob(base64Data);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            array[i] = binary.charCodeAt(i);
+        }
+        return new File([array], filename, { type: mimeType });
+    };
+
+
+    const handleGenerateClick = async () => {
+        if (!prompt) {
+            toast({ title: "Prompt Required", description: "Please enter a prompt for the image.", variant: "destructive" });
+            return;
+        }
+        setIsGenerating(true);
+        try {
+            const result = await generateImage({ prompt });
+            const file = dataUriToFiIe(result.imageDataUri, `${fileType}-${Date.now()}.png`);
+            onGenerate(file);
+            setIsOpen(false);
+        } catch (error) {
+            console.error("Image generation failed:", error);
+            toast({ title: "Generation Failed", description: "Could not generate the image.", variant: "destructive" });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+                 <Button type="button" variant="outline" size="sm">
+                    <Wand2 className="h-4 w-4 mr-2" /> Generate
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Generate {fileType.charAt(0).toUpperCase() + fileType.slice(1)} with AI</DialogTitle>
+                    <DialogDescription>
+                        Describe the image you want to create. Be as specific as possible for the best results.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <Textarea 
+                        placeholder={`e.g., "A minimalist logo of a coffee cup with steam rising"`}
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                    <Button onClick={handleGenerateClick} disabled={isGenerating}>
+                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Generate Image
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export default function StoreSettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -166,8 +249,7 @@ export default function StoreSettingsPage() {
     bannerFileInputRef.current?.click();
   };
   
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, fileType: 'logo' | 'banner') => {
-    const file = event.target.files?.[0];
+  const handleFileChange = async (file: File, fileType: 'logo' | 'banner') => {
     if (file && user && user.merchantId) {
       if (fileType === 'logo') {
         setIsUploading(true);
@@ -408,68 +490,76 @@ export default function StoreSettingsPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="flex items-center space-x-6">
-                <div className="relative">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage src={merchantData?.logo || "https://placehold.co/100x100"} alt="Store logo" />
-                    <AvatarFallback>{(merchantData?.companyName?.[0] || "S")}</AvatarFallback>
-                  </Avatar>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={(e) => handleFileChange(e, 'logo')}
-                    className="hidden"
-                    accept="image/png, image/jpeg, image/gif"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="absolute bottom-0 right-0 rounded-full"
-                    onClick={handleAvatarClick}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                    <span className="sr-only">Change logo</span>
-                  </Button>
+               <div className="space-y-2">
+                    <FormLabel>Logo Image</FormLabel>
+                    <div className="flex items-center gap-4">
+                         <div className="relative">
+                          <Avatar className="h-24 w-24 border">
+                            <AvatarImage src={merchantData?.logo || "https://placehold.co/100x100"} alt="Store logo" />
+                            <AvatarFallback>{(merchantData?.companyName?.[0] || "S")}</AvatarFallback>
+                          </Avatar>
+                           <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={(e) => e.target.files?.[0] && handleFileChange(e.target.files[0], 'logo')}
+                            className="hidden"
+                            accept="image/png, image/jpeg, image/gif"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleAvatarClick}
+                                disabled={isUploading}
+                            >
+                                {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
+                                Upload
+                            </Button>
+                             <GenerateImageDialog onGenerate={(file) => handleFileChange(file, 'logo')} fileType="logo" />
+                        </div>
+                        <div className="flex-grow pl-4">
+                            <FormField
+                                control={form.control}
+                                name="companyName"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Company Name</FormLabel>
+                                    <FormControl>
+                                    <Input placeholder="Your Company" {...field} className="text-2xl font-bold" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                        </div>
+                    </div>
                 </div>
-                <div className="flex-grow">
-                  <FormField
-                    control={form.control}
-                    name="companyName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your Company" {...field} className="text-2xl font-bold" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <FormLabel>Banner Image</FormLabel>
-                <div className="relative w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center">
+                <div className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 relative">
+                  {isUploadingBanner && <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg z-10"><Loader2 className="h-8 w-8 animate-spin text-white"/></div>}
                   {merchantData?.banner && <img src={merchantData.banner} alt="Banner" className="w-full h-full object-cover rounded-lg" />}
-                  <input
+                   <input
                     type="file"
                     ref={bannerFileInputRef}
-                    onChange={(e) => handleFileChange(e, 'banner')}
+                    onChange={(e) => e.target.files?.[0] && handleFileChange(e.target.files[0], 'banner')}
                     className="hidden"
                     accept="image/png, image/jpeg, image/gif"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="absolute"
-                    onClick={handleBannerClick}
-                    disabled={isUploadingBanner}
-                  >
-                    {isUploadingBanner ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Camera className="h-4 w-4 mr-2" /> Change Banner</>}
-                  </Button>
+                  <div className="absolute flex gap-2">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleBannerClick}
+                        disabled={isUploadingBanner}
+                    >
+                        <Camera className="h-4 w-4 mr-2" /> Upload Banner
+                    </Button>
+                    <GenerateImageDialog onGenerate={(file) => handleFileChange(file, 'banner')} fileType="banner" />
+                  </div>
                 </div>
               </div>
 
