@@ -30,7 +30,7 @@ import { states } from "@/data/states";
 import { provinces } from "@/data/provinces";
 import { useAuth } from "@/hooks/use-auth";
 import { db, storage, ref, uploadBytesResumable, getDownloadURL } from "@/lib/firebase";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,14 +39,18 @@ import { storeCategories } from "@/data/store-categories";
 import { enhanceDescription } from "@/ai/flows/enhance-description";
 import { generateImage } from "@/ai/flows/generate-image";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Separator } from "@/components/ui/separator";
+import { useRouter } from "next/navigation";
 
 
 type Position = { lat: number; lng: number };
@@ -197,6 +201,7 @@ const GenerateImageDialog = ({ onGenerate, fileType }: { onGenerate: (file: File
 
 export default function StoreSettingsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -206,6 +211,8 @@ export default function StoreSettingsPage() {
   const [positionPreview, setPositionPreview] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
+  const [isShutdownDialogOpen, setIsShutdownDialogOpen] = useState(false);
+  const [shutdownConfirmation, setShutdownConfirmation] = useState("");
 
 
   const form = useForm<StoreSettingsValues>({
@@ -368,6 +375,32 @@ export default function StoreSettingsPage() {
         title: "Error",
         description: (error as Error).message || "There was an error updating your store settings.",
       });
+    }
+  };
+
+  const handleShutdownStore = async () => {
+    if (!user || !user.merchantId) {
+      toast({ title: "Error", description: "Could not identify the store to shut down.", variant: "destructive" });
+      return;
+    }
+
+    const merchantDocRef = doc(db, 'merchants', user.merchantId);
+    const userDocRef = doc(db, 'users', user.id);
+
+    try {
+        await deleteDoc(merchantDocRef);
+        await updateDoc(userDocRef, {
+            role: 'user',
+            merchantId: null
+        });
+
+        toast({ title: "Store Shutdown", description: "Your store has been permanently removed." });
+        router.push('/');
+    } catch(error) {
+        console.error("Error shutting down store:", error);
+        toast({ title: "Error", description: "Could not shut down the store.", variant: "destructive" });
+    } finally {
+        setIsShutdownDialogOpen(false);
     }
   };
 
@@ -815,6 +848,53 @@ export default function StoreSettingsPage() {
               </div>
             </form>
           </Form>
+
+           <Separator className="my-8" />
+
+            <div className="space-y-4">
+                <div>
+                    <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
+                    <p className="text-sm text-muted-foreground">
+                        Be careful, these actions are not reversible.
+                    </p>
+                </div>
+                 <Card className="border-destructive">
+                     <CardHeader className="flex-row items-center justify-between">
+                         <div className="space-y-1">
+                            <CardTitle className="text-base">Shutdown Store</CardTitle>
+                            <CardDescription>Permanently delete your store and all associated data.</CardDescription>
+                         </div>
+                         <AlertDialog open={isShutdownDialogOpen} onOpenChange={setIsShutdownDialogOpen}>
+                             <AlertDialogTrigger asChild>
+                                <Button variant="destructive">Shutdown Store</Button>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action is irreversible. It will permanently delete your store, listings, and all associated data. To confirm, please type <strong className="text-foreground">shutdown my store</strong> in the box below.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <Input 
+                                    value={shutdownConfirmation}
+                                    onChange={(e) => setShutdownConfirmation(e.target.value)}
+                                    placeholder="shutdown my store"
+                                />
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                        onClick={handleShutdownStore}
+                                        disabled={shutdownConfirmation !== 'shutdown my store'}
+                                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                    >
+                                        Yes, shut down my store
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                             </AlertDialogContent>
+                         </AlertDialog>
+                     </CardHeader>
+                 </Card>
+            </div>
         </CardContent>
       </Card>
     </div>
