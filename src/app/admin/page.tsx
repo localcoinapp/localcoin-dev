@@ -53,10 +53,8 @@ export default function AdminPage() {
     const unsubscribes = collectionsToMonitor.map(({ name, setter }) => {
         const ref = collection(db, name);
         return onSnapshot(ref, (snapshot) => {
-            // Correctly map document ID and data, avoiding field collision
             const data = snapshot.docs.map(doc => {
               const docData = doc.data();
-              // Keep the original document ID, don't let a field named 'id' overwrite it.
               return { ...docData, id: doc.id } as any;
             });
             setter(data);
@@ -84,8 +82,7 @@ export default function AdminPage() {
     const batch = writeBatch(db);
     
     const merchantRef = doc(db, 'merchants', merchant.id);
-    // Set initial storeStatus to 'pending_launch' so merchant must complete checklist
-    batch.update(merchantRef, { status: 'approved', storeStatus: 'pending_launch' });
+    batch.update(merchantRef, { status: 'approved' });
 
     const userRef = doc(db, 'users', merchant.owner);
     batch.update(userRef, { role: 'merchant', merchantId: merchant.id });
@@ -164,7 +161,7 @@ export default function AdminPage() {
     const batch = writeBatch(db);
 
     const merchantRef = doc(db, 'merchants', merchant.id);
-    batch.update(merchantRef, { status: 'blocked', storeStatus: 'paused' });
+    batch.update(merchantRef, { status: 'blocked' });
 
     const userFromRef = doc(db, 'users', merchant.owner);
     const userToRef = doc(db, 'blocked_users', merchant.owner);
@@ -239,7 +236,7 @@ export default function AdminPage() {
   }
 
   const pendingApplications = merchants.filter(m => m.status === 'pending');
-  const activeMerchants = merchants.filter(m => m.status === 'approved');
+  const activeMerchants = merchants.filter(m => m.status === 'approved' || m.status === 'live' || m.status === 'paused');
   const blockedMerchants = merchants.filter(m => m.status === 'blocked');
 
   return (
@@ -334,9 +331,10 @@ export default function AdminPage() {
                   <Card><CardHeader><CardTitle>Active Merchant Management</CardTitle></CardHeader>
                     <CardContent>
                       <Table>
-                        <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Owner Email</TableHead><TableHead>Created</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Owner Email</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
-                          {activeMerchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell><TableCell>{formatDate(m.createdAt)}</TableCell>
+                          {activeMerchants.map(m => <TableRow key={m.id}><TableCell>{m.companyName}</TableCell><TableCell>{m.userEmail}</TableCell>
+                              <TableCell><Badge variant={m.status === 'live' ? 'default' : 'secondary'} className={m.status === 'live' ? 'bg-green-600 text-white' : ''}>{m.status}</Badge></TableCell>
                               <TableCell className="text-right"><Button size="sm" variant="destructive" onClick={() => handleBlockMerchant(m)} disabled={m.owner === user?.id}><ShieldX className="mr-2 h-4 w-4" /> Block</Button></TableCell>
                             </TableRow>
                           )}

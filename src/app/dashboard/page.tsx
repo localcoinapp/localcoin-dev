@@ -69,7 +69,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
-import type { MerchantItem, CartItem, MerchantStoreStatus, Merchant } from "@/types";
+import type { MerchantItem, CartItem, MerchantStatus, Merchant } from "@/types";
 import { Keypair } from "@solana/web3.js";
 import * as bip39 from "bip39";
 import { Alert, AlertDescription as AlertDescriptionComponent, AlertTitle } from "@/components/ui/alert";
@@ -86,8 +86,6 @@ const updateInventory = (listings: MerchantItem[], itemId: string, quantityChang
         updatedListings[listingIndex] = updatedItem;
         return updatedListings;
     }
-    // This function should only be used when we are sure the listing exists.
-    // We are not creating new listings from here to prevent duplication bugs.
     return listings;
 };
 
@@ -95,7 +93,6 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<Merchant | null>(null);
-  const [isBlocked, setIsBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<any>(null);
@@ -119,7 +116,6 @@ export default function DashboardPage() {
         if (doc.exists()) {
           const data = doc.data() as Merchant;
           setMerchantData(data);
-          setIsBlocked(data.status === 'blocked');
           const active = (data.pendingOrders || []).filter((order: any) => 
               !['completed', 'rejected', 'cancelled'].includes(order.status)
           );
@@ -162,11 +158,11 @@ export default function DashboardPage() {
     }
   }
 
-  const handleStoreStatusChange = async (newStatus: MerchantStoreStatus) => {
+  const handleStatusChange = async (newStatus: MerchantStatus) => {
     if (!user || !user.merchantId) return;
     const merchantDocRef = doc(db, 'merchants', user.merchantId);
     try {
-      await updateDoc(merchantDocRef, { storeStatus: newStatus });
+      await updateDoc(merchantDocRef, { status: newStatus });
       toast({ title: `Store is now ${newStatus}`, description: `Your store is now ${newStatus === 'live' ? 'visible in the marketplace' : 'hidden from the marketplace'}.` });
     } catch (error) {
       console.error("Error updating store status:", error);
@@ -178,7 +174,6 @@ export default function DashboardPage() {
     if (!user || !user.merchantId || !merchantData) return;
     const merchantDocRef = doc(db, 'merchants', user.merchantId);
     
-    // Create a new array with the updated item
     const updatedListings = (merchantData.listings || []).map((item: MerchantItem) => 
         item.id === listing.id ? { ...item, active: !item.active } : item
     );
@@ -207,12 +202,10 @@ export default function DashboardPage() {
         const currentUserData = userDoc.data();
         const redeemCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-        // Update merchant's pending orders
         const updatedPendingOrders = (currentMerchantData.pendingOrders || []).map((order: CartItem) =>
           order.orderId === orderId ? { ...order, status: 'approved', redeemCode } : order
         );
 
-        // Update user's cart
         const updatedUserCart = (currentUserData.cart || []).map((item: CartItem) => 
             item.orderId === orderId ? { ...item, status: 'approved', redeemCode } : item
         );
@@ -249,7 +242,6 @@ export default function DashboardPage() {
         const orderToDeny = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === orderId);
         if (!orderToDeny) throw new Error("Order not found.");
   
-        // --- Update Status ---
         const updatedPendingOrders = merchantData.pendingOrders.map((o: CartItem) => 
             o.orderId === orderId ? { ...o, status: 'rejected' } : o
         );
@@ -257,18 +249,14 @@ export default function DashboardPage() {
             item.orderId === orderId ? { ...item, status: 'rejected' } : item
         );
   
-        // --- Return stock to listings (THE FIX) ---
-        // This ensures we ONLY update the quantity of an existing item.
         const updatedListings = updateInventory(
             merchantData.listings || [],
             orderToDeny.listingId,
             orderToDeny.quantity
         );
 
-        // --- Remove from reserved ---
         const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== orderId);
   
-        // --- Commit all updates ---
         transaction.update(merchantDocRef, {
           pendingOrders: updatedPendingOrders,
           listings: updatedListings,
@@ -329,14 +317,8 @@ export default function DashboardPage() {
         const userData = userDoc.data();
 
         const orderToRedeem = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === order.orderId);
-        if (!orderToRedeem) return; // Already processed
+        if (!orderToRedeem) return; 
 
-        // --- Wallet Balance Transfer ---
-        // This is now handled on-chain. We remove the Firestore balance updates.
-        // --- End Wallet Balance Transfer ---
-
-
-        // --- Update status to completed ---
         const completedOrder = { ...orderToRedeem, status: 'completed', redeemedAt: new Date() };
 
         const updatedPendingOrders = merchantData.pendingOrders.map((o: CartItem) => 
@@ -346,7 +328,6 @@ export default function DashboardPage() {
             cartItem.orderId === order.orderId ? completedOrder : cartItem
         );
         
-        // --- Remove from reserved, add to transactions ---
         const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== order.orderId);
         const updatedTransactions = [...(merchantData.recentTransactions || []), completedOrder];
 
@@ -375,7 +356,7 @@ export default function DashboardPage() {
     return <div className="container text-center"><p>Loading dashboard...</p></div>;
   }
 
-  if (isBlocked) {
+  if (merchantData?.status === 'blocked') {
     return (
        <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
          <Card className="w-full max-w-lg text-center p-8 border-destructive">
@@ -408,10 +389,9 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], walletAddress, seedPhrase, storeStatus, logo, banner, description } = merchantData;
-  const isStoreLive = storeStatus === 'live';
+  const { listings = [], walletAddress, seedPhrase, status, logo, banner, description } = merchantData;
+  const isStoreLive = status === 'live';
   
-  // Launch checklist conditions
   const hasListings = listings.length > 0;
   const hasLogo = !!logo;
   const hasBanner = !!banner;
@@ -426,8 +406,7 @@ export default function DashboardPage() {
   );
 
   const renderDashboardHeader = () => {
-    // Case 1: Store is live or paused (meaning it has been launched before)
-    if (storeStatus === 'live' || storeStatus === 'paused') {
+    if (status === 'live' || status === 'paused') {
         return (
             <Alert className={cn("mb-8", isStoreLive ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50")}>
                 <div className="flex items-center justify-between">
@@ -442,15 +421,15 @@ export default function DashboardPage() {
                 </div>
                 <Switch
                     checked={isStoreLive}
-                    onCheckedChange={(checked) => handleStoreStatusChange(checked ? 'live' : 'paused')}
+                    onCheckedChange={(checked) => handleStatusChange(checked ? 'live' : 'paused')}
                     aria-label="Toggle store status"
                 />
                 </div>
             </Alert>
         );
     }
-    // Case 2: Store is approved but has not been launched yet
-    if (storeStatus === 'pending_launch') {
+
+    if (status === 'approved') {
         return (
             <Card className="mb-8 border-primary/50">
                 <CardHeader>
@@ -459,7 +438,7 @@ export default function DashboardPage() {
                         You're Approved! Time to Launch.
                     </CardTitle>
                     <CardDescription>
-                        Your application has been approved. Complete the steps below to make your store visible to everyone in the marketplace.
+                        Complete the steps below to make your store visible to everyone in the marketplace.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -471,7 +450,7 @@ export default function DashboardPage() {
                    </div>
                     <Button 
                         size="lg" 
-                        onClick={() => handleStoreStatusChange('live')} 
+                        onClick={() => handleStatusChange('live')} 
                         disabled={!canLaunch}
                         className="w-full"
                     >

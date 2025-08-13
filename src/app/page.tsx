@@ -42,8 +42,7 @@ export default function MarketplacePage() {
       try {
         setLoading(true);
         const merchantsCollection = collection(db, 'merchants');
-        // Only fetch merchants that have a "live" status
-        const q = query(merchantsCollection, where("storeStatus", "==", "live"));
+        const q = query(merchantsCollection, where("status", "==", "live"));
         const merchantSnapshot = await getDocs(q);
         const merchantList = merchantSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Merchant));
         setMerchants(merchantList);
