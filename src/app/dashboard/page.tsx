@@ -513,9 +513,12 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 ) : (
-                    // This case should ideally not be hit if wallet is created on launch
                     <div className="flex flex-col items-start gap-4">
-                        <p className="text-muted-foreground">Wallet not found.</p>
+                        <p className="text-muted-foreground">You have not created a wallet yet.</p>
+                        <Button onClick={handleLaunchStore} disabled={isLaunching}>
+                            {isLaunching ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
+                            Create Wallet
+                        </Button>
                     </div>
                 )}
                 </CardContent>
