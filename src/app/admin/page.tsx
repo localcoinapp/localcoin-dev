@@ -53,7 +53,12 @@ export default function AdminPage() {
     const unsubscribes = collectionsToMonitor.map(({ name, setter }) => {
         const ref = collection(db, name);
         return onSnapshot(ref, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as any);
+            // Correctly map document ID and data, avoiding field collision
+            const data = snapshot.docs.map(doc => {
+              const docData = doc.data();
+              // Keep the original document ID, don't let a field named 'id' overwrite it.
+              return { ...docData, id: doc.id } as any;
+            });
             setter(data);
             if (loading && --activeSubscriptions === 0) {
                  setLoading(false);
@@ -79,7 +84,8 @@ export default function AdminPage() {
     const batch = writeBatch(db);
     
     const merchantRef = doc(db, 'merchants', merchant.id);
-    batch.update(merchantRef, { status: 'approved', storeStatus: 'paused' });
+    // Set initial storeStatus to 'pending_launch' so merchant must complete checklist
+    batch.update(merchantRef, { status: 'approved', storeStatus: 'pending_launch' });
 
     const userRef = doc(db, 'users', merchant.owner);
     batch.update(userRef, { role: 'merchant', merchantId: merchant.id });
@@ -157,11 +163,9 @@ export default function AdminPage() {
     
     const batch = writeBatch(db);
 
-    // Update merchant status to 'blocked'
     const merchantRef = doc(db, 'merchants', merchant.id);
     batch.update(merchantRef, { status: 'blocked', storeStatus: 'paused' });
 
-    // Move owner user to 'blocked_users'
     const userFromRef = doc(db, 'users', merchant.owner);
     const userToRef = doc(db, 'blocked_users', merchant.owner);
 
@@ -170,6 +174,8 @@ export default function AdminPage() {
         if (userSnap.exists()) {
             batch.set(userToRef, { ...userSnap.data(), blockedAt: serverTimestamp() });
             batch.delete(userFromRef);
+        } else {
+            console.warn(`User ${merchant.owner} not found in 'users' collection to block. They may already be blocked.`);
         }
 
         await batch.commit();
@@ -180,6 +186,7 @@ export default function AdminPage() {
     }
   };
 
+
   const handleUnblockMerchant = async (merchant: Merchant) => {
     if (!merchant.id || !merchant.owner) {
         toast({ title: "Error", description: "Merchant ID or owner ID is missing.", variant: "destructive" });
@@ -188,11 +195,9 @@ export default function AdminPage() {
     
     const batch = writeBatch(db);
 
-    // Update merchant status back to 'approved'
     const merchantRef = doc(db, 'merchants', merchant.id);
     batch.update(merchantRef, { status: 'approved' });
 
-    // Move owner user back to 'users'
     const userFromRef = doc(db, 'blocked_users', merchant.owner);
     const userToRef = doc(db, 'users', merchant.owner);
     
@@ -202,6 +207,8 @@ export default function AdminPage() {
             const { blockedAt, ...userData } = userSnap.data();
             batch.set(userToRef, userData);
             batch.delete(userFromRef);
+        } else {
+             console.warn(`User ${merchant.owner} not found in 'blocked_users' collection to unblock.`);
         }
         
         await batch.commit();

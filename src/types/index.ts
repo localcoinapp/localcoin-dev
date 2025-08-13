@@ -20,7 +20,7 @@ export type MerchantItem = {
 }
 
 export type MerchantStatus = 'pending' | 'approved' | 'rejected' | 'blocked';
-export type MerchantStoreStatus = 'live' | 'paused';
+export type MerchantStoreStatus = 'live' | 'paused' | 'pending_launch';
 
 export type Merchant = {
   id: string

@@ -48,7 +48,10 @@ import {
   Briefcase,
   ShieldAlert,
   Power,
-  PowerOff
+  PowerOff,
+  Rocket,
+  CheckCircle2,
+  Circle
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -66,10 +69,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
-import type { MerchantItem, CartItem, MerchantStoreStatus } from "@/types";
+import type { MerchantItem, CartItem, MerchantStoreStatus, Merchant } from "@/types";
 import { Keypair } from "@solana/web3.js";
 import * as bip39 from "bip39";
-import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
+import { Alert, AlertDescription as AlertDescriptionComponent, AlertTitle } from "@/components/ui/alert";
 
 
 // --- Helper function to find and update inventory ---
@@ -91,7 +94,7 @@ const updateInventory = (listings: MerchantItem[], itemId: string, quantityChang
 export default function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [merchantData, setMerchantData] = useState<any>(null);
+  const [merchantData, setMerchantData] = useState<Merchant | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -114,7 +117,7 @@ export default function DashboardPage() {
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
       const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
-          const data = doc.data();
+          const data = doc.data() as Merchant;
           setMerchantData(data);
           setIsBlocked(data.status === 'blocked');
           const active = (data.pendingOrders || []).filter((order: any) => 
@@ -172,7 +175,7 @@ export default function DashboardPage() {
   };
 
   const handleListingStatusChange = async (listing: MerchantItem) => {
-    if (!user || !user.merchantId) return;
+    if (!user || !user.merchantId || !merchantData) return;
     const merchantDocRef = doc(db, 'merchants', user.merchantId);
     
     // Create a new array with the updated item
@@ -405,8 +408,82 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], walletAddress, seedPhrase, storeStatus } = merchantData;
+  const { listings = [], walletAddress, seedPhrase, storeStatus, logo, banner, description } = merchantData;
   const isStoreLive = storeStatus === 'live';
+  
+  // Launch checklist conditions
+  const hasListings = listings.length > 0;
+  const hasLogo = !!logo;
+  const hasBanner = !!banner;
+  const hasSufficientDescription = (description || '').length >= 100;
+  const canLaunch = hasListings && hasLogo && hasBanner && hasSufficientDescription;
+
+  const ChecklistItem = ({ isComplete, children }: { isComplete: boolean; children: React.ReactNode }) => (
+    <div className="flex items-center gap-3">
+        {isComplete ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+        <span className={cn(isComplete ? 'text-foreground' : 'text-muted-foreground')}>{children}</span>
+    </div>
+  );
+
+  const renderDashboardHeader = () => {
+    // Case 1: Store is live or paused (meaning it has been launched before)
+    if (storeStatus === 'live' || storeStatus === 'paused') {
+        return (
+            <Alert className={cn("mb-8", isStoreLive ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50")}>
+                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    {isStoreLive ? <Power className="h-5 w-5 text-green-600"/> : <PowerOff className="h-5 w-5 text-amber-600"/>}
+                    <div>
+                    <AlertDescriptionComponent className={cn("font-semibold", isStoreLive ? "text-green-800" : "text-amber-800")}>
+                        Your store is currently {isStoreLive ? 'Live' : 'Paused'}.
+                    </AlertDescriptionComponent>
+                    <p className="text-xs text-muted-foreground">{isStoreLive ? "It is visible to customers in the marketplace." : "Customers cannot see your store."}</p>
+                    </div>
+                </div>
+                <Switch
+                    checked={isStoreLive}
+                    onCheckedChange={(checked) => handleStoreStatusChange(checked ? 'live' : 'paused')}
+                    aria-label="Toggle store status"
+                />
+                </div>
+            </Alert>
+        );
+    }
+    // Case 2: Store is approved but has not been launched yet
+    if (storeStatus === 'pending_launch') {
+        return (
+            <Card className="mb-8 border-primary/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-primary">
+                        <Rocket className="h-6 w-6" />
+                        You're Approved! Time to Launch.
+                    </CardTitle>
+                    <CardDescription>
+                        Your application has been approved. Complete the steps below to make your store visible to everyone in the marketplace.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 p-4 border rounded-lg">
+                     <ChecklistItem isComplete={hasLogo}>Upload a store logo</ChecklistItem>
+                     <ChecklistItem isComplete={hasBanner}>Upload a banner image</ChecklistItem>
+                     <ChecklistItem isComplete={hasSufficientDescription}>Write a description (min. 100 chars)</ChecklistItem>
+                     <ChecklistItem isComplete={hasListings}>Add at least one listing</ChecklistItem>
+                   </div>
+                    <Button 
+                        size="lg" 
+                        onClick={() => handleStoreStatusChange('live')} 
+                        disabled={!canLaunch}
+                        className="w-full"
+                    >
+                        {canLaunch ? 'Launch My Store!' : 'Complete the steps above to launch'}
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return null;
+  }
 
   return (
     <>
@@ -426,25 +503,8 @@ export default function DashboardPage() {
           </div>
         </div>
         <p className="text-muted-foreground mb-8">Manage listings, view transactions, and handle incoming orders.</p>
-
-        <Alert className={cn("mb-8", isStoreLive ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50")}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {isStoreLive ? <Power className="h-5 w-5 text-green-600"/> : <PowerOff className="h-5 w-5 text-amber-600"/>}
-              <div>
-                <AlertDescriptionComponent className={cn("font-semibold", isStoreLive ? "text-green-800" : "text-amber-800")}>
-                  Your store is currently {isStoreLive ? 'Live' : 'Paused'}.
-                </AlertDescriptionComponent>
-                <p className="text-xs text-muted-foreground">{isStoreLive ? "It is visible to customers in the marketplace." : "Customers cannot see your store."}</p>
-              </div>
-            </div>
-            <Switch
-              checked={isStoreLive}
-              onCheckedChange={(checked) => handleStoreStatusChange(checked ? 'live' : 'paused')}
-              aria-label="Toggle store status"
-            />
-          </div>
-        </Alert>
+        
+        {renderDashboardHeader()}
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card>
