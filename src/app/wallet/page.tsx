@@ -124,7 +124,7 @@ export default function WalletPage() {
                      <RefundDialog>
                         <Button variant="secondary">
                             <LifeBuoy className="mr-2 h-4 w-4" />
-                            Sell / Refund
+                            Refund
                         </Button>
                      </RefundDialog>
                 </CardContent>
