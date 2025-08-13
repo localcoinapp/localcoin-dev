@@ -116,22 +116,13 @@ export default function DashboardPage() {
         if (doc.exists()) {
           const data = doc.data();
           setMerchantData(data);
-          setIsBlocked(false);
+          setIsBlocked(data.status === 'blocked');
           const active = (data.pendingOrders || []).filter((order: any) => 
               !['completed', 'rejected', 'cancelled'].includes(order.status)
           );
           setActiveOrders(active);
         } else {
-          // If the merchant doc is not in the 'merchants' collection, check 'blocked_merchants'
-          const blockedMerchantDocRef = doc(db, 'blocked_merchants', user.merchantId!);
-          onSnapshot(blockedMerchantDocRef, (blockedDoc) => {
-              if (blockedDoc.exists()) {
-                  setIsBlocked(true);
-              } else {
-                  setMerchantData(null);
-              }
-          });
-          setActiveOrders([]);
+          setMerchantData(null);
         }
         setIsLoading(false);
       }, (error) => {
