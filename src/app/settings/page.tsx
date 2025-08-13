@@ -104,12 +104,17 @@ export default function SettingsPage() {
         }
 
         try {
-            // --- Wallet Transfer and Destruction Logic ---
-            // In a real application, this is where you would securely:
-            // 1. Load the user's wallet using their (hopefully encrypted) seed phrase.
-            // 2. Transfer any remaining balance to an admin wallet.
-            // 3. This logic is highly sensitive and requires a secure backend service.
-            console.log("Placeholder: Transferring wallet balance for user:", user.id);
+            // Conditionally run wallet logic
+            if (user.walletAddress && user.walletBalance && user.walletBalance > 0) {
+              // --- Wallet Transfer and Destruction Logic ---
+              // In a real application, this is where you would securely:
+              // 1. Load the user's wallet using their (hopefully encrypted) seed phrase.
+              // 2. Transfer any remaining balance to an admin wallet.
+              // 3. This logic is highly sensitive and requires a secure backend service.
+              console.log("Placeholder: Transferring wallet balance for user:", user.id);
+            } else {
+              console.log("Skipping wallet cleanup: No wallet or zero balance.");
+            }
 
             // Delete Firestore document
             const userDocRef = doc(db, "users", currentUser.uid);
