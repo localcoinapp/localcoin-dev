@@ -1,7 +1,5 @@
-
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   allowedDevOrigins: [
     "https://3000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
     "http://localhost:3000",
@@ -40,5 +38,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Forcing a server restart to clear the cache.
 export default nextConfig;
