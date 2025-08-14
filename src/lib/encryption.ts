@@ -1,5 +1,7 @@
-
-'use server';
+// This file contains server-side encryption utilities.
+// It does not use the 'use server' directive because its functions are
+// synchronous and are only called from API routes, which are already
+// guaranteed to run on the server.
 
 import crypto from 'crypto';
 
@@ -18,7 +20,7 @@ const getKey = (salt: Buffer): Buffer => {
     return crypto.pbkdf2Sync(key, salt, ITERATIONS, KEY_LENGTH, 'sha512');
 };
 
-export const encrypt = async (text: string): Promise<string> => {
+export const encrypt = (text: string): string => {
     const salt = crypto.randomBytes(SALT_LENGTH);
     const key = getKey(salt);
     const iv = crypto.randomBytes(IV_LENGTH);
@@ -32,7 +34,7 @@ export const encrypt = async (text: string): Promise<string> => {
     return Buffer.concat([salt, iv, tag, Buffer.from(encrypted, 'hex')]).toString('hex');
 };
 
-export const decrypt = async (encryptedText: string): Promise<string> => {
+export const decrypt = (encryptedText: string): string => {
     const data = Buffer.from(encryptedText, 'hex');
     
     const salt = data.subarray(0, SALT_LENGTH);
