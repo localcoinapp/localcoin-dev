@@ -6,6 +6,7 @@ import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { TokenPurchaseRequest } from '@/types';
+import * as bip39 from 'bip39';
 
 
 export async function POST(req: NextRequest) {
@@ -22,31 +23,10 @@ export async function POST(req: NextRequest) {
     const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
 
     try {
-        // --- SECURITY WARNING & VALIDATION ---
-        console.log("Loading ISSUER_PRIVATE_KEY from environment variables...");
-        const issuerPrivateKeyString = process.env.ISSUER_PRIVATE_KEY;
-        if (!issuerPrivateKeyString) {
-            console.error("CRITICAL: ISSUER_PRIVATE_KEY environment variable is not set.");
-            return NextResponse.json({ error: 'Server configuration error: The issuer wallet is not configured.' }, { status: 500 });
-        }
-        
-        let issuerPrivateKey: Uint8Array;
-        try {
-            const parsedKey = JSON.parse(issuerPrivateKeyString);
-            if (!Array.isArray(parsedKey) || parsedKey.some(isNaN)) {
-                throw new Error("Private key is not a valid array of numbers.");
-            }
-            issuerPrivateKey = Uint8Array.from(parsedKey);
-            if (issuerPrivateKey.length !== 64) {
-                 throw new Error(`Invalid private key length. Expected 64 bytes, got ${issuerPrivateKey.length}.`);
-            }
-            console.log("Successfully parsed ISSUER_PRIVATE_KEY.");
-        } catch (e) {
-            console.error("CRITICAL: Failed to parse ISSUER_PRIVATE_KEY. It must be a stringified array of 64 numbers.", e);
-            return NextResponse.json({ error: 'Server configuration error: The issuer wallet key is malformed.' }, { status: 500 });
-        }
-        
-        const issuerKeypair = Keypair.fromSecretKey(issuerPrivateKey);
+        // --- Use hardcoded seed phrase to generate issuer keypair ---
+        const mnemonic = "extend deliver wait margin attend bean unaware skate silly cruel rose reveal";
+        const seed = await bip39.mnemonicToSeed(mnemonic);
+        const issuerKeypair = Keypair.fromSeed(seed.slice(0, 32));
         console.log(`Issuer public key: ${issuerKeypair.publicKey.toBase58()}`);
         
         // Fetch the request from Firestore
