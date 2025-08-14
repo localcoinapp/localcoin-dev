@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
         // must be set in your deployment environment as ISSUER_PRIVATE_KEY.
         const issuerPrivateKeyString = process.env.ISSUER_PRIVATE_KEY;
         if (!issuerPrivateKeyString) {
-            throw new Error("Issuer private key is not configured on the server. Please set the ISSUER_PRIVATE_KEY environment variable.");
+            console.error("CRITICAL: ISSUER_PRIVATE_KEY environment variable is not set.");
+            return NextResponse.json({ error: 'The server is not configured for token purchases. Please contact support.' }, { status: 500 });
         }
         
         // The private key is expected to be a stringified array of numbers (e.g., "[1,2,3,...]")
