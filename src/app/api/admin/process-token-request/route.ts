@@ -11,15 +11,17 @@ import type { TokenPurchaseRequest } from '@/types';
 export async function POST(req: NextRequest) {
     console.log("Received POST request to /api/admin/process-token-request");
 
+    const { requestId } = await req.json();
+    console.log(`Processing request ID: ${requestId}`);
+
+    if (!requestId) {
+        console.error("Missing requestId in request body");
+        return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
+    }
+    
+    const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
+
     try {
-        const { requestId } = await req.json();
-        console.log(`Processing request ID: ${requestId}`);
-
-        if (!requestId) {
-            console.error("Missing requestId in request body");
-            return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
-        }
-
         // --- SECURITY WARNING & VALIDATION ---
         console.log("Loading ISSUER_PRIVATE_KEY from environment variables...");
         const issuerPrivateKeyString = process.env.ISSUER_PRIVATE_KEY;
@@ -49,7 +51,6 @@ export async function POST(req: NextRequest) {
         
         // Fetch the request from Firestore
         console.log(`Fetching request document from Firestore: tokenPurchaseRequests/${requestId}`);
-        const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
         const requestSnap = await getDoc(requestRef);
 
         if (!requestSnap.exists() || requestSnap.data()?.status !== 'pending') {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
         const requestData = requestSnap.data() as TokenPurchaseRequest;
         console.log("Request data from Firestore:", requestData);
 
-        const { userWalletAddress: recipient, amount, userId } = requestData;
+        const { userWalletAddress: recipient, amount } = requestData;
 
         const recipientPublicKey = new PublicKey(recipient);
         const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
@@ -119,6 +120,14 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
         console.error('Error in process-token-request API:', error);
+        
+        // Attempt to update the request to 'denied' if the transaction fails
+        try {
+            await updateDoc(requestRef, { status: 'denied', processedAt: serverTimestamp() });
+        } catch (dbError) {
+             console.error('Additionally, failed to update request status to denied in Firestore:', dbError);
+        }
+
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
         return NextResponse.json({ error: 'Failed to process token purchase.', details: errorMessage }, { status: 500 });
     }
