@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         const keypair = Keypair.fromSeed(seed.slice(0, 32));
         const walletAddress = keypair.publicKey.toBase58();
 
-        const encryptedSeedPhrase = encrypt(mnemonic);
+        const encryptedSeedPhrase = await encrypt(mnemonic);
 
         await updateDoc(docRef, {
             walletAddress: walletAddress,

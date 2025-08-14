@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Seed phrase not found for this account.' }, { status: 404 });
         }
 
-        const seedPhrase = decrypt(encryptedSeedPhrase);
+        const seedPhrase = await decrypt(encryptedSeedPhrase);
 
         return NextResponse.json({ seedPhrase });
 
