@@ -314,58 +314,37 @@ export default function DashboardPage() {
     }
   };
 
-  const handleRedeemOrder = async (order: any) => {
-    if (!user || !user.merchantId || !order || !order.userId) {
-      toast({ title: "Error", description: "Could not redeem order due to missing data.", variant: "destructive" });
-      return;
-    }
-
-    const merchantDocRef = doc(db, 'merchants', user.merchantId);
-    const userDocRef = doc(db, 'users', order.userId);
-
+  const handleRedeemOrder = async (order: CartItem) => {
+    setIsRedeemModalOpen(false); // Close the modal immediately
+    toast({ title: "Processing Redemption...", description: "Please wait while we transfer the tokens." });
+  
     try {
-      await runTransaction(db, async (transaction) => {
-        const merchantDoc = await transaction.get(merchantDocRef);
-        const userDoc = await transaction.get(userDocRef);
-
-        if (!merchantDoc.exists() || !userDoc.exists()) throw new Error("User or Merchant document does not exist!");
-        
-        const merchantData = merchantDoc.data();
-        const userData = userDoc.data();
-
-        const orderToRedeem = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === order.orderId);
-        if (!orderToRedeem) return; 
-
-        const completedOrder = { ...orderToRedeem, status: 'completed', redeemedAt: new Date() };
-
-        const updatedPendingOrders = merchantData.pendingOrders.map((o: CartItem) => 
-            o.orderId === order.orderId ? completedOrder : o
-        );
-        const updatedUserCart = (userData.cart || []).map((cartItem: CartItem) =>
-            cartItem.orderId === order.orderId ? completedOrder : cartItem
-        );
-        
-        const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== order.orderId);
-        const updatedTransactions = [...(merchantData.recentTransactions || []), completedOrder];
-
-        transaction.update(merchantDocRef, {
-          pendingOrders: updatedPendingOrders,
-          recentTransactions: updatedTransactions,
-          reserved: updatedReserved,
-        });
-        transaction.update(userDocRef, { 
-            cart: updatedUserCart,
-        });
+      const response = await fetch('/api/merchant/redeem-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
       });
-
-      toast({ title: "Order Redeemed!", description: "The transaction has been successfully completed." });
-      setIsRedeemModalOpen(false);
-      setRedeemingOrder(null);
-
+  
+      const result = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(result.details || 'Failed to redeem order.');
+      }
+  
+      toast({
+        title: "Order Redeemed!",
+        description: `Transaction successful. Signature: ${result.signature.substring(0, 20)}...`,
+      });
+  
     } catch (error: any) {
       console.error("Error redeeming order:", error);
-      const errorMessage = "There was a problem completing the redemption.";
-      toast({ title: "Redemption Failed", description: errorMessage, variant: "destructive" });
+      toast({
+        title: "Redemption Failed",
+        description: error.message || "There was a problem completing the redemption.",
+        variant: "destructive",
+      });
+    } finally {
+        setRedeemingOrder(null);
     }
   };
 
