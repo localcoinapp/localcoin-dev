@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, Keypair, PublicKey, clusterApiUrl, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
-import { getOrCreateAssociatedTokenAccount, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { getOrCreateAssociatedTokenAccount, createTransferCheckedInstruction, getMint } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -23,14 +23,11 @@ export async function POST(req: NextRequest) {
     const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
 
     try {
-        // --- Use hardcoded seed phrase to generate issuer keypair ---
         const mnemonic = "extend deliver wait margin attend bean unaware skate silly cruel rose reveal";
         const seed = await bip39.mnemonicToSeed(mnemonic);
         const issuerKeypair = Keypair.fromSeed(seed.slice(0, 32));
         console.log(`Issuer public key: ${issuerKeypair.publicKey.toBase58()}`);
         
-        // Fetch the request from Firestore
-        console.log(`Fetching request document from Firestore: tokenPurchaseRequests/${requestId}`);
         const requestSnap = await getDoc(requestRef);
 
         if (!requestSnap.exists() || requestSnap.data()?.status !== 'pending') {
@@ -44,42 +41,37 @@ export async function POST(req: NextRequest) {
 
         const recipientPublicKey = new PublicKey(recipient);
         const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
-        console.log(`Recipient public key: ${recipientPublicKey.toBase58()}`);
-        console.log(`Token mint public key: ${tokenMintPublicKey.toBase58()}`);
-
+        
         const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
         console.log("Connected to Solana devnet.");
 
-        // Get or create the recipient's token account.
-        console.log("Getting or creating recipient's token account...");
-        const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
-            connection,
-            issuerKeypair, // Payer
-            tokenMintPublicKey,
-            recipientPublicKey
-        );
-        console.log(`Recipient's token account address: ${recipientTokenAccount.address.toBase58()}`);
+        // Fetch the mint information to get the correct number of decimals
+        const mintInfo = await getMint(connection, tokenMintPublicKey);
+        const decimals = mintInfo.decimals;
+        console.log(`Token decimals fetched from chain: ${decimals}`);
 
-
-         // Get or create the issuer's token account (less likely to be needed, but good practice)
-        console.log("Getting or creating issuer's token account...");
-        const issuerTokenAccount = await getOrCreateAssociatedTokenAccount(
+        const fromAta = await getOrCreateAssociatedTokenAccount(
             connection,
             issuerKeypair, // Payer
             tokenMintPublicKey,
             issuerKeypair.publicKey
         );
-        console.log(`Issuer's token account address: ${issuerTokenAccount.address.toBase58()}`);
+        const toAta = await getOrCreateAssociatedTokenAccount(
+            connection,
+            issuerKeypair, // Payer
+            tokenMintPublicKey,
+            recipientPublicKey
+        );
 
         console.log("Creating transfer instruction...");
         const transaction = new Transaction().add(
-            createTransferInstruction(
-                issuerTokenAccount.address,
-                recipientTokenAccount.address,
-                issuerKeypair.publicKey,
-                amount * (10 ** siteConfig.token.decimals), // Use decimals from config
-                [],
-                TOKEN_PROGRAM_ID
+             createTransferCheckedInstruction(
+                fromAta.address, // from
+                tokenMintPublicKey, // mint
+                toAta.address, // to
+                issuerKeypair.publicKey, // from owner
+                amount * (10 ** decimals), // amount, adjusted for decimals
+                decimals // decimals
             )
         );
         console.log("Transfer instruction created. Sending and confirming transaction...");
@@ -87,7 +79,6 @@ export async function POST(req: NextRequest) {
         const signature = await sendAndConfirmTransaction(connection, transaction, [issuerKeypair]);
         console.log(`Transaction successful with signature: ${signature}`);
         
-        // After successful on-chain transaction, only update the request status in Firestore.
         console.log("Updating Firestore document status to 'completed'...");
         await updateDoc(requestRef, {
             status: 'completed',
@@ -101,9 +92,11 @@ export async function POST(req: NextRequest) {
     } catch (error) {
         console.error('Error in process-token-request API:', error);
         
-        // Attempt to update the request to 'denied' if the transaction fails
         try {
-            await updateDoc(requestRef, { status: 'denied', processedAt: serverTimestamp() });
+            const requestDoc = await getDoc(requestRef);
+            if (requestDoc.exists()) {
+                await updateDoc(requestRef, { status: 'denied', processedAt: serverTimestamp() });
+            }
         } catch (dbError) {
              console.error('Additionally, failed to update request status to denied in Firestore:', dbError);
         }
