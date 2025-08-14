@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, Keypair, PublicKey, clusterApiUrl, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import { getOrCreateAssociatedTokenAccount, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
         }
         const requestData = requestSnap.data() as TokenPurchaseRequest;
 
-        const { userWalletAddress: recipient, amount } = requestData;
+        const { userWalletAddress: recipient, amount, userId } = requestData;
 
         // The private key is expected to be a stringified array of numbers (e.g., "[1,2,3,...]")
         const issuerPrivateKey = Uint8Array.from(JSON.parse(issuerPrivateKeyString));
@@ -51,7 +52,9 @@ export async function POST(req: NextRequest) {
             issuerKeypair.publicKey
         );
         
-        // Get or create the recipient's token account
+        // Get or create the recipient's token account.
+        // This function handles the logic for unfunded recipients by creating the account
+        // and having the 'issuerKeypair' (the payer) fund the creation.
         const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
             connection,
             issuerKeypair, // Payer
@@ -72,12 +75,25 @@ export async function POST(req: NextRequest) {
 
         const signature = await sendAndConfirmTransaction(connection, transaction, [issuerKeypair]);
 
+        const batch = db.batch();
+
         // Update the request status in Firestore
-        await updateDoc(requestRef, {
+        batch.update(requestRef, {
             status: 'completed',
             processedAt: serverTimestamp(),
             transactionSignature: signature
         });
+        
+        // Update user's walletBalance in Firestore
+        const userRef = doc(db, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        if(userSnap.exists()){
+            const currentBalance = userSnap.data().walletBalance || 0;
+            batch.update(userRef, { walletBalance: currentBalance + amount });
+        }
+
+        await batch.commit();
+
 
         return NextResponse.json({ signature });
 
