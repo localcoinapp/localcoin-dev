@@ -1,3 +1,4 @@
+
 // This file contains server-side encryption utilities.
 // It does not use the 'use server' directive because its functions are
 // synchronous and are only called from API routes, which are already
