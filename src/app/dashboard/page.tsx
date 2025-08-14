@@ -72,7 +72,7 @@ import { RedeemModal } from "@/components/RedeemModal";
 import type { MerchantItem, CartItem, MerchantStatus, Merchant } from "@/types";
 import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
 import * as bip39 from "bip39";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 
 
 // --- Helper function to find and update inventory ---
@@ -108,8 +108,46 @@ export default function DashboardPage() {
   const [isViewingSeed, setIsViewingSeed] = useState(false);
   const [showSeedDialog, setShowSeedDialog] = useState(false);
   const [currentSeedPhrase, setCurrentSeedPhrase] = useState<string | null>(null);
+  const [tokenBalance, setTokenBalance] = useState(0);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(true);
 
+  // Function to fetch balance
+  const fetchBalance = async () => {
+    if (merchantData?.walletAddress) {
+        setIsBalanceLoading(true);
+        try {
+            const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+            const walletPublicKey = new PublicKey(merchantData.walletAddress);
+            const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
 
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
+                mint: tokenMintPublicKey,
+            });
+
+            if (tokenAccounts.value.length > 0) {
+                const accountInfo = tokenAccounts.value[0].account.data.parsed.info;
+                setTokenBalance(accountInfo.tokenAmount.uiAmount || 0);
+            } else {
+                setTokenBalance(0);
+            }
+        } catch (error) {
+            console.error("Failed to fetch merchant token balance:", error);
+            setTokenBalance(0);
+            toast({
+                title: "Error",
+                description: "Could not fetch merchant wallet balance.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsBalanceLoading(false);
+        }
+    } else {
+        setIsBalanceLoading(false);
+        setTokenBalance(0);
+    }
+  };
+  
+  // Effect for initial data load from Firestore
   useEffect(() => {
     if (user && user.role === 'merchant' && user.merchantId) {
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
@@ -135,6 +173,12 @@ export default function DashboardPage() {
       setMerchantData(null);
     }
   }, [user]);
+
+  // Effect to fetch balance when merchantData is available or changes
+  useEffect(() => {
+      fetchBalance();
+  }, [merchantData?.walletAddress]);
+
 
   const handleStatusToggle = async (isLive: boolean) => {
     if (!user || !user.merchantId) return;
@@ -330,6 +374,9 @@ export default function DashboardPage() {
       if (!response.ok) {
         throw new Error(result.details || 'Failed to redeem order.');
       }
+      
+      // Manually trigger a balance refresh after successful redemption
+      fetchBalance();
   
       toast({
         title: "Order Redeemed!",
@@ -492,7 +539,13 @@ export default function DashboardPage() {
                 <CardContent>
                 {walletAddress ? (
                     <div className="space-y-4">
-                        <div className="text-2xl font-bold font-headline">0.00 {siteConfig.token.symbol}</div>
+                        <div className="text-2xl font-bold font-headline">
+                           {isBalanceLoading ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                           ) : (
+                            `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
+                           )}
+                        </div>
                         <p className="text-xs text-muted-foreground pt-2 break-all">
                             Address: {walletAddress}
                         </p>
