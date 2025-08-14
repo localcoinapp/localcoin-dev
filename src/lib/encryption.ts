@@ -18,7 +18,7 @@ const getKey = (salt: Buffer): Buffer => {
     return crypto.pbkdf2Sync(key, salt, ITERATIONS, KEY_LENGTH, 'sha512');
 };
 
-export const encrypt = (text: string): string => {
+export const encrypt = async (text: string): Promise<string> => {
     const salt = crypto.randomBytes(SALT_LENGTH);
     const key = getKey(salt);
     const iv = crypto.randomBytes(IV_LENGTH);
@@ -32,7 +32,7 @@ export const encrypt = (text: string): string => {
     return Buffer.concat([salt, iv, tag, Buffer.from(encrypted, 'hex')]).toString('hex');
 };
 
-export const decrypt = (encryptedText: string): string => {
+export const decrypt = async (encryptedText: string): Promise<string> => {
     const data = Buffer.from(encryptedText, 'hex');
     
     const salt = data.subarray(0, SALT_LENGTH);
