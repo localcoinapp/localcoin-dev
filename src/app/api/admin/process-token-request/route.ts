@@ -4,8 +4,8 @@ import { Connection, Keypair, PublicKey, clusterApiUrl, Transaction, sendAndConf
 import { getOrCreateAssociatedTokenAccount, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { TokenPurchaseRequest } from '@/types';
+import { doc, getDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import type { TokenPurchaseRequest, User } from '@/types';
 
 
 export async function POST(req: NextRequest) {
@@ -16,14 +16,30 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
         }
 
-        // --- SECURITY WARNING ---
-        // This private key for the main issuing wallet (4ADvsfQFwdwZBwMFMmxgoVzsWuAEGKTcAtRfxzHMruUG)
-        // must be set in your deployment environment as ISSUER_PRIVATE_KEY.
+        // --- SECURITY WARNING & VALIDATION ---
+        // This private key for the main issuing wallet must be set in your deployment environment.
         const issuerPrivateKeyString = process.env.ISSUER_PRIVATE_KEY;
         if (!issuerPrivateKeyString) {
             console.error("CRITICAL: ISSUER_PRIVATE_KEY environment variable is not set.");
-            return NextResponse.json({ error: 'The server is not configured for token purchases. Please contact support.' }, { status: 500 });
+            return NextResponse.json({ error: 'Server configuration error: The issuer wallet is not configured.' }, { status: 500 });
         }
+        
+        let issuerPrivateKey: Uint8Array;
+        try {
+            const parsedKey = JSON.parse(issuerPrivateKeyString);
+            if (!Array.isArray(parsedKey) || parsedKey.some(isNaN)) {
+                throw new Error("Private key is not a valid array of numbers.");
+            }
+            issuerPrivateKey = Uint8Array.from(parsedKey);
+            if (issuerPrivateKey.length !== 64) {
+                 throw new Error(`Invalid private key length. Expected 64 bytes, got ${issuerPrivateKey.length}.`);
+            }
+        } catch (e) {
+            console.error("CRITICAL: Failed to parse ISSUER_PRIVATE_KEY. It must be a stringified array of 64 numbers.", e);
+            return NextResponse.json({ error: 'Server configuration error: The issuer wallet key is malformed.' }, { status: 500 });
+        }
+        
+        const issuerKeypair = Keypair.fromSecretKey(issuerPrivateKey);
         
         // Fetch the request from Firestore
         const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
@@ -36,22 +52,11 @@ export async function POST(req: NextRequest) {
 
         const { userWalletAddress: recipient, amount, userId } = requestData;
 
-        // The private key is expected to be a stringified array of numbers (e.g., "[1,2,3,...]")
-        const issuerPrivateKey = Uint8Array.from(JSON.parse(issuerPrivateKeyString));
-        const issuerKeypair = Keypair.fromSecretKey(issuerPrivateKey);
         const recipientPublicKey = new PublicKey(recipient);
         const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
 
         const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
 
-        // Get or create the issuer's token account
-        const issuerTokenAccount = await getOrCreateAssociatedTokenAccount(
-            connection,
-            issuerKeypair, // Payer
-            tokenMintPublicKey,
-            issuerKeypair.publicKey
-        );
-        
         // Get or create the recipient's token account.
         // This function handles the logic for unfunded recipients by creating the account
         // and having the 'issuerKeypair' (the payer) fund the creation.
@@ -60,6 +65,14 @@ export async function POST(req: NextRequest) {
             issuerKeypair, // Payer
             tokenMintPublicKey,
             recipientPublicKey
+        );
+
+         // Get or create the issuer's token account (less likely to be needed, but good practice)
+        const issuerTokenAccount = await getOrCreateAssociatedTokenAccount(
+            connection,
+            issuerKeypair, // Payer
+            tokenMintPublicKey,
+            issuerKeypair.publicKey
         );
 
         const transaction = new Transaction().add(
@@ -74,26 +87,25 @@ export async function POST(req: NextRequest) {
         );
 
         const signature = await sendAndConfirmTransaction(connection, transaction, [issuerKeypair]);
-
-        const batch = db.batch();
-
-        // Update the request status in Firestore
-        batch.update(requestRef, {
-            status: 'completed',
-            processedAt: serverTimestamp(),
-            transactionSignature: signature
-        });
         
-        // Update user's walletBalance in Firestore
-        const userRef = doc(db, 'users', userId);
-        const userSnap = await getDoc(userRef);
-        if(userSnap.exists()){
+        // Use a transaction to ensure atomicity of Firestore updates
+        await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, "users", userId);
+            const userSnap = await transaction.get(userRef);
+
+            if (!userSnap.exists()) {
+                throw new Error("User document not found.");
+            }
+
             const currentBalance = userSnap.data().walletBalance || 0;
-            batch.update(userRef, { walletBalance: currentBalance + amount });
-        }
+            transaction.update(userRef, { walletBalance: currentBalance + amount });
 
-        await batch.commit();
-
+            transaction.update(requestRef, {
+                status: 'completed',
+                processedAt: serverTimestamp(),
+                transactionSignature: signature
+            });
+        });
 
         return NextResponse.json({ signature });
 
