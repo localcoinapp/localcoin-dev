@@ -123,8 +123,8 @@
     Theme: Berlin
   ================================================================= */
   .theme-berlin {
-    --font-header: 'Belanosima', sans-serif;
-    --font-body: 'Raleway', sans-serif;
+    --font-header: 'Exo 2', sans-serif;
+    --font-body: 'Ubuntu', sans-serif;
     --background: 0 0% 96%;            /* Default page background */
     --foreground: 0 0% 10%;            /* Default text color */
     --card: 0 0% 100%;                 /* Card component background */
@@ -147,7 +147,7 @@
     --radius: 0rem;                    /* Component border radius */
   }
   .dark.theme-berlin {
-    --font-header: 'Belanosima', sans-serif;
+    --font-header: 'Exo 2', sans-serif;
     --font-body: 'Ubuntu', sans-serif;
     --background: 0 0% 10%;
     --foreground: 0 0% 95%;
