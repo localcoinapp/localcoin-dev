@@ -40,8 +40,6 @@ import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import React, { useRef, useState } from "react"
-import * as bip39 from "bip39";
-import { Keypair } from "@solana/web3.js";
 
 
 const profileFormSchema = z.object({
@@ -67,6 +65,8 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -141,11 +141,11 @@ export default function ProfilePage() {
 
   async function onSubmit(data: ProfileFormValues) {
     if (!user) return;
+    setIsSubmitting(true);
     try {
       const currentUser = auth.currentUser
       if (currentUser) {
-        // Prepare user data for Firestore update
-        const userDataToUpdate: any = {
+        const userDataToUpdate = {
           name: data.name,
           email: data.email,
           bio: data.bio,
@@ -153,19 +153,8 @@ export default function ProfilePage() {
           address: data.address,
           state: data.state,
           province: data.province,
-          profileComplete: true, // Mark profile as complete
+          profileComplete: true,
         };
-
-        // Create a wallet if one doesn't exist
-        if (!user.walletAddress) {
-          const mnemonic = bip39.generateMnemonic();
-          const seed = bip39.mnemonicToSeedSync(mnemonic);
-          const keypair = Keypair.fromSeed(seed.slice(0, 32));
-          userDataToUpdate.walletAddress = keypair.publicKey.toBase58();
-          // In a real app, this should be encrypted or handled by a secure wallet service
-          userDataToUpdate.seedPhrase = mnemonic; 
-          toast({ title: "Wallet Created!", description: "Your secure wallet has been set up." });
-        }
 
         // Update Firebase Auth profile
         await updateProfile(currentUser, { displayName: data.name })
@@ -178,6 +167,8 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Error updating profile:", error)
       toast({ title: "Error", description: "There was an error updating your profile.", variant: "destructive" })
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
@@ -380,8 +371,8 @@ export default function ProfilePage() {
               />
 
               <div className="text-right">
-                <Button type="submit" disabled={form.formState.isSubmitting || isUploading}>
-                    {form.formState.isSubmitting || isUploading ? 'Saving...' : 'Update Profile'}
+                <Button type="submit" disabled={isSubmitting || isUploading}>
+                    {isSubmitting || isUploading ? 'Saving...' : 'Update Profile'}
                 </Button>
               </div>
             </form>
@@ -392,5 +383,3 @@ export default function ProfilePage() {
     </>
   )
 }
-
-    

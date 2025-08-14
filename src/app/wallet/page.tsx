@@ -18,9 +18,6 @@ import Link from "next/link"
 import { PurchaseHistory } from "@/components/purchase-history"
 import { useAuth } from "@/hooks/use-auth"
 import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
-import * as bip39 from "bip39";
-import { db } from "@/lib/firebase"
-import { doc, setDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
@@ -39,8 +36,9 @@ export default function WalletPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isCreatingWallet, setIsCreatingWallet] = useState(false);
-    const [showSeedPhrase, setShowSeedPhrase] = useState(false);
-    const [newSeedPhrase, setNewSeedPhrase] = useState<string | null>(null);
+    const [isViewingSeed, setIsViewingSeed] = useState(false);
+    const [showSeedDialog, setShowSeedDialog] = useState(false);
+    const [currentSeedPhrase, setCurrentSeedPhrase] = useState<string | null>(null);
     const [tokenBalance, setTokenBalance] = useState(0);
     const [isBalanceLoading, setIsBalanceLoading] = useState(true);
 
@@ -87,25 +85,53 @@ export default function WalletPage() {
         if (!user) return;
         setIsCreatingWallet(true);
         try {
-            const mnemonic = bip39.generateMnemonic();
-            const seed = bip39.mnemonicToSeedSync(mnemonic);
-            const keypair = Keypair.fromSeed(seed.slice(0, 32));
-            const address = keypair.publicKey.toBase58();
-
-            const userDocRef = doc(db, "users", user.id);
-            // In a real app, this should be encrypted before storing
-            await setDoc(userDocRef, { walletAddress: address, seedPhrase: mnemonic }, { merge: true });
-
-            setNewSeedPhrase(mnemonic);
+            const response = await fetch('/api/wallet/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, userType: 'user' }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.details || 'Failed to create wallet.');
+            }
+            
+            // Show the newly created seed phrase to the user
+            setCurrentSeedPhrase(data.seedPhrase);
+            setShowSeedDialog(true);
+            
             toast({ title: "Wallet Created!", description: "Your new Solana wallet is ready."});
+
         } catch(e) {
             console.error("Wallet creation failed", e);
-            toast({ title: "Error", description: "Failed to create a new wallet.", variant: "destructive"});
+            toast({ title: "Error", description: (e as Error).message, variant: "destructive"});
         } finally {
             setIsCreatingWallet(false);
         }
     }
 
+    const handleViewSeedPhrase = async () => {
+        if (!user) return;
+        setIsViewingSeed(true);
+        try {
+            const response = await fetch('/api/wallet/view-seed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, userType: 'user' }),
+            });
+            const data = await response.json();
+             if (!response.ok) {
+                throw new Error(data.details || 'Failed to retrieve seed phrase.');
+            }
+
+            setCurrentSeedPhrase(data.seedPhrase);
+            setShowSeedDialog(true);
+        } catch(e) {
+            console.error("View seed phrase failed", e);
+            toast({ title: "Error", description: (e as Error).message, variant: "destructive"});
+        } finally {
+            setIsViewingSeed(false);
+        }
+    }
 
     return (
       <>
@@ -140,8 +166,9 @@ export default function WalletPage() {
                         Token: {siteConfig.token.mintAddress}
                       </p> */}
                       <div className="flex gap-2 mt-4">
-                          <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
-                              <Eye className="mr-2" /> Show Seed Phrase
+                          <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
+                              {isViewingSeed ? <Loader2 className="animate-spin mr-2" /> : <Eye className="mr-2" />}
+                              Show Seed Phrase
                           </Button>
                       </div>
                     </div>
@@ -181,44 +208,22 @@ export default function WalletPage() {
         <PurchaseHistory />
       </div>
 
-       {/* Dialog for displaying NEWLY created seed phrase */}
-      <AlertDialog open={!!newSeedPhrase} onOpenChange={() => setNewSeedPhrase(null)}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Wallet Created Successfully!</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      Please save this seed phrase in a secure location. It is the ONLY way to recover your wallet.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <Alert variant="destructive" className="text-center">
-                  <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
-                    {newSeedPhrase}
-                  </AlertDescriptionComponent>
-              </Alert>
-              <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(newSeedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
-                  <AlertDialogCancel onClick={() => setNewSeedPhrase(null)}>I've saved it</AlertDialogCancel>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Dialog for showing EXISTING seed phrase */}
-      <AlertDialog open={showSeedPhrase} onOpenChange={setShowSeedPhrase}>
+      <AlertDialog open={showSeedDialog} onOpenChange={setShowSeedDialog}>
           <AlertDialogContent>
               <AlertDialogHeader>
                   <AlertDialogTitle>Your Secret Seed Phrase</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Do not share this with anyone! Anyone with this phrase can take your assets.
+                      This is the ONLY way to recover your wallet. Store it securely and do not share it with anyone.
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <Alert variant="destructive" className="text-center">
                   <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
-                    {user?.seedPhrase || "No seed phrase found."}
+                    {currentSeedPhrase}
                   </AlertDescriptionComponent>
               </Alert>
               <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(user?.seedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
-                  <AlertDialogCancel onClick={() => setShowSeedPhrase(false)}>Close</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(currentSeedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
+                  <AlertDialogCancel onClick={() => { setCurrentSeedPhrase(null); setShowSeedDialog(false) }}>I've saved it</AlertDialogCancel>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>

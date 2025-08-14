@@ -70,9 +70,7 @@ import { Switch } from "@/components/ui/switch";
 import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
 import type { MerchantItem, CartItem, MerchantStatus, Merchant } from "@/types";
-import { Keypair } from "@solana/web3.js";
-import * as bip39 from "bip39";
-import { Alert, AlertDescription as AlertDescriptionComponent, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
 
 
 // --- Helper function to find and update inventory ---
@@ -105,8 +103,9 @@ export default function DashboardPage() {
 
   // Wallet State
   const [isLaunching, setIsLaunching] = useState(false);
-  const [showSeedPhrase, setShowSeedPhrase] = useState(false);
-  const [newSeedPhrase, setNewSeedPhrase] = useState<string | null>(null);
+  const [isViewingSeed, setIsViewingSeed] = useState(false);
+  const [showSeedDialog, setShowSeedDialog] = useState(false);
+  const [currentSeedPhrase, setCurrentSeedPhrase] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -153,27 +152,57 @@ export default function DashboardPage() {
     setIsLaunching(true);
 
     try {
-        const mnemonic = bip39.generateMnemonic();
-        const seed = bip39.mnemonicToSeedSync(mnemonic);
-        const keypair = Keypair.fromSeed(seed.slice(0, 32));
-        const address = keypair.publicKey.toBase58();
+       const response = await fetch('/api/wallet/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.merchantId, userType: 'merchant' }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.details || 'Failed to create wallet.');
+        }
 
+        // The API now handles setting the wallet address and encrypted seed.
+        // We just need to set the status to 'live'.
         const merchantDocRef = doc(db, "merchants", user.merchantId);
         await updateDoc(merchantDocRef, { 
             status: 'live',
-            walletAddress: address, 
-            seedPhrase: mnemonic 
         });
 
-        setNewSeedPhrase(mnemonic);
+        setCurrentSeedPhrase(data.seedPhrase);
+        setShowSeedDialog(true);
         toast({ title: "Store Launched & Wallet Created!", description: "Your store is now live and your wallet is ready."});
     } catch(e) {
         console.error("Store launch failed", e);
-        toast({ title: "Error", description: "Failed to launch your store or create a wallet.", variant: "destructive"});
+        toast({ title: "Error", description: (e as Error).message, variant: "destructive"});
     } finally {
         setIsLaunching(false);
     }
   }
+
+  const handleViewSeedPhrase = async () => {
+        if (!user || !user.merchantId) return;
+        setIsViewingSeed(true);
+        try {
+            const response = await fetch('/api/wallet/view-seed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.merchantId, userType: 'merchant' }),
+            });
+            const data = await response.json();
+             if (!response.ok) {
+                throw new Error(data.details || 'Failed to retrieve seed phrase.');
+            }
+
+            setCurrentSeedPhrase(data.seedPhrase);
+            setShowSeedDialog(true);
+        } catch(e) {
+            console.error("View seed phrase failed", e);
+            toast({ title: "Error", description: (e as Error).message, variant: "destructive"});
+        } finally {
+            setIsViewingSeed(false);
+        }
+    }
 
 
   const handleListingStatusChange = async (listing: MerchantItem) => {
@@ -395,7 +424,7 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], walletAddress, seedPhrase, status, logo, banner, description } = merchantData;
+  const { listings = [], walletAddress, status, logo, banner, description } = merchantData;
   const isStoreLive = status === 'live';
   
   const hasListings = listings.length > 0;
@@ -507,8 +536,9 @@ export default function DashboardPage() {
                             Address: {walletAddress}
                         </p>
                         <div className="flex gap-2 mt-4">
-                            <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
-                                <Eye className="mr-2" /> Show Seed Phrase
+                            <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
+                                {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2" />}
+                                Show Seed Phrase
                             </Button>
                         </div>
                     </div>
@@ -619,44 +649,22 @@ export default function DashboardPage() {
       {editingListing && <EditListingModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} listing={editingListing} merchantId={user?.merchantId} />}
       {redeemingOrder && <RedeemModal isOpen={isRedeemModalOpen} onClose={() => setIsRedeemModalOpen(false)} redeemCode={redeemingOrder.redeemCode} onRedeem={() => handleRedeemOrder(redeemingOrder)} />}
     
-      {/* Dialog for displaying NEWLY created seed phrase */}
-      <AlertDialog open={!!newSeedPhrase} onOpenChange={() => setNewSeedPhrase(null)}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Wallet Created Successfully!</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      Please save this seed phrase in a secure location. It is the ONLY way to recover your wallet.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <Alert variant="destructive" className="text-center">
-                  <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
-                    {newSeedPhrase}
-                  </AlertDescriptionComponent>
-              </Alert>
-              <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(newSeedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
-                  <AlertDialogCancel onClick={() => setNewSeedPhrase(null)}>I've saved it</AlertDialogCancel>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Dialog for showing EXISTING seed phrase */}
-      <AlertDialog open={showSeedPhrase} onOpenChange={setShowSeedPhrase}>
+      <AlertDialog open={showSeedDialog} onOpenChange={setShowSeedDialog}>
           <AlertDialogContent>
               <AlertDialogHeader>
                   <AlertDialogTitle>Your Secret Seed Phrase</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Do not share this with anyone! Anyone with this phrase can take your assets.
+                      This is the ONLY way to recover your wallet. Store it securely and do not share it with anyone.
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <Alert variant="destructive" className="text-center">
                   <AlertDescriptionComponent className="font-mono p-4 bg-primary/10 rounded-md">
-                    {seedPhrase || "No seed phrase found."}
+                    {currentSeedPhrase}
                   </AlertDescriptionComponent>
               </Alert>
               <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(seedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
-                  <AlertDialogCancel onClick={() => setShowSeedPhrase(false)}>Close</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => { navigator.clipboard.writeText(currentSeedPhrase || ''); toast({ title: 'Copied!' }); }}>Copy Phrase</AlertDialogAction>
+                  <AlertDialogCancel onClick={() => { setCurrentSeedPhrase(null); setShowSeedDialog(false); }}>I've saved it</AlertDialogCancel>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
