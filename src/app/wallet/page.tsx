@@ -120,7 +120,7 @@ export default function WalletPage() {
         <div className="grid gap-6 md:grid-cols-2 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Solana Wallet (Devnet)</CardTitle>
+                  <CardTitle className="text-sm font-medium">Your Balance</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -136,9 +136,9 @@ export default function WalletPage() {
                       <p className="text-xs text-muted-foreground pt-2 break-all">
                         Address: {user.walletAddress}
                       </p>
-                       <p className="text-xs text-muted-foreground pt-1 break-all">
+                       {/* <p className="text-xs text-muted-foreground pt-1 break-all">
                         Token: {siteConfig.token.mintAddress}
-                      </p>
+                      </p> */}
                       <div className="flex gap-2 mt-4">
                           <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>
                               <Eye className="mr-2" /> Show Seed Phrase
