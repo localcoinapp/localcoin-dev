@@ -71,6 +71,8 @@ import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
 import type { MerchantItem, CartItem, MerchantStatus, Merchant } from "@/types";
 import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
+import * as bip39 from "bip39";
+import { Keypair } from "@solana/web3.js";
 
 
 // --- Helper function to find and update inventory ---
@@ -152,24 +154,19 @@ export default function DashboardPage() {
     setIsLaunching(true);
 
     try {
-       const response = await fetch('/api/wallet/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.merchantId, userType: 'merchant' }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.details || 'Failed to create wallet.');
-        }
+        const mnemonic = bip39.generateMnemonic();
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        const keypair = Keypair.fromSeed(seed.slice(0, 32));
+        const walletAddress = keypair.publicKey.toBase58();
 
-        // The API now handles setting the wallet address and encrypted seed.
-        // We just need to set the status to 'live'.
         const merchantDocRef = doc(db, "merchants", user.merchantId);
         await updateDoc(merchantDocRef, { 
             status: 'live',
+            walletAddress: walletAddress,
+            seedPhrase: mnemonic, // Storing unencrypted seed phrase
         });
 
-        setCurrentSeedPhrase(data.seedPhrase);
+        setCurrentSeedPhrase(mnemonic);
         setShowSeedDialog(true);
         toast({ title: "Store Launched & Wallet Created!", description: "Your store is now live and your wallet is ready."});
     } catch(e) {
@@ -180,29 +177,14 @@ export default function DashboardPage() {
     }
   }
 
-  const handleViewSeedPhrase = async () => {
-        if (!user || !user.merchantId) return;
-        setIsViewingSeed(true);
-        try {
-            const response = await fetch('/api/wallet/view-seed', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.merchantId, userType: 'merchant' }),
-            });
-            const data = await response.json();
-             if (!response.ok) {
-                throw new Error(data.details || 'Failed to retrieve seed phrase.');
-            }
-
-            setCurrentSeedPhrase(data.seedPhrase);
-            setShowSeedDialog(true);
-        } catch(e) {
-            console.error("View seed phrase failed", e);
-            toast({ title: "Error", description: (e as Error).message, variant: "destructive"});
-        } finally {
-            setIsViewingSeed(false);
-        }
+  const handleViewSeedPhrase = () => {
+    if (!merchantData?.seedPhrase) {
+        toast({ title: "Error", description: "Seed phrase not found for this merchant.", variant: "destructive"});
+        return;
     }
+    setCurrentSeedPhrase(merchantData.seedPhrase);
+    setShowSeedDialog(true);
+  }
 
 
   const handleListingStatusChange = async (listing: MerchantItem) => {

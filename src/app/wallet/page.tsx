@@ -30,6 +30,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert"
+import * as bip39 from "bip39";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 export default function WalletPage() {
@@ -85,18 +88,18 @@ export default function WalletPage() {
         if (!user) return;
         setIsCreatingWallet(true);
         try {
-            const response = await fetch('/api/wallet/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, userType: 'user' }),
+            const mnemonic = bip39.generateMnemonic();
+            const seed = bip39.mnemonicToSeedSync(mnemonic);
+            const keypair = Keypair.fromSeed(seed.slice(0, 32));
+            const walletAddress = keypair.publicKey.toBase58();
+
+            const userDocRef = doc(db, 'users', user.id);
+            await updateDoc(userDocRef, {
+                walletAddress: walletAddress,
+                seedPhrase: mnemonic,
             });
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.details || 'Failed to create wallet.');
-            }
             
-            // Show the newly created seed phrase to the user
-            setCurrentSeedPhrase(data.seedPhrase);
+            setCurrentSeedPhrase(mnemonic);
             setShowSeedDialog(true);
             
             toast({ title: "Wallet Created!", description: "Your new Solana wallet is ready."});
@@ -109,28 +112,13 @@ export default function WalletPage() {
         }
     }
 
-    const handleViewSeedPhrase = async () => {
-        if (!user) return;
-        setIsViewingSeed(true);
-        try {
-            const response = await fetch('/api/wallet/view-seed', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, userType: 'user' }),
-            });
-            const data = await response.json();
-             if (!response.ok) {
-                throw new Error(data.details || 'Failed to retrieve seed phrase.');
-            }
-
-            setCurrentSeedPhrase(data.seedPhrase);
-            setShowSeedDialog(true);
-        } catch(e) {
-            console.error("View seed phrase failed", e);
-            toast({ title: "Error", description: (e as Error).message, variant: "destructive"});
-        } finally {
-            setIsViewingSeed(false);
+    const handleViewSeedPhrase = () => {
+        if (!user?.seedPhrase) {
+            toast({ title: "Error", description: "Seed phrase not found.", variant: "destructive" });
+            return;
         }
+        setCurrentSeedPhrase(user.seedPhrase);
+        setShowSeedDialog(true);
     }
 
     return (
@@ -162,9 +150,6 @@ export default function WalletPage() {
                       <p className="text-xs text-muted-foreground pt-2 break-all">
                         Address: {user.walletAddress}
                       </p>
-                       {/* <p className="text-xs text-muted-foreground pt-1 break-all">
-                        Token: {siteConfig.token.mintAddress}
-                      </p> */}
                       <div className="flex gap-2 mt-4">
                           <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
                               {isViewingSeed ? <Loader2 className="animate-spin mr-2" /> : <Eye className="mr-2" />}
