@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Card,
   CardContent,
@@ -17,7 +17,7 @@ import { RefundDialog } from "@/components/wallet/refund-dialog"
 import Link from "next/link"
 import { PurchaseHistory } from "@/components/purchase-history"
 import { useAuth } from "@/hooks/use-auth"
-import { Keypair } from "@solana/web3.js";
+import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import * as bip39 from "bip39";
 import { db } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
@@ -41,9 +41,47 @@ export default function WalletPage() {
     const [isCreatingWallet, setIsCreatingWallet] = useState(false);
     const [showSeedPhrase, setShowSeedPhrase] = useState(false);
     const [newSeedPhrase, setNewSeedPhrase] = useState<string | null>(null);
+    const [tokenBalance, setTokenBalance] = useState(0);
+    const [isBalanceLoading, setIsBalanceLoading] = useState(true);
 
-    // This is a placeholder for now. Real balance would come from Solana's RPC.
-    const walletBalance = 0; 
+    useEffect(() => {
+        const fetchBalance = async () => {
+            if (user?.walletAddress) {
+                setIsBalanceLoading(true);
+                try {
+                    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+                    const walletPublicKey = new PublicKey(user.walletAddress);
+                    const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
+
+                    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
+                        mint: tokenMintPublicKey,
+                    });
+
+                    if (tokenAccounts.value.length > 0) {
+                        const accountInfo = tokenAccounts.value[0].account.data.parsed.info;
+                        setTokenBalance(accountInfo.tokenAmount.uiAmount || 0);
+                    } else {
+                        setTokenBalance(0);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch token balance:", error);
+                    setTokenBalance(0);
+                    toast({
+                        title: "Error",
+                        description: "Could not fetch wallet balance.",
+                        variant: "destructive"
+                    });
+                } finally {
+                    setIsBalanceLoading(false);
+                }
+            } else {
+                setIsBalanceLoading(false);
+            }
+        };
+
+        fetchBalance();
+    }, [user?.walletAddress, toast]);
+
 
     const handleCreateWallet = async () => {
         if (!user) return;
@@ -82,15 +120,24 @@ export default function WalletPage() {
         <div className="grid gap-6 md:grid-cols-2 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Solana Wallet</CardTitle>
+                  <CardTitle className="text-sm font-medium">Solana Wallet (Devnet)</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                   {user?.walletAddress ? (
                     <div className="space-y-4">
-                      <div className="text-2xl font-bold font-headline">{walletBalance.toFixed(2)} SOL</div>
+                      <div className="text-2xl font-bold font-headline">
+                        {isBalanceLoading ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                        ) : (
+                            `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground pt-2 break-all">
                         Address: {user.walletAddress}
+                      </p>
+                       <p className="text-xs text-muted-foreground pt-1 break-all">
+                        Token: {siteConfig.token.mintAddress}
                       </p>
                       <div className="flex gap-2 mt-4">
                           <Button variant="secondary" size="sm" onClick={() => setShowSeedPhrase(true)}>

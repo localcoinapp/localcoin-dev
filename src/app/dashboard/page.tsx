@@ -502,7 +502,7 @@ export default function DashboardPage() {
                 <CardContent>
                 {walletAddress ? (
                     <div className="space-y-4">
-                        <div className="text-2xl font-bold font-headline">0.00 SOL</div>
+                        <div className="text-2xl font-bold font-headline">0.00 {siteConfig.token.symbol}</div>
                         <p className="text-xs text-muted-foreground pt-2 break-all">
                             Address: {walletAddress}
                         </p>
