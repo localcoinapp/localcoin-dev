@@ -4,8 +4,8 @@ import { Connection, Keypair, PublicKey, clusterApiUrl, Transaction, sendAndConf
 import { getOrCreateAssociatedTokenAccount, createTransferInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
-import type { TokenPurchaseRequest, User } from '@/types';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import type { TokenPurchaseRequest } from '@/types';
 
 
 export async function POST(req: NextRequest) {
