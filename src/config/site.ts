@@ -11,6 +11,7 @@ export const siteConfig = {
   token: {
     name: "LocalCoin",
     symbol: "LCL",
-    mintAddress: "5hfFxuvUvjLzmzpRha2MtpCsTZnGSzqrjAbG7faHvL6u"
+    mintAddress: "5hfFxuvUvjLzmzpRha2MtpCsTZnGSzqrjAbG7faHvL6u",
+    decimals: 9,
   }
 }

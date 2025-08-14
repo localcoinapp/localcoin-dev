@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
                 issuerTokenAccount.address,
                 recipientTokenAccount.address,
                 issuerKeypair.publicKey,
-                amount * (10 ** 9), // Amount in the smallest unit (lamports for this token)
+                amount * (10 ** siteConfig.token.decimals), // Use decimals from config
                 [],
                 TOKEN_PROGRAM_ID
             )
@@ -88,23 +88,11 @@ export async function POST(req: NextRequest) {
 
         const signature = await sendAndConfirmTransaction(connection, transaction, [issuerKeypair]);
         
-        // Use a transaction to ensure atomicity of Firestore updates
-        await runTransaction(db, async (transaction) => {
-            const userRef = doc(db, "users", userId);
-            const userSnap = await transaction.get(userRef);
-
-            if (!userSnap.exists()) {
-                throw new Error("User document not found.");
-            }
-
-            const currentBalance = userSnap.data().walletBalance || 0;
-            transaction.update(userRef, { walletBalance: currentBalance + amount });
-
-            transaction.update(requestRef, {
-                status: 'completed',
-                processedAt: serverTimestamp(),
-                transactionSignature: signature
-            });
+        // After successful on-chain transaction, only update the request status in Firestore.
+        await updateDoc(requestRef, {
+            status: 'completed',
+            processedAt: serverTimestamp(),
+            transactionSignature: signature
         });
 
         return NextResponse.json({ signature });
