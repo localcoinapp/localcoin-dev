@@ -13,12 +13,12 @@ export async function POST(req: NextRequest) {
         }
 
         // --- SECURITY WARNING ---
-        // This is where you would securely load your issuer's private key.
-        // NEVER hardcode private keys in your code.
-        // Use a secure key management service or environment variables.
+        // This is where you would securely load your issuer's private key from an environment variable.
+        // The private key for the main issuing wallet (4ADvsfQFwdwZBwMFMmxgoVzsWuAEGKTcAtRfxzHMruUG)
+        // must be set in your deployment environment as ISSUER_PRIVATE_KEY.
         const issuerPrivateKeyString = process.env.ISSUER_PRIVATE_KEY;
         if (!issuerPrivateKeyString) {
-            throw new Error("Issuer private key is not configured on the server.");
+            throw new Error("Issuer private key is not configured on the server. Please set the ISSUER_PRIVATE_KEY environment variable.");
         }
         
         // The private key is expected to be a stringified array of numbers (e.g., "[1,2,3,...]")
