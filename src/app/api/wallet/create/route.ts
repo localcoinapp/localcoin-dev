@@ -4,7 +4,38 @@ import * as bip39 from "bip39";
 import { Keypair } from "@solana/web3.js";
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { encrypt } from '@/lib/encryption';
+import crypto from 'crypto';
+
+// --- Encryption Logic ---
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+const SALT_LENGTH = 64;
+const KEY_LENGTH = 32;
+const TAG_LENGTH = 16;
+const ITERATIONS = 100000;
+
+const getKey = (salt: Buffer): Buffer => {
+    const key = process.env.ENCRYPTION_KEY;
+    if (!key) {
+        throw new Error('ENCRYPTION_KEY environment variable is not set.');
+    }
+    return crypto.pbkdf2Sync(key, salt, ITERATIONS, KEY_LENGTH, 'sha512');
+};
+
+const encrypt = (text: string): string => {
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    const key = getKey(salt);
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+
+    const tag = cipher.getAuthTag();
+
+    return Buffer.concat([salt, iv, tag, Buffer.from(encrypted, 'hex')]).toString('hex');
+};
+// --- End Encryption Logic ---
 
 export async function POST(req: NextRequest) {
     const { userId, userType } = await req.json();
@@ -30,7 +61,7 @@ export async function POST(req: NextRequest) {
         const keypair = Keypair.fromSeed(seed.slice(0, 32));
         const walletAddress = keypair.publicKey.toBase58();
 
-        const encryptedSeedPhrase = await encrypt(mnemonic);
+        const encryptedSeedPhrase = encrypt(mnemonic);
 
         await updateDoc(docRef, {
             walletAddress: walletAddress,
