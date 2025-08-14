@@ -34,17 +34,24 @@ export function ThemeProvider({
   defaultMode?: Mode
   storageKey?: string
 }) {
-  const [theme, setTheme] = React.useState<Theme>(defaultTheme)
-  const [mode, setMode] = React.useState<Mode>(defaultMode)
-
-  React.useEffect(() => {
-    const storedThemeValue = localStorage.getItem(storageKey);
-    if (storedThemeValue) {
-      const [storedTheme, storedMode] = storedThemeValue.split(':');
-      if (storedTheme) setTheme(storedTheme as Theme);
-      if (storedMode) setMode(storedMode as Mode);
+  const [theme, setTheme] = React.useState<Theme>(() => {
+    try {
+      const stored = localStorage.getItem(storageKey)?.split(':')[0];
+      return (stored as Theme) || defaultTheme;
+    } catch (e) {
+      return defaultTheme;
     }
-  }, [storageKey]);
+  });
+
+  const [mode, setMode] = React.useState<Mode>(() => {
+    try {
+      const stored = localStorage.getItem(storageKey)?.split(':')[1];
+      return (stored as Mode) || defaultMode;
+    } catch (e) {
+      return defaultMode;
+    }
+  });
+
 
   React.useEffect(() => {
     const root = window.document.documentElement
@@ -59,18 +66,18 @@ export function ThemeProvider({
     }
 
     root.classList.add(theme)
-    localStorage.setItem(storageKey, `${theme}:${mode}`)
+    try {
+      localStorage.setItem(storageKey, `${theme}:${mode}`)
+    } catch (e) {
+      console.error("Failed to save theme to local storage", e);
+    }
   }, [theme, mode, storageKey])
 
   const value = {
     theme,
-    setTheme: (newTheme: Theme) => {
-      setTheme(newTheme)
-    },
+    setTheme,
     mode,
-    setMode: (newMode: Mode) => {
-      setMode(newMode)
-    },
+    setMode,
   }
 
   return (
