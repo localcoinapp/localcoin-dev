@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -12,10 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff } from 'lucide-react';
-import type { User, Merchant } from '@/types';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X } from 'lucide-react';
+import type { User, Merchant, TokenPurchaseRequest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { siteConfig } from '@/config/site';
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
@@ -31,9 +33,11 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [tokenRequests, setTokenRequests] = useState<TokenPurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -46,6 +50,7 @@ export default function AdminPage() {
         { name: 'users', setter: setUsers },
         { name: 'blocked_users', setter: setBlockedUsers },
         { name: 'merchants', setter: setMerchants },
+        { name: 'tokenPurchaseRequests', setter: (data: any) => setTokenRequests(data.filter((req: TokenPurchaseRequest) => req.status === 'pending')) },
     ];
     
     let activeSubscriptions = collectionsToMonitor.length;
@@ -72,6 +77,34 @@ export default function AdminPage() {
 
     return () => unsubscribes.forEach(unsub => unsub());
   }, [user, authLoading, router, toast, loading]);
+  
+  const handleProcessTokenRequest = async (requestId: string, action: 'approve' | 'deny') => {
+    setProcessingRequest(requestId);
+    try {
+        if (action === 'approve') {
+            const response = await fetch('/api/admin/process-token-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.details || 'Failed to approve request.');
+            }
+            toast({ title: 'Success', description: 'Token purchase approved and processed.' });
+        } else { // Deny
+            const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
+            await updateDoc(requestRef, { status: 'denied' });
+            toast({ title: 'Request Denied', variant: 'destructive' });
+        }
+    } catch (error) {
+        console.error("Error processing token request:", error);
+        toast({ title: 'Processing Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setProcessingRequest(null);
+    }
+  };
+
 
   const handleApprove = async (merchant: Merchant) => {
     if (!merchant.id || !merchant.owner) {
@@ -244,8 +277,9 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-5 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
+            <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
             <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
@@ -279,6 +313,40 @@ export default function AdminPage() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="token_requests">
+             <Card>
+                <CardHeader>
+                    <CardTitle>Pending Token Purchase Requests</CardTitle>
+                    <CardDescription>Review and process user requests to buy tokens.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <Table>
+                        <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Wallet Address</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {tokenRequests.length > 0 ? tokenRequests.map(req => (
+                                <TableRow key={req.id}>
+                                    <TableCell>{req.userName || req.userId}</TableCell>
+                                    <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                    <TableCell className="font-mono text-xs">{req.userWalletAddress}</TableCell>
+                                    <TableCell>{formatDate(req.createdAt)}</TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button size="sm" onClick={() => handleProcessTokenRequest(req.id, 'approve')} disabled={processingRequest === req.id}>
+                                                {processingRequest === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Approve
+                                            </Button>
+                                            <Button size="sm" variant="destructive" onClick={() => handleProcessTokenRequest(req.id, 'deny')} disabled={processingRequest === req.id}>
+                                                <X className="mr-2 h-4 w-4" /> Deny
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No pending token requests.</TableCell></TableRow>}
+                        </TableBody>
+                   </Table>
+                </CardContent>
+             </Card>
           </TabsContent>
 
           <TabsContent value="user_management">

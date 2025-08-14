@@ -1,4 +1,5 @@
 
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type NavItem = {
@@ -126,3 +127,15 @@ export type CartItem = {
   userName: string;
   category: string;
 }
+
+export type TokenPurchaseRequest = {
+  id: string;
+  userId: string;
+  userName: string;
+  userWalletAddress: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'denied';
+  createdAt: Timestamp;
+  processedAt?: Timestamp;
+  transactionSignature?: string;
+};

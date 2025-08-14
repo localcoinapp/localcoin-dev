@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState } from "react"
@@ -15,21 +16,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
-import { countries } from "@/data/countries"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 interface RampDialogProps {
   type: 'buy';
   children: React.ReactNode;
-}
-
-const userCountryCode = 'DE'; 
-
-const getCurrencyForCountry = (countryCode: string) => {
-    const country = countries.find(c => c.code === countryCode);
-    return country ? { code: country.currency, symbol: country.currencySymbol } : { code: 'USD', symbol: '$' };
 }
 
 export function RampDialog({ type, children }: RampDialogProps) {
@@ -38,7 +33,6 @@ export function RampDialog({ type, children }: RampDialogProps) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const currency = getCurrencyForCountry(userCountryCode);
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -57,38 +51,26 @@ export function RampDialog({ type, children }: RampDialogProps) {
 
         setIsLoading(true);
         try {
-            const response = await fetch('/api/buy-tokens', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    recipient: user.walletAddress,
-                    amount: parseFloat(amount)
-                }),
+            const requestsCollection = collection(db, 'tokenPurchaseRequests');
+            await addDoc(requestsCollection, {
+                userId: user.id,
+                userName: user.name || user.email,
+                userWalletAddress: user.walletAddress,
+                amount: parseFloat(amount),
+                status: 'pending',
+                createdAt: serverTimestamp(),
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Transaction failed');
-            }
-
             toast({
-                title: "Purchase Successful!",
-                description: (
-                    <span>
-                        Transaction completed. {' '}
-                        <a href={`https://explorer.solana.com/tx/${data.signature}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="underline">
-                            View on Explorer
-                        </a>
-                    </span>
-                ),
+                title: "Request Submitted!",
+                description: `Your request to buy ${amount} ${siteConfig.token.symbol} is pending admin approval.`,
             });
             
             setOpen(false);
             setAmount('');
         } catch (error) {
             toast({
-                title: "Purchase Failed",
+                title: "Request Failed",
                 description: (error as Error).message,
                 variant: "destructive",
             });
@@ -106,7 +88,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
         <DialogHeader>
           <DialogTitle className="capitalize">{type} {siteConfig.token.name}</DialogTitle>
           <DialogDescription>
-            Enter the amount you want to purchase.
+            Enter the amount you want to purchase. An admin will approve your request.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -132,7 +114,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
             className="capitalize"
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {type}
+            Request to {type}
           </Button>
         </DialogFooter>
       </DialogContent>
