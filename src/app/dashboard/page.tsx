@@ -51,7 +51,8 @@ import {
   PowerOff,
   Rocket,
   CheckCircle2,
-  Circle
+  Circle,
+  ArrowDown
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -73,6 +74,7 @@ import type { MerchantItem, CartItem, MerchantStatus, Merchant } from "@/types";
 import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
 import * as bip39 from "bip39";
 import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { CashoutDialog } from "@/components/wallet/cashout-dialog";
 
 
 // --- Helper function to find and update inventory ---
@@ -549,7 +551,12 @@ export default function DashboardPage() {
                         <p className="text-xs text-muted-foreground pt-2 break-all">
                             Address: {walletAddress}
                         </p>
-                        <div className="flex gap-2 mt-4">
+                        <div className="flex flex-wrap gap-2 mt-4">
+                            <CashoutDialog>
+                                <Button variant="outline" size="sm">
+                                    <ArrowDown/> Request Cash Out
+                                </Button>
+                            </CashoutDialog>
                             <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
                                 {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2" />}
                                 Show Seed Phrase

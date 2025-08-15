@@ -134,8 +134,21 @@ export type TokenPurchaseRequest = {
   userName: string;
   userWalletAddress: string;
   amount: number;
-  status: 'pending' | 'completed' | 'denied';
+  status: 'pending' | 'approved' | 'denied';
   createdAt: Timestamp;
   processedAt?: Timestamp;
   transactionSignature?: string;
+};
+
+export type MerchantCashoutRequest = {
+  id: string;
+  merchantId: string;
+  merchantName: string;
+  merchantWalletAddress: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'denied';
+  createdAt: Timestamp;
+  processedAt?: Timestamp;
+  transactionSignature?: string;
+  error?: string;
 };

@@ -13,8 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X } from 'lucide-react';
-import type { User, Merchant, TokenPurchaseRequest } from '@/types';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown } from 'lucide-react';
+import type { User, Merchant, TokenPurchaseRequest, MerchantCashoutRequest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { siteConfig } from '@/config/site';
@@ -34,6 +34,7 @@ export default function AdminPage() {
   const [blockedUsers, setBlockedUsers] = useState<User[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [tokenRequests, setTokenRequests] = useState<TokenPurchaseRequest[]>([]);
+  const [cashoutRequests, setCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -51,6 +52,7 @@ export default function AdminPage() {
         { name: 'blocked_users', setter: setBlockedUsers },
         { name: 'merchants', setter: setMerchants },
         { name: 'tokenPurchaseRequests', setter: (data: any) => setTokenRequests(data.filter((req: TokenPurchaseRequest) => req.status === 'pending')) },
+        { name: 'merchantCashoutRequests', setter: (data: any) => setCashoutRequests(data.filter((req: MerchantCashoutRequest) => req.status === 'pending')) },
     ];
     
     let activeSubscriptions = collectionsToMonitor.length;
@@ -99,6 +101,33 @@ export default function AdminPage() {
         }
     } catch (error) {
         console.error("Error processing token request:", error);
+        toast({ title: 'Processing Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setProcessingRequest(null);
+    }
+  };
+
+  const handleProcessCashoutRequest = async (requestId: string, action: 'approve' | 'deny') => {
+    setProcessingRequest(requestId);
+    try {
+        if (action === 'approve') {
+            const response = await fetch('/api/admin/process-cashout-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.details || 'Failed to approve cashout request.');
+            }
+            toast({ title: 'Success', description: 'Cashout request approved and processed.' });
+        } else { // Deny
+            const requestRef = doc(db, 'merchantCashoutRequests', requestId);
+            await updateDoc(requestRef, { status: 'denied' });
+            toast({ title: 'Request Denied', variant: 'destructive' });
+        }
+    } catch (error) {
+        console.error("Error processing cashout request:", error);
         toast({ title: 'Processing Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
         setProcessingRequest(null);
@@ -280,9 +309,9 @@ export default function AdminPage() {
           <TabsList className="grid grid-cols-1 sm:grid-cols-5 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
+            <TabsTrigger value="cashout_requests">Cashout Requests ({cashoutRequests.length})</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics Overview</TabsTrigger>
           </TabsList>
 
           <TabsContent value="applications">
@@ -343,6 +372,40 @@ export default function AdminPage() {
                                     </TableCell>
                                 </TableRow>
                             )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No pending token requests.</TableCell></TableRow>}
+                        </TableBody>
+                   </Table>
+                </CardContent>
+             </Card>
+          </TabsContent>
+
+          <TabsContent value="cashout_requests">
+             <Card>
+                <CardHeader>
+                    <CardTitle>Merchant Cashout Requests</CardTitle>
+                    <CardDescription>Review and process merchant requests to cash out tokens.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <Table>
+                        <TableHeader><TableRow><TableHead>Merchant</TableHead><TableHead>Amount</TableHead><TableHead>Wallet Address</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {cashoutRequests.length > 0 ? cashoutRequests.map(req => (
+                                <TableRow key={req.id}>
+                                    <TableCell>{req.merchantName}</TableCell>
+                                    <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                    <TableCell className="font-mono text-xs">{req.merchantWalletAddress}</TableCell>
+                                    <TableCell>{formatDate(req.createdAt)}</TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <Button size="sm" onClick={() => handleProcessCashoutRequest(req.id, 'approve')} disabled={processingRequest === req.id}>
+                                                {processingRequest === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Approve
+                                            </Button>
+                                            <Button size="sm" variant="destructive" onClick={() => handleProcessCashoutRequest(req.id, 'deny')} disabled={processingRequest === req.id}>
+                                                <X className="mr-2 h-4 w-4" /> Deny
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No pending cashout requests.</TableCell></TableRow>}
                         </TableBody>
                    </Table>
                 </CardContent>
@@ -427,10 +490,6 @@ export default function AdminPage() {
                   </Card>
                 </TabsContent>
               </Tabs>
-          </TabsContent>
-
-           <TabsContent value="analytics">
-              <Card><CardHeader><CardTitle>Analytics Overview</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Analytics dashboard coming soon.</p></CardContent></Card>
           </TabsContent>
         </Tabs>
       </div>
