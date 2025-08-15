@@ -194,7 +194,7 @@ export default function WalletPage() {
             </Card>
         </div>
 
-        <PurchaseHistory />
+        <PurchaseHistory onOpenHistory={() => setIsHistoryModalOpen(true)} />
       </div>
 
       <AlertDialog open={showSeedDialog} onOpenChange={setShowSeedDialog}>

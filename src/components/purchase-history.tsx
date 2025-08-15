@@ -26,6 +26,7 @@ import type { TokenPurchaseRequest } from "@/types";
 import { siteConfig } from "@/config/site";
 import { Skeleton } from "./ui/skeleton";
 import Link from "next/link";
+import { Button } from "./ui/button";
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
@@ -39,8 +40,11 @@ const statusConfig: { [key: string]: { label: string; variant: 'default' | 'seco
   denied: { label: 'Denied', variant: 'destructive' },
 };
 
+interface PurchaseHistoryProps {
+  onOpenHistory: () => void;
+}
 
-export function PurchaseHistory() {
+export function PurchaseHistory({ onOpenHistory }: PurchaseHistoryProps) {
   const { user } = useAuth();
   const [history, setHistory] = useState<TokenPurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +58,11 @@ export function PurchaseHistory() {
     const q = query(
         collection(db, "tokenPurchaseRequests"), 
         where("userId", "==", user.id)
-        // orderBy("createdAt", "desc") - This would require a composite index.
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TokenPurchaseRequest));
         
-        // Sort on the client-side to avoid needing the index
         historyData.sort((a, b) => {
             const timeA = a.createdAt?.toDate()?.getTime() || 0;
             const timeB = b.createdAt?.toDate()?.getTime() || 0;
@@ -100,7 +102,7 @@ export function PurchaseHistory() {
                             <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                             <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                             <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                            <TableCell className="text-right"><Skeleton className="h-4 w-12" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                         </TableRow>
                     ))
                 ) : history.length > 0 ? (
@@ -115,9 +117,9 @@ export function PurchaseHistory() {
                             </TableCell>
                             <TableCell className="text-right">
                                 {item.transactionSignature ? (
-                                    <Link href={`https://explorer.solana.com/tx/${item.transactionSignature}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-end gap-1 text-sm underline hover:text-primary">
-                                        View <ExternalLink className="h-3 w-3" />
-                                    </Link>
+                                    <Button variant="link" size="sm" onClick={onOpenHistory}>
+                                        View
+                                    </Button>
                                 ) : (
                                     '-'
                                 )}
