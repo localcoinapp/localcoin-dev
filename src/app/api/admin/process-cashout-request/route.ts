@@ -68,13 +68,14 @@ export async function POST(req: NextRequest) {
       throw new Error('Merchant seed phrase not found. Cannot authorize transfer.');
     }
 
-    // Platform wallet becomes the recipient
+    // --- FIX START: Correctly define platform wallet as recipient ---
     const platformMnemonic = process.env.LOCALCOIN_MNEMONIC;
     if (!platformMnemonic) {
       throw new Error('Platform wallet not configured (set LOCALCOIN_MNEMONIC)');
     }
     const platformKeypair = keypairFromMnemonic(platformMnemonic, process.env.LOCALCOIN_PASSPHRASE || '');
-    const recipientPublicKey = platformKeypair.publicKey;
+    const recipientPublicKey = platformKeypair.publicKey; // Platform wallet is the recipient
+    // --- FIX END ---
 
     // Merchant's wallet is the sender
     const merchantKeypair = keypairFromMnemonic(merchantMnemonic);
@@ -88,14 +89,14 @@ export async function POST(req: NextRequest) {
     // Get ATAs
     const fromAta = await getOrCreateAssociatedTokenAccount(
       connection,
-      merchantKeypair, // Payer for ATA creation if needed
+      merchantKeypair, // Payer for ATA creation if needed for the sender
       tokenMintPublicKey,
       merchantKeypair.publicKey
     );
 
     const toAta = await getOrCreateAssociatedTokenAccount(
       connection,
-      platformKeypair,
+      platformKeypair, // Platform wallet pays for its own ATA if it doesn't exist
       tokenMintPublicKey,
       recipientPublicKey
     );
