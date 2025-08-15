@@ -39,6 +39,7 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     
     const handleSubmit = async () => {
         setIsLoading(true);
+        // This check now uses the most current 'merchant' prop value
         if (!merchant || !merchant.id || !merchant.walletAddress) {
             toast({ title: "Error", description: "Merchant details not found. Please ensure the merchant is fully set up.", variant: "destructive" });
             setIsLoading(false);
@@ -105,7 +106,7 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
           <Button 
             type="submit" 
             onClick={handleSubmit} 
-            disabled={!amount || parseFloat(amount) <= 0 || isLoading} 
+            disabled={!amount || parseFloat(amount) <= 0 || isLoading || !merchant} 
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Send Request
