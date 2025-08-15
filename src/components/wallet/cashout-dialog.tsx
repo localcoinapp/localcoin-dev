@@ -38,13 +38,13 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     }
     
     const handleSubmit = async () => {
+        setIsLoading(true);
         if (!merchant || !merchant.id || !merchant.walletAddress) {
             toast({ title: "Error", description: "Merchant details not found. Please ensure the merchant is fully set up.", variant: "destructive" });
             setIsLoading(false);
             return;
         }
 
-        setIsLoading(true);
         try {
             const requestsCollection = collection(db, 'merchantCashoutRequests');
             await addDoc(requestsCollection, {
