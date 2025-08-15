@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink } from 'lucide-react';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart } from 'lucide-react';
 import type { User, Merchant, TokenPurchaseRequest, MerchantCashoutRequest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -36,6 +36,8 @@ export default function AdminPage() {
   const [tokenRequests, setTokenRequests] = useState<TokenPurchaseRequest[]>([]);
   const [pendingCashoutRequests, setPendingCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
   const [historicalCashoutRequests, setHistoricalCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
+  const [allTokenRequests, setAllTokenRequests] = useState<TokenPurchaseRequest[]>([]);
+  const [allCashoutRequests, setAllCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -60,10 +62,12 @@ export default function AdminPage() {
       }),
       onSnapshot(collection(db, 'tokenPurchaseRequests'), (snapshot) => {
         const allRequests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as TokenPurchaseRequest));
+        setAllTokenRequests(allRequests);
         setTokenRequests(allRequests.filter(req => req.status === 'pending'));
       }),
       onSnapshot(collection(db, 'merchantCashoutRequests'), (snapshot) => {
         const allRequests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MerchantCashoutRequest));
+        setAllCashoutRequests(allRequests);
         setPendingCashoutRequests(allRequests.filter(req => req.status === 'pending'));
         setHistoricalCashoutRequests(allRequests.filter(req => req.status !== 'pending'));
       })
@@ -294,18 +298,30 @@ export default function AdminPage() {
   const pendingApplications = merchants.filter(m => m.status === 'pending');
   const activeMerchants = merchants.filter(m => m.status === 'approved' || m.status === 'live' || m.status === 'paused');
   const blockedMerchants = merchants.filter(m => m.status === 'blocked');
+  
+  const totalTokensIssued = allTokenRequests
+    .filter(req => req.status === 'approved')
+    .reduce((acc, req) => acc + req.amount, 0);
+
+  const totalTokensCashedOut = allCashoutRequests
+    .filter(req => req.status === 'approved')
+    .reduce((acc, req) => acc + req.amount, 0);
+
+  const platformProfit = totalTokensCashedOut * 0.20;
+
 
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-6 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
             <TabsTrigger value="cashout_requests">Cashout Requests</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
+            <TabsTrigger value="accounting">Accounting</TabsTrigger>
           </TabsList>
 
           <TabsContent value="applications">
@@ -526,6 +542,48 @@ export default function AdminPage() {
                 </TabsContent>
               </Tabs>
           </TabsContent>
+          
+          <TabsContent value="accounting">
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center"><BarChart className="mr-2 h-5 w-5" />Platform Accounting</CardTitle>
+                    <CardDescription>An overview of the token economy.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-6 md:grid-cols-3">
+                   <Card>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Total Tokens Issued</CardTitle>
+                           <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-2xl font-bold">{totalTokensIssued.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <p className="text-xs text-muted-foreground">from {allTokenRequests.filter(r=>r.status === 'approved').length} approved requests</p>
+                       </CardContent>
+                   </Card>
+                   <Card>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Total Tokens Cashed Out</CardTitle>
+                           <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-2xl font-bold">{totalTokensCashedOut.toFixed(2)} {siteConfig.token.symbol}</div>
+                            <p className="text-xs text-muted-foreground">from {allCashoutRequests.filter(r=>r.status === 'approved').length} approved requests</p>
+                       </CardContent>
+                   </Card>
+                   <Card>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Platform Profit (20%)</CardTitle>
+                           <Wallet className="h-4 w-4 text-muted-foreground" />
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-2xl font-bold">{platformProfit.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <p className="text-xs text-muted-foreground">from cashed out tokens</p>
+                       </CardContent>
+                   </Card>
+                </CardContent>
+             </Card>
+          </TabsContent>
+
         </Tabs>
       </div>
       
