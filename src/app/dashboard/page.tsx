@@ -52,7 +52,10 @@ import {
   Rocket,
   CheckCircle2,
   Circle,
-  ArrowDown
+  ArrowDown,
+  TrendingUp,
+  TrendingDown,
+  Wallet
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -65,12 +68,15 @@ import {
   arrayRemove,
   runTransaction,
   setDoc,
+  collection,
+  query,
+  where,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import EditListingModal from '@/components/dashboard/edit-listing-modal';
 import { RedeemModal } from "@/components/RedeemModal";
-import type { MerchantItem, CartItem, MerchantStatus, Merchant } from "@/types";
+import type { MerchantItem, CartItem, MerchantStatus, Merchant, MerchantCashoutRequest } from "@/types";
 import { Alert, AlertDescription as AlertDescriptionComponent } from "@/components/ui/alert";
 import * as bip39 from "bip39";
 import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
@@ -95,6 +101,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<Merchant | null>(null);
+  const [cashoutHistory, setCashoutHistory] = useState<MerchantCashoutRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<any>(null);
@@ -153,7 +160,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user && user.role === 'merchant' && user.merchantId) {
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
-      const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
+      const cashoutQuery = query(collection(db, 'merchantCashoutRequests'), where('merchantId', '==', user.merchantId));
+
+      const unsubscribeMerchant = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
           const data = { id: doc.id, ...doc.data() } as Merchant;
           setMerchantData(data);
@@ -169,7 +178,15 @@ export default function DashboardPage() {
         console.error("Error fetching merchant data:", error);
         setIsLoading(false);
       });
-      return () => unsubscribe();
+
+      const unsubscribeCashouts = onSnapshot(cashoutQuery, (snapshot) => {
+          setCashoutHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MerchantCashoutRequest)));
+      });
+
+      return () => {
+        unsubscribeMerchant();
+        unsubscribeCashouts();
+      }
     } else if (user) {
       setIsLoading(false);
       setMerchantData(null);
@@ -434,7 +451,7 @@ export default function DashboardPage() {
     );
   }
   
-  const { listings = [], walletAddress, status, logo, banner, description } = merchantData;
+  const { listings = [], walletAddress, status, logo, banner, description, recentTransactions = [] } = merchantData;
   const isStoreLive = status === 'live';
   
   const hasListings = listings.length > 0;
@@ -442,6 +459,14 @@ export default function DashboardPage() {
   const hasBanner = !!banner;
   const hasSufficientDescription = (description || '').length >= 100;
   const canLaunch = hasListings && hasLogo && hasBanner && hasSufficientDescription;
+
+  // --- Accounting Calculations ---
+  const totalEarnings = recentTransactions.reduce((acc, tx) => acc + tx.price, 0);
+  const totalCashedOut = cashoutHistory
+      .filter(req => req.status === 'approved')
+      .reduce((acc, req) => acc + req.amount, 0);
+  const totalCommissions = totalCashedOut * 0.20;
+  // -----------------------------
 
   const ChecklistItem = ({ isComplete, children }: { isComplete: boolean; children: React.ReactNode }) => (
     <div className="flex items-center gap-3">
@@ -532,49 +557,6 @@ export default function DashboardPage() {
         {renderDashboardHeader()}
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-         {(status === 'live' || status === 'paused') && (
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Wallet</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                {walletAddress ? (
-                    <div className="space-y-4">
-                        <div className="text-2xl font-bold font-headline">
-                           {isBalanceLoading ? (
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                           ) : (
-                            `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
-                           )}
-                        </div>
-                        <p className="text-xs text-muted-foreground pt-2 break-all">
-                            Address: {walletAddress}
-                        </p>
-                        <div className="flex flex-wrap gap-2 mt-4">
-                            <CashoutDialog merchant={merchantData}>
-                                <Button variant="outline" size="sm">
-                                    <ArrowDown className="mr-2 h-4 w-4" /> Request Cash Out
-                                </Button>
-                            </CashoutDialog>
-                            <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
-                                {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2 h-4 w-4" />}
-                                Show Seed Phrase
-                            </Button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-start gap-4">
-                        <p className="text-muted-foreground">You have not created a wallet yet.</p>
-                        <Button onClick={handleLaunchStore} disabled={isLaunching}>
-                            {isLaunching ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
-                            Create Wallet
-                        </Button>
-                    </div>
-                )}
-                </CardContent>
-            </Card>
-         )}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Listings</CardTitle>
@@ -594,6 +576,83 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {(status === 'live' || status === 'paused') && (
+            <div className="mb-8">
+                <h2 className="text-2xl font-bold font-headline mb-4">Financial Overview</h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                     <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                        {walletAddress ? (
+                            <div className="space-y-4">
+                                <div className="text-2xl font-bold font-headline">
+                                   {isBalanceLoading ? (
+                                    <Loader2 className="h-6 w-6 animate-spin" />
+                                   ) : (
+                                    `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
+                                   )}
+                                </div>
+                                <div className="flex flex-wrap gap-2 mt-4">
+                                    <CashoutDialog merchant={merchantData}>
+                                        <Button variant="outline" size="sm">
+                                            <ArrowDown className="mr-2 h-4 w-4" /> Request Cash Out
+                                        </Button>
+                                    </CashoutDialog>
+                                    <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
+                                        {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2 h-4 w-4" />}
+                                        Show Seed Phrase
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-start gap-4">
+                                <p className="text-muted-foreground">You have not created a wallet yet.</p>
+                                <Button onClick={handleLaunchStore} disabled={isLaunching}>
+                                    {isLaunching ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
+                                    Create Wallet
+                                </Button>
+                            </div>
+                        )}
+                        </CardContent>
+                    </Card>
+
+                   <Card>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                           <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <p className="text-xs text-muted-foreground">from {recentTransactions.length} completed sales</p>
+                       </CardContent>
+                   </Card>
+                   <Card>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Total Cashed Out</CardTitle>
+                           <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-2xl font-bold">{totalCashedOut.toFixed(2)} {siteConfig.token.symbol}</div>
+                            <p className="text-xs text-muted-foreground">from {cashoutHistory.filter(r=>r.status === 'approved').length} requests</p>
+                       </CardContent>
+                   </Card>
+                   <Card>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Commissions Paid</CardTitle>
+                           <Wallet className="h-4 w-4 text-muted-foreground" />
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-2xl font-bold">{totalCommissions.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <p className="text-xs text-muted-foreground">20% of total cash outs</p>
+                       </CardContent>
+                   </Card>
+                </div>
+            </div>
+        )}
 
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2 grid gap-8">
