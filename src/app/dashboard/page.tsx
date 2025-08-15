@@ -552,7 +552,7 @@ export default function DashboardPage() {
                             Address: {walletAddress}
                         </p>
                         <div className="flex flex-wrap gap-2 mt-4">
-                            <CashoutDialog>
+                            <CashoutDialog merchant={merchantData}>
                                 <Button variant="outline" size="sm">
                                     <ArrowDown/> Request Cash Out
                                 </Button>

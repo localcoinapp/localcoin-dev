@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
-import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
@@ -24,10 +23,10 @@ import type { Merchant } from "@/types"
 
 interface CashoutDialogProps {
   children: React.ReactNode;
+  merchant: Merchant | null;
 }
 
-export function CashoutDialog({ children }: CashoutDialogProps) {
-    const { user } = useAuth();
+export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState('');
@@ -39,14 +38,8 @@ export function CashoutDialog({ children }: CashoutDialogProps) {
     }
     
     const handleSubmit = async () => {
-        if (!user || !user.merchantId) {
+        if (!merchant || !merchant.id || !merchant.walletAddress) {
             toast({ title: "Error", description: "Merchant details not found.", variant: "destructive" });
-            return;
-        }
-
-        const merchant = user as any as Merchant; // Cast user to merchant which has the required fields
-        if (!merchant.walletAddress) {
-            toast({ title: "Error", description: "Merchant wallet address not found.", variant: "destructive" });
             return;
         }
 
@@ -54,7 +47,7 @@ export function CashoutDialog({ children }: CashoutDialogProps) {
         try {
             const requestsCollection = collection(db, 'merchantCashoutRequests');
             await addDoc(requestsCollection, {
-                merchantId: user.merchantId,
+                merchantId: merchant.id,
                 merchantName: merchant.companyName,
                 merchantWalletAddress: merchant.walletAddress,
                 amount: parseFloat(amount),
