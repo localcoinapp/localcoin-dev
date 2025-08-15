@@ -41,10 +41,10 @@ const statusConfig: { [key: string]: { label: string; variant: 'default' | 'seco
 };
 
 interface PurchaseHistoryProps {
-  onOpenHistory: () => void;
+  onViewTransaction: (signature: string) => void;
 }
 
-export function PurchaseHistory({ onOpenHistory }: PurchaseHistoryProps) {
+export function PurchaseHistory({ onViewTransaction }: PurchaseHistoryProps) {
   const { user } = useAuth();
   const [history, setHistory] = useState<TokenPurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +117,7 @@ export function PurchaseHistory({ onOpenHistory }: PurchaseHistoryProps) {
                             </TableCell>
                             <TableCell className="text-right">
                                 {item.transactionSignature ? (
-                                    <Button variant="link" size="sm" onClick={onOpenHistory}>
+                                    <Button variant="link" size="sm" onClick={() => onViewTransaction(item.transactionSignature!)}>
                                         View
                                     </Button>
                                 ) : (

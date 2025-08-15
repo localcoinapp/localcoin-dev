@@ -12,16 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ExternalLink, RefreshCw } from "lucide-react";
-import { Connection, PublicKey, clusterApiUrl, ConfirmedSignatureInfo } from "@solana/web3.js";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Connection, PublicKey, clusterApiUrl, ConfirmedSignatureInfo, ParsedTransactionWithMeta } from "@solana/web3.js";
 import Link from "next/link";
 import { Badge } from "../ui/badge";
 
@@ -29,6 +20,7 @@ interface TransactionHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   walletAddress: string;
+  signature: string | null;
 }
 
 const formatDate = (timestamp: number | undefined) => {
@@ -36,25 +28,24 @@ const formatDate = (timestamp: number | undefined) => {
     return new Date(timestamp * 1000).toLocaleString();
 };
 
-
-export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: TransactionHistoryModalProps) {
+export function TransactionHistoryModal({ isOpen, onClose, walletAddress, signature }: TransactionHistoryModalProps) {
     const { toast } = useToast();
-    const [signatures, setSignatures] = useState<ConfirmedSignatureInfo[]>([]);
+    const [transaction, setTransaction] = useState<ParsedTransactionWithMeta | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const fetchHistory = async () => {
-        if (!walletAddress) return;
+    const fetchTransaction = async () => {
+        if (!signature) return;
         setIsLoading(true);
         try {
             const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-            const publicKey = new PublicKey(walletAddress);
-            const sigs = await connection.getSignaturesForAddress(publicKey, { limit: 25 });
-            setSignatures(sigs);
+            // getParsedTransaction is more detailed than getSignatureStatus
+            const tx = await connection.getParsedTransaction(signature, { maxSupportedTransactionVersion: 0 });
+            setTransaction(tx);
         } catch (error) {
-            console.error("Failed to fetch transaction history:", error);
+            console.error("Failed to fetch transaction details:", error);
             toast({
                 title: "Error",
-                description: "Could not fetch transaction history.",
+                description: "Could not fetch transaction details.",
                 variant: "destructive",
             });
         } finally {
@@ -63,72 +54,62 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     };
 
     useEffect(() => {
-        if (isOpen) {
-            fetchHistory();
+        if (isOpen && signature) {
+            fetchTransaction();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, walletAddress]);
+    }, [isOpen, signature]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>Transaction History</DialogTitle>
+                    <DialogTitle>Transaction Details</DialogTitle>
                     <DialogDescription>
-                        Recent transactions for wallet: <span className="font-mono text-xs">{walletAddress}</span>
+                       Details for transaction on the Solana network.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="relative">
-                    {isLoading && (
-                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                <div className="relative min-h-[200px]">
+                    {isLoading ? (
+                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-md">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
+                    ) : transaction ? (
+                       <div className="space-y-4">
+                           <div className="p-4 border rounded-md text-sm break-all">
+                             <p className="font-semibold">Signature</p>
+                             <p className="font-mono text-xs">{signature}</p>
+                           </div>
+                            <div className="p-4 border rounded-md text-sm">
+                             <p className="font-semibold">Status</p>
+                              <Badge variant={transaction.meta?.err ? 'destructive' : 'default'}>
+                                {transaction.meta?.err ? 'Failed' : 'Success'}
+                              </Badge>
+                           </div>
+                           <div className="p-4 border rounded-md text-sm">
+                             <p className="font-semibold">Timestamp</p>
+                             <p>{formatDate(transaction.blockTime)}</p>
+                           </div>
+                             <div className="p-4 border rounded-md text-sm">
+                             <p className="font-semibold">Fee</p>
+                             <p>{transaction.meta?.fee} lamports</p>
+                           </div>
+                       </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-full">
+                            <p className="text-muted-foreground">No transaction selected.</p>
+                        </div>
                     )}
-                    <ScrollArea className="h-[60vh] border rounded-md">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-background">
-                                <TableRow>
-                                    <TableHead>Signature</TableHead>
-                                    <TableHead>Timestamp</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Explorer</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {signatures.length > 0 ? (
-                                    signatures.map((sig) => (
-                                        <TableRow key={sig.signature}>
-                                            <TableCell className="font-mono text-xs">{sig.signature.slice(0, 10)}...</TableCell>
-                                            <TableCell>{formatDate(sig.blockTime)}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={sig.err ? 'destructive' : 'default'}>
-                                                    {sig.err ? 'Failed' : 'Success'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="icon" asChild>
-                                                    <Link href={`https://explorer.solana.com/tx/${sig.signature}?cluster=devnet`} target="_blank" rel="noopener noreferrer">
-                                                        <ExternalLink className="h-4 w-4" />
-                                                    </Link>
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
-                                            No transaction history found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                    <div className="flex justify-end mt-4">
-                        <Button variant="outline" onClick={fetchHistory} disabled={isLoading}>
-                            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+                </div>
+                 <div className="flex justify-end mt-4 gap-2">
+                    {signature && (
+                         <Button variant="outline" asChild>
+                            <Link href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4" /> View on Explorer
+                            </Link>
                         </Button>
-                    </div>
+                    )}
+                    <Button variant="outline" onClick={onClose}>Close</Button>
                 </div>
             </DialogContent>
         </Dialog>

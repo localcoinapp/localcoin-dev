@@ -45,6 +45,7 @@ export default function WalletPage() {
     const [tokenBalance, setTokenBalance] = useState(0);
     const [isBalanceLoading, setIsBalanceLoading] = useState(true);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchBalance = async () => {
@@ -121,6 +122,16 @@ export default function WalletPage() {
         setCurrentSeedPhrase(user.seedPhrase);
         setShowSeedDialog(true);
     }
+    
+    const handleViewTransaction = (signature: string) => {
+        setSelectedSignature(signature);
+        setIsHistoryModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsHistoryModalOpen(false);
+        setSelectedSignature(null);
+    }
 
     return (
       <>
@@ -156,10 +167,6 @@ export default function WalletPage() {
                               {isViewingSeed ? <Loader2 className="animate-spin mr-2" /> : <Eye className="mr-2" />}
                               Show Seed Phrase
                           </Button>
-                          <Button variant="secondary" size="sm" onClick={() => setIsHistoryModalOpen(true)}>
-                              <History className="mr-2" />
-                              Transaction History
-                          </Button>
                       </div>
                     </div>
                   ) : (
@@ -194,7 +201,7 @@ export default function WalletPage() {
             </Card>
         </div>
 
-        <PurchaseHistory onOpenHistory={() => setIsHistoryModalOpen(true)} />
+        <PurchaseHistory onViewTransaction={handleViewTransaction} />
       </div>
 
       <AlertDialog open={showSeedDialog} onOpenChange={setShowSeedDialog}>
@@ -220,8 +227,9 @@ export default function WalletPage() {
       {user?.walletAddress && (
           <TransactionHistoryModal 
             isOpen={isHistoryModalOpen} 
-            onClose={() => setIsHistoryModalOpen(false)} 
+            onClose={handleCloseModal} 
             walletAddress={user.walletAddress}
+            signature={selectedSignature}
           />
       )}
       </>
