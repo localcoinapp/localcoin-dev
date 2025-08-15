@@ -53,12 +53,20 @@ export function PurchaseHistory() {
 
     const q = query(
         collection(db, "tokenPurchaseRequests"), 
-        where("userId", "==", user.id),
-        orderBy("createdAt", "desc")
+        where("userId", "==", user.id)
+        // orderBy("createdAt", "desc") - This would require a composite index.
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TokenPurchaseRequest));
+        
+        // Sort on the client-side to avoid needing the index
+        historyData.sort((a, b) => {
+            const timeA = a.createdAt?.toDate()?.getTime() || 0;
+            const timeB = b.createdAt?.toDate()?.getTime() || 0;
+            return timeB - timeA;
+        });
+
         setHistory(historyData);
         setLoading(false);
     }, (error) => {
