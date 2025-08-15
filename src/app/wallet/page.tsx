@@ -182,8 +182,8 @@ export default function WalletPage() {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Buy/Sell Tokens</CardTitle>
-                    <CardDescription>Add or remove funds from your wallet.</CardDescription>
+                    <CardTitle>Buy Tokens</CardTitle>
+                    <CardDescription>Add funds to your wallet.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex gap-2">
                     <RampDialog type="buy">
