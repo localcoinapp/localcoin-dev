@@ -39,7 +39,8 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     
     const handleSubmit = async () => {
         if (!merchant || !merchant.id || !merchant.walletAddress) {
-            toast({ title: "Error", description: "Merchant details not found.", variant: "destructive" });
+            toast({ title: "Error", description: "Merchant details not found. Please ensure the merchant is fully set up.", variant: "destructive" });
+            setIsLoading(false);
             return;
         }
 
