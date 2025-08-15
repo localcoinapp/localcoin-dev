@@ -10,11 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { DollarSign, ArrowRight, LifeBuoy, ArrowUp, KeyRound, Eye, Loader2 } from "lucide-react"
+import { DollarSign, ArrowUp, KeyRound, Eye, Loader2, History } from "lucide-react"
 import { siteConfig } from "@/config/site"
 import { RampDialog } from "@/components/wallet/ramp-dialog"
 import { RefundDialog } from "@/components/wallet/refund-dialog"
-import Link from "next/link"
 import { PurchaseHistory } from "@/components/purchase-history"
 import { useAuth } from "@/hooks/use-auth"
 import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
@@ -33,6 +32,7 @@ import { Alert, AlertDescription as AlertDescriptionComponent } from "@/componen
 import * as bip39 from "bip39";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { TransactionHistoryModal } from "@/components/wallet/transaction-history-modal"
 
 
 export default function WalletPage() {
@@ -44,6 +44,7 @@ export default function WalletPage() {
     const [currentSeedPhrase, setCurrentSeedPhrase] = useState<string | null>(null);
     const [tokenBalance, setTokenBalance] = useState(0);
     const [isBalanceLoading, setIsBalanceLoading] = useState(true);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchBalance = async () => {
@@ -150,10 +151,14 @@ export default function WalletPage() {
                       <p className="text-xs text-muted-foreground pt-2 break-all">
                         Address: {user.walletAddress}
                       </p>
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex flex-wrap gap-2 mt-4">
                           <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
                               {isViewingSeed ? <Loader2 className="animate-spin mr-2" /> : <Eye className="mr-2" />}
                               Show Seed Phrase
+                          </Button>
+                          <Button variant="secondary" size="sm" onClick={() => setIsHistoryModalOpen(true)}>
+                              <History className="mr-2" />
+                              Transaction History
                           </Button>
                       </div>
                     </div>
@@ -182,8 +187,7 @@ export default function WalletPage() {
                     </RampDialog>
                      <RefundDialog>
                         <Button variant="secondary">
-                            <LifeBuoy className="mr-2 h-4 w-4" />
-                            Refund
+                            Request Refund
                         </Button>
                      </RefundDialog>
                 </CardContent>
@@ -212,6 +216,14 @@ export default function WalletPage() {
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
+
+      {user?.walletAddress && (
+          <TransactionHistoryModal 
+            isOpen={isHistoryModalOpen} 
+            onClose={() => setIsHistoryModalOpen(false)} 
+            walletAddress={user.walletAddress}
+          />
+      )}
       </>
     );
 }
