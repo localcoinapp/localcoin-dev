@@ -39,7 +39,6 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     
     const handleSubmit = async () => {
         setIsLoading(true);
-        // This check now uses the most current 'merchant' prop value
         if (!merchant || !merchant.id || !merchant.walletAddress) {
             toast({ title: "Error", description: "Merchant details not found. Please ensure the merchant is fully set up.", variant: "destructive" });
             setIsLoading(false);
@@ -116,3 +115,5 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     </Dialog>
   )
 }
+
+    

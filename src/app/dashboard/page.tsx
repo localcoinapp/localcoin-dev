@@ -155,7 +155,7 @@ export default function DashboardPage() {
       const merchantDocRef = doc(db, 'merchants', user.merchantId);
       const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
-          const data = doc.data() as Merchant;
+          const data = { id: doc.id, ...doc.data() } as Merchant;
           setMerchantData(data);
           const active = (data.pendingOrders || []).filter((order: any) => 
               !['completed', 'rejected', 'cancelled'].includes(order.status)
@@ -554,11 +554,11 @@ export default function DashboardPage() {
                         <div className="flex flex-wrap gap-2 mt-4">
                             <CashoutDialog merchant={merchantData}>
                                 <Button variant="outline" size="sm">
-                                    <ArrowDown/> Request Cash Out
+                                    <ArrowDown className="mr-2 h-4 w-4" /> Request Cash Out
                                 </Button>
                             </CashoutDialog>
                             <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
-                                {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2" />}
+                                {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2 h-4 w-4" />}
                                 Show Seed Phrase
                             </Button>
                         </div>
@@ -692,3 +692,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    
