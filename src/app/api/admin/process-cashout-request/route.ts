@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     const toAta = await getOrCreateAssociatedTokenAccount(
       connection,
-      platformKeypair, // FIX: Platform keypair must pay for its own ATA creation.
+      platformKeypair,
       tokenMintPublicKey,
       recipientPublicKey
     );
