@@ -72,6 +72,7 @@ import {
   collection,
   query,
   where,
+  Timestamp
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -82,6 +83,8 @@ import { Alert, AlertDescription as AlertDescriptionComponent } from "@/componen
 import * as bip39 from "bip39";
 import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import { CashoutDialog } from "@/components/wallet/cashout-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isWithinInterval, startOfToday, startOfWeek, startOfMonth, startOfQuarter, startOfYear, endOfToday, endOfWeek, endOfMonth, endOfQuarter, endOfYear } from 'date-fns';
 
 
 // --- Helper function to find and update inventory ---
@@ -120,6 +123,9 @@ export default function DashboardPage() {
   const [currentSeedPhrase, setCurrentSeedPhrase] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [isBalanceLoading, setIsBalanceLoading] = useState(true);
+  
+  const [timeframe, setTimeframe] = useState('total');
+
 
   // Function to fetch balance
   const fetchBalance = async () => {
@@ -462,8 +468,37 @@ export default function DashboardPage() {
   const canLaunch = hasListings && hasLogo && hasBanner && hasSufficientDescription;
 
   // --- Accounting Calculations ---
+  const filteredCashoutHistory = cashoutHistory.filter(req => {
+      if (timeframe === 'total' || !req.processedAt) return true;
+
+      const now = new Date();
+      const processedDate = req.processedAt.toDate();
+      let interval;
+
+      switch (timeframe) {
+          case 'today':
+              interval = { start: startOfToday(), end: endOfToday() };
+              break;
+          case 'week':
+              interval = { start: startOfWeek(now), end: endOfWeek(now) };
+              break;
+        case 'month':
+              interval = { start: startOfMonth(now), end: endOfMonth(now) };
+              break;
+        case 'quarter':
+              interval = { start: startOfQuarter(now), end: endOfQuarter(now) };
+              break;
+        case 'year':
+              interval = { start: startOfYear(now), end: endOfYear(now) };
+              break;
+        default:
+              return true;
+      }
+      return isWithinInterval(processedDate, interval);
+  });
+  
   const totalEarnings = recentTransactions.reduce((acc, tx) => acc + tx.price, 0);
-  const totalCashedOut = cashoutHistory
+  const totalCashedOut = filteredCashoutHistory
       .filter(req => req.status === 'approved')
       .reduce((acc, req) => acc + req.amount, 0);
   const netProfit = totalCashedOut * (1 - siteConfig.commissionRate);
@@ -550,6 +585,9 @@ export default function DashboardPage() {
             </Link>
              <Link href="/dashboard/order-history" passHref>
               <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
+            </Link>
+             <Link href="/dashboard/cashout-history" passHref>
+              <Button variant="outline"><Receipt className="mr-2 h-4 w-4" /> Cash-out History</Button>
             </Link>
           </div>
         </div>
@@ -644,7 +682,19 @@ export default function DashboardPage() {
                    <Card>
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                           <Wallet className="h-4 w-4 text-muted-foreground" />
+                            <Select value={timeframe} onValueChange={setTimeframe}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select timeframe" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="total">Total</SelectItem>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="week">This Week</SelectItem>
+                                    <SelectItem value="month">This Month</SelectItem>
+                                    <SelectItem value="quarter">This Quarter</SelectItem>
+                                    <SelectItem value="year">This Year</SelectItem>
+                                </SelectContent>
+                            </Select>
                        </CardHeader>
                        <CardContent>
                            <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
