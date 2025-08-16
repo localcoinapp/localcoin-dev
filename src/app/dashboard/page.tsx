@@ -586,9 +586,6 @@ export default function DashboardPage() {
              <Link href="/dashboard/order-history" passHref>
               <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
             </Link>
-             <Link href="/dashboard/cashout-history" passHref>
-              <Button variant="outline"><Receipt className="mr-2 h-4 w-4" /> Cash-out History</Button>
-            </Link>
           </div>
         </div>
         <p className="text-muted-foreground mb-8">Manage listings, view transactions, and handle incoming orders.</p>
@@ -665,17 +662,17 @@ export default function DashboardPage() {
                         </CardHeader>
                         <CardContent className="p-0">
                            <div className="grid grid-cols-2 items-center">
-                             <div className="p-6 text-center border-r">
-                               <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
-                             </div>
-                             <div className="flex items-center justify-center p-3">
-                                <Button asChild variant="outline">
-                                    <Link href="/dashboard/cashout-history">
-                                        <Receipt className="mr-2 h-4 w-4"/>
-                                        View History
-                                    </Link>
-                                </Button>
-                             </div>
+                                <div className="p-6 text-center border-r">
+                                    <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
+                                </div>
+                                <div className="flex items-center justify-center p-3">
+                                    <Button asChild variant="outline">
+                                        <Link href="/dashboard/cashout-history">
+                                            <Receipt className="mr-2 h-4 w-4"/>
+                                            View History
+                                        </Link>
+                                    </Button>
+                                </div>
                            </div>
                         </CardContent>
                    </Card>
