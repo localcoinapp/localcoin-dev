@@ -551,9 +551,6 @@ export default function DashboardPage() {
              <Link href="/dashboard/order-history" passHref>
               <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
             </Link>
-             <Link href="/dashboard/cashout-history" passHref>
-              <Button variant="outline"><Receipt className="mr-2 h-4 w-4" /> Cash-out History</Button>
-            </Link>
           </div>
         </div>
         <p className="text-muted-foreground mb-8">Manage listings, view transactions, and handle incoming orders.</p>
@@ -624,13 +621,18 @@ export default function DashboardPage() {
                 <h2 className="text-2xl font-bold font-headline mb-4">Financial Overview</h2>
                 <div className="grid gap-6 md:grid-cols-2">
                    <Card>
-                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                           <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                           <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                       </CardHeader>
-                       <CardContent>
-                          <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
-                       </CardContent>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                           <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
+                           <Link href="/dashboard/cashout-history" passHref>
+                               <Button variant="outline" size="sm" className="mt-2">
+                                  <Receipt className="mr-2 h-4 w-4"/> View Cash-out History
+                               </Button>
+                           </Link>
+                        </CardContent>
                    </Card>
                    <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
