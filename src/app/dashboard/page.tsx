@@ -55,8 +55,8 @@ import {
   Circle,
   ArrowDown,
   TrendingUp,
-  TrendingDown,
-  Wallet
+  Wallet,
+  Receipt
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -466,7 +466,6 @@ export default function DashboardPage() {
   const totalCashedOut = cashoutHistory
       .filter(req => req.status === 'approved')
       .reduce((acc, req) => acc + req.amount, 0);
-  const totalCommissions = totalCashedOut * siteConfig.commissionRate;
   const netProfit = totalCashedOut * (1 - siteConfig.commissionRate);
   // -----------------------------
 
@@ -552,6 +551,9 @@ export default function DashboardPage() {
              <Link href="/dashboard/order-history" passHref>
               <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
             </Link>
+             <Link href="/dashboard/cashout-history" passHref>
+              <Button variant="outline"><Receipt className="mr-2 h-4 w-4" /> Cash-out History</Button>
+            </Link>
           </div>
         </div>
         <p className="text-muted-foreground mb-8">Manage listings, view transactions, and handle incoming orders.</p>
@@ -620,24 +622,17 @@ export default function DashboardPage() {
         {(status === 'live' || status === 'paused') && (
             <div className="mb-8">
                 <h2 className="text-2xl font-bold font-headline mb-4">Financial Overview</h2>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                   <Card className="col-span-2">
+                <div className="grid gap-6 md:grid-cols-2">
+                   <Card>
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                           <CardTitle className="text-sm font-medium">Earnings &amp; Payouts</CardTitle>
+                           <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
-                       <CardContent className="flex justify-around pt-4">
-                          <div className="text-center">
-                              <p className="text-xs text-muted-foreground">Total Earnings</p>
-                              <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
-                          </div>
-                           <div className="text-center">
-                              <p className="text-xs text-muted-foreground">Total Cashed Out</p>
-                              <p className="text-2xl font-bold">{totalCashedOut.toFixed(2)} {siteConfig.token.symbol}</p>
-                          </div>
+                       <CardContent>
+                          <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
                        </CardContent>
                    </Card>
-                   <Card className="col-span-2">
+                   <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
                            <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -645,7 +640,7 @@ export default function DashboardPage() {
                        <CardContent>
                            <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
                            <p className="text-xs text-muted-foreground">
-                            After {totalCommissions.toFixed(2)} {siteConfig.fiatCurrency.symbol} in commissions
+                            After {siteConfig.commissionRate * 100}% platform commission.
                            </p>
                        </CardContent>
                    </Card>
