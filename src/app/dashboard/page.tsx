@@ -581,6 +581,9 @@ export default function DashboardPage() {
             <Link href="/dashboard/add-listing" passHref>
               <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add New Item</Button>
             </Link>
+            <Link href="/dashboard/order-history" passHref>
+              <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
+            </Link>
             <Link href="/dashboard/settings" passHref>
               <Button variant="outline"><Settings className="mr-2 h-4 w-4" /> Store Settings</Button>
             </Link>
