@@ -118,13 +118,20 @@ export default function CashoutHistoryPage() {
       "Transaction ID"
     ];
 
+    const formatCsvDate = (timestamp: Timestamp | Date | undefined) => {
+        if (!timestamp) return 'N/A';
+        const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
+        // Format to "YYYY-MM-DD" or similar non-comma format.
+        return format(date, "MMM dd yyyy"); 
+    };
+
     const rows = filteredAndSortedHistory.map(req => {
       const fiatPayout = req.status === 'approved' ? req.amount * (1 - siteConfig.commissionRate) : 0;
       const commission = req.status === 'approved' ? req.amount * siteConfig.commissionRate : 0;
       
       return [
-        formatDate(req.createdAt),
-        formatDate(req.processedAt),
+        formatCsvDate(req.createdAt),
+        formatCsvDate(req.processedAt),
         req.amount.toFixed(2),
         commission.toFixed(2),
         fiatPayout.toFixed(2),
