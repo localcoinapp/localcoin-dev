@@ -85,6 +85,7 @@ import { Keypair, Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import { CashoutDialog } from "@/components/wallet/cashout-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isWithinInterval, startOfToday, startOfWeek, startOfMonth, startOfQuarter, startOfYear, endOfToday, endOfWeek, endOfMonth, endOfQuarter, endOfYear } from 'date-fns';
+import { Separator } from "@/components/ui/separator";
 
 
 // --- Helper function to find and update inventory ---
@@ -668,7 +669,7 @@ export default function DashboardPage() {
                    <Card>
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                            <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                             <Select value={timeframe} onValueChange={setTimeframe}>
+                           <Select value={timeframe} onValueChange={setTimeframe}>
                                 <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="Select timeframe" />
                                 </SelectTrigger>
@@ -682,8 +683,15 @@ export default function DashboardPage() {
                                 </SelectContent>
                             </Select>
                        </CardHeader>
-                       <CardContent>
+                       <CardContent className="grid grid-cols-2 items-center">
                            <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <div className="flex h-full items-center justify-center p-2">
+                             <Link href="/dashboard/cashout-history" passHref className="w-full">
+                                <Button variant="outline" className="w-full">
+                                    <History className="mr-2 h-4 w-4" /> View History
+                                </Button>
+                             </Link>
+                           </div>
                        </CardContent>
                    </Card>
                    <Card>
