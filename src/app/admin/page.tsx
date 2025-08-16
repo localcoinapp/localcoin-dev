@@ -307,7 +307,7 @@ export default function AdminPage() {
     .filter(req => req.status === 'approved')
     .reduce((acc, req) => acc + req.amount, 0);
 
-  const platformProfit = totalTokensCashedOut * 0.20;
+  const platformProfit = totalTokensCashedOut * siteConfig.commissionRate;
 
 
   return (
@@ -572,7 +572,7 @@ export default function AdminPage() {
                    </Card>
                    <Card>
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                           <CardTitle className="text-sm font-medium">Platform Profit (20%)</CardTitle>
+                           <CardTitle className="text-sm font-medium">Platform Profit ({siteConfig.commissionRate * 100}%)</CardTitle>
                            <Wallet className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
                        <CardContent>

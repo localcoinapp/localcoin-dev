@@ -465,7 +465,7 @@ export default function DashboardPage() {
   const totalCashedOut = cashoutHistory
       .filter(req => req.status === 'approved')
       .reduce((acc, req) => acc + req.amount, 0);
-  const totalCommissions = totalCashedOut * 0.20;
+  const totalCommissions = totalCashedOut * siteConfig.commissionRate;
   // -----------------------------
 
   const ChecklistItem = ({ isComplete, children }: { isComplete: boolean; children: React.ReactNode }) => (
@@ -647,7 +647,7 @@ export default function DashboardPage() {
                        </CardHeader>
                        <CardContent>
                            <div className="text-2xl font-bold">{totalCommissions.toFixed(2)} {siteConfig.token.symbol}</div>
-                           <p className="text-xs text-muted-foreground">20% of total cash outs</p>
+                           <p className="text-xs text-muted-foreground">{siteConfig.commissionRate * 100}% of total cash outs</p>
                        </CardContent>
                    </Card>
                 </div>
