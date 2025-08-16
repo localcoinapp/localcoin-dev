@@ -468,6 +468,10 @@ export default function DashboardPage() {
   const hasSufficientDescription = (description || '').length >= 100;
   const canLaunch = hasListings && hasLogo && hasBanner && hasSufficientDescription;
 
+  // --- Order Counts ---
+  const ordersWaitingForApproval = activeOrders.filter(o => o.status === 'pending_approval').length;
+  const ordersWaitingToBeRedeemed = activeOrders.filter(o => ['approved', 'ready_to_redeem'].includes(o.status)).length;
+  
   // --- Accounting Calculations ---
   const filteredCashoutHistory = cashoutHistory.filter(req => {
       if (timeframe === 'total' || !req.processedAt) return true;
@@ -613,6 +617,10 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{activeOrders.length}</div>
+              <div className="space-y-1 text-xs text-muted-foreground mt-2">
+                 <p>{ordersWaitingForApproval} waiting for approval</p>
+                 <p>{ordersWaitingToBeRedeemed} waiting to be redeemed</p>
+              </div>
             </CardContent>
           </Card>
            <Card>
