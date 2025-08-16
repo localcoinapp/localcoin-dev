@@ -576,7 +576,7 @@ export default function AdminPage() {
                            <Wallet className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
                        <CardContent>
-                           <div className="text-2xl font-bold">{platformProfit.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <div className="text-2xl font-bold">{platformProfit.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
                            <p className="text-xs text-muted-foreground">from cashed out tokens</p>
                        </CardContent>
                    </Card>

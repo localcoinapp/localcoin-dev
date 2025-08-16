@@ -14,5 +14,9 @@ export const siteConfig = {
     mintAddress: "5hfFxuvUvjLzmzpRha2MtpCsTZnGSzqrjAbG7faHvL6u",
     decimals: 0,
   },
+  fiatCurrency: {
+    symbol: "EUR",
+    name: "Euro",
+  },
   commissionRate: 0.20,
 }
