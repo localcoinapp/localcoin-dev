@@ -459,7 +459,6 @@ export default function DashboardPage() {
   }
   
   const { listings = [], walletAddress, status, logo, banner, description, recentTransactions = [] } = merchantData;
-  const activeListingsCount = listings.filter(l => l.active).length;
   const isStoreLive = status === 'live';
   
   const hasListings = listings.length > 0;
@@ -468,41 +467,39 @@ export default function DashboardPage() {
   const hasSufficientDescription = (description || '').length >= 100;
   const canLaunch = hasListings && hasLogo && hasBanner && hasSufficientDescription;
 
+  // --- Listing Counts ---
+  const totalListingsCount = listings.length;
+  const activeListingsCount = listings.filter(l => l.active).length;
+
   // --- Order Counts ---
   const ordersWaitingForApproval = activeOrders.filter(o => o.status === 'pending_approval').length;
   const ordersWaitingToBeRedeemed = activeOrders.filter(o => ['approved', 'ready_to_redeem'].includes(o.status)).length;
   
-  // --- Accounting Calculations ---
-  const filteredCashoutHistory = cashoutHistory.filter(req => {
-      if (timeframe === 'total' || !req.processedAt) return true;
-
+  const getTimeframeInterval = (timeframe: string) => {
       const now = new Date();
-      const processedDate = req.processedAt.toDate();
-      let interval;
-
       switch (timeframe) {
-          case 'today':
-              interval = { start: startOfToday(), end: endOfToday() };
-              break;
-          case 'week':
-              interval = { start: startOfWeek(now), end: endOfWeek(now) };
-              break;
-        case 'month':
-              interval = { start: startOfMonth(now), end: endOfMonth(now) };
-              break;
-        case 'quarter':
-              interval = { start: startOfQuarter(now), end: endOfQuarter(now) };
-              break;
-        case 'year':
-              interval = { start: startOfYear(now), end: endOfYear(now) };
-              break;
-        default:
-              return true;
+          case 'today': return { start: startOfToday(), end: endOfToday() };
+          case 'week': return { start: startOfWeek(now), end: endOfWeek(now) };
+          case 'month': return { start: startOfMonth(now), end: endOfMonth(now) };
+          case 'quarter': return { start: startOfQuarter(now), end: endOfQuarter(now) };
+          case 'year': return { start: startOfYear(now), end: endOfYear(now) };
+          default: return null;
       }
-      return isWithinInterval(processedDate, interval);
-  });
+  }
+
+  // --- Accounting Calculations ---
+  const interval = getTimeframeInterval(timeframe);
+
+  const filteredTransactions = interval
+    ? recentTransactions.filter(tx => tx.redeemedAt && isWithinInterval(tx.redeemedAt.toDate(), interval))
+    : recentTransactions;
+
+  const filteredCashoutHistory = interval
+    ? cashoutHistory.filter(req => req.processedAt && isWithinInterval(req.processedAt.toDate(), interval))
+    : cashoutHistory;
   
-  const totalEarnings = recentTransactions.reduce((acc, tx) => acc + tx.price, 0);
+  const totalEarnings = filteredTransactions.reduce((acc, tx) => acc + tx.price, 0);
+
   const totalCashedOut = filteredCashoutHistory
       .filter(req => req.status === 'approved')
       .reduce((acc, req) => acc + req.amount, 0);
@@ -603,11 +600,12 @@ export default function DashboardPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Listings</CardTitle>
+              <CardTitle className="text-sm font-medium">Listings Overview</CardTitle>
               <ShoppingBag className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{activeListingsCount}</div>
+              <div className="text-2xl font-bold">{activeListingsCount} / {totalListingsCount}</div>
+              <p className="text-xs text-muted-foreground">active / total</p>
             </CardContent>
           </Card>
           <Card>
@@ -668,22 +666,25 @@ export default function DashboardPage() {
                 <h2 className="text-2xl font-bold font-headline mb-4">Financial Overview</h2>
                 <div className="grid gap-6 md:grid-cols-2">
                    <Card>
-                        <CardContent className="p-0">
-                           <div className="grid grid-cols-2 items-stretch h-full">
-                                <div className="p-6 text-center border-r flex flex-col justify-center">
-                                    <p className="text-muted-foreground text-sm">Total Earnings</p>
-                                    <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
-                                </div>
-                                <div className="flex items-center justify-center p-3">
-                                     <Button asChild variant="outline" className="w-full h-full">
-                                        <Link href="/dashboard/cashout-history" className="flex flex-col justify-center items-center h-full">
-                                            <Receipt className="mb-1"/>
-                                            <span className="text-xs">View Cash-out History</span>
-                                        </Link>
-                                    </Button>
-                                </div>
-                           </div>
-                        </CardContent>
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                             <Select value={timeframe} onValueChange={setTimeframe}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select timeframe" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="total">Total</SelectItem>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="week">This Week</SelectItem>
+                                    <SelectItem value="month">This Month</SelectItem>
+                                    <SelectItem value="quarter">This Quarter</SelectItem>
+                                    <SelectItem value="year">This Year</SelectItem>
+                                </SelectContent>
+                            </Select>
+                       </CardHeader>
+                       <CardContent>
+                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
+                       </CardContent>
                    </Card>
                    <Card>
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
