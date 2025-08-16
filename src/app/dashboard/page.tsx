@@ -627,17 +627,17 @@ export default function DashboardPage() {
                         </CardHeader>
                         <CardContent className="p-0">
                            <div className="grid grid-cols-2 items-center">
-                             <div className="p-6 text-center">
+                             <div className="p-6 text-center border-r">
                                <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
                              </div>
-                             <Link href="/dashboard/cashout-history" passHref>
-                                <div className="h-full flex items-center justify-center p-6 border-l hover:bg-muted/50 transition-colors cursor-pointer">
-                                   <div className="text-center">
-                                       <Receipt className="mx-auto h-5 w-5 mb-1 text-muted-foreground"/>
-                                       <span className="text-sm font-semibold">View History</span>
-                                   </div>
-                               </div>
-                           </Link>
+                             <div className="flex items-center justify-center p-3">
+                                <Button asChild variant="outline">
+                                    <Link href="/dashboard/cashout-history">
+                                        <Receipt className="mr-2 h-4 w-4"/>
+                                        View History
+                                    </Link>
+                                </Button>
+                             </div>
                            </div>
                         </CardContent>
                    </Card>
