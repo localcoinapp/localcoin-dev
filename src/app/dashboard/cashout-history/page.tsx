@@ -150,41 +150,48 @@ export default function CashoutHistoryPage() {
                 <TableRow>
                   <TableHead>Requested</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Fiat Payout</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Processed</TableHead>
                   <TableHead className="text-right">Transaction</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAndSortedHistory.map((req) => (
-                  <TableRow key={req.id}>
-                    <TableCell>{formatDate(req.createdAt)}</TableCell>
-                    <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
-                    <TableCell>
-                        <Badge 
-                            variant={
-                                req.status === 'approved' ? 'default' 
-                                : req.status === 'denied' ? 'destructive' 
-                                : 'outline'
-                            }
-                            className={req.status === 'approved' ? 'bg-green-600 text-white' : ''}
-                        >
-                            {req.status}
-                        </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(req.processedAt)}</TableCell>
-                    <TableCell className="text-right">
-                        {req.transactionSignature ? (
-                             <Button asChild variant="outline" size="sm">
-                                <Link href={`https://explorer.solana.com/tx/${req.transactionSignature}?cluster=devnet`} target="_blank">
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    View on Explorer
-                                </Link>
-                            </Button>
-                        ) : 'N/A'}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredAndSortedHistory.map((req) => {
+                  const fiatPayout = req.amount * (1 - siteConfig.commissionRate);
+                  return (
+                    <TableRow key={req.id}>
+                      <TableCell>{formatDate(req.createdAt)}</TableCell>
+                      <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                      <TableCell className="font-medium text-green-600">
+                        {req.status === 'approved' ? `${fiatPayout.toFixed(2)} ${siteConfig.fiatCurrency.symbol}`: 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                          <Badge 
+                              variant={
+                                  req.status === 'approved' ? 'default' 
+                                  : req.status === 'denied' ? 'destructive' 
+                                  : 'outline'
+                              }
+                              className={req.status === 'approved' ? 'bg-green-600 text-white' : ''}
+                          >
+                              {req.status}
+                          </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(req.processedAt)}</TableCell>
+                      <TableCell className="text-right">
+                          {req.transactionSignature ? (
+                               <Button asChild variant="outline" size="sm">
+                                  <Link href={`https://explorer.solana.com/tx/${req.transactionSignature}?cluster=devnet`} target="_blank">
+                                      <ExternalLink className="mr-2 h-4 w-4" />
+                                      View on Explorer
+                                  </Link>
+                              </Button>
+                          ) : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           ) : (
