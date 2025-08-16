@@ -467,7 +467,7 @@ export default function DashboardPage() {
       .filter(req => req.status === 'approved')
       .reduce((acc, req) => acc + req.amount, 0);
   const totalCommissions = totalCashedOut * siteConfig.commissionRate;
-  const netProfit = totalEarnings - totalCashedOut;
+  const netProfit = totalCashedOut * (1 - siteConfig.commissionRate);
   // -----------------------------
 
   const ChecklistItem = ({ isComplete, children }: { isComplete: boolean; children: React.ReactNode }) => (
@@ -643,7 +643,7 @@ export default function DashboardPage() {
                            <Wallet className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
                        <CardContent>
-                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
                            <p className="text-xs text-muted-foreground">
                             After {totalCommissions.toFixed(2)} {siteConfig.fiatCurrency.symbol} in commissions
                            </p>
