@@ -27,13 +27,18 @@ import {
 } from '@/components/ui/select';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, History, ExternalLink, Receipt } from "lucide-react";
+import { ArrowLeft, History, ExternalLink, Receipt, Download, Calendar as CalendarIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, Timestamp, collection, query, where } from "firebase/firestore";
 import type { MerchantCashoutRequest } from "@/types";
 import { siteConfig } from "@/config/site";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRange } from "react-day-picker";
+import { addDays, format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 type SortOption = 'date-desc' | 'date-asc' | 'amount-asc' | 'amount-desc';
 type StatusFilter = 'all' | 'pending' | 'approved' | 'denied';
@@ -55,6 +60,10 @@ export default function CashoutHistoryPage() {
   
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: addDays(new Date(), -90),
+    to: new Date(),
+  });
 
   useEffect(() => {
     if (user && user.merchantId) {
@@ -76,7 +85,13 @@ export default function CashoutHistoryPage() {
   }, [user]);
 
   const filteredAndSortedHistory = cashoutHistory
-    .filter(req => statusFilter === 'all' || req.status === statusFilter)
+    .filter(req => {
+      const reqDate = req.createdAt?.toDate();
+      if (!reqDate) return false;
+      const isInDateRange = (!date?.from || reqDate >= date.from) && (!date?.to || reqDate <= date.to);
+      const hasStatus = statusFilter === 'all' || req.status === statusFilter;
+      return isInDateRange && hasStatus;
+    })
     .sort((a, b) => {
       switch (sortOption) {
         case 'date-desc':
@@ -91,6 +106,43 @@ export default function CashoutHistoryPage() {
           return 0;
       }
     });
+
+  const handleExport = () => {
+    const headers = [
+      "Requested Date",
+      "Processed Date",
+      `Amount (${siteConfig.token.symbol})`,
+      `Commission (${siteConfig.fiatCurrency.symbol})`,
+      `Payout (${siteConfig.fiatCurrency.symbol})`,
+      "Status",
+      "Transaction ID"
+    ];
+
+    const rows = filteredAndSortedHistory.map(req => {
+      const fiatPayout = req.status === 'approved' ? req.amount * (1 - siteConfig.commissionRate) : 0;
+      const commission = req.status === 'approved' ? req.amount * siteConfig.commissionRate : 0;
+      
+      return [
+        formatDate(req.createdAt),
+        formatDate(req.processedAt),
+        req.amount.toFixed(2),
+        commission.toFixed(2),
+        fiatPayout.toFixed(2),
+        req.status,
+        req.transactionSignature || 'N/A'
+      ].join(',');
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `cashout-report-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   if (isLoading) {
     return <div className="container text-center"><p>Loading cash-out history...</p></div>;
@@ -113,14 +165,46 @@ export default function CashoutHistoryPage() {
       </div>
       
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
-            <div>
+        <CardHeader className="flex-wrap items-center justify-between gap-4 md:flex-row">
+            <div className="flex-grow">
                 <CardTitle>Request Log</CardTitle>
                 <CardDescription>Browse through your historical cash-out data.</CardDescription>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+                 <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date?.from ? (
+                          date.to ? (
+                            <>
+                              {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(date.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -131,7 +215,7 @@ export default function CashoutHistoryPage() {
                     </SelectContent>
                 </Select>
                  <Select value={sortOption} onValueChange={(value) => setSortOption(value as any)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
@@ -141,6 +225,10 @@ export default function CashoutHistoryPage() {
                         <SelectItem value="amount-desc">Amount (High-Low)</SelectItem>
                     </SelectContent>
                 </Select>
+                <Button onClick={handleExport} disabled={filteredAndSortedHistory.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export CSV
+                </Button>
             </div>
         </CardHeader>
         <CardContent>
@@ -197,7 +285,7 @@ export default function CashoutHistoryPage() {
           ) : (
             <div className="text-center text-muted-foreground p-8">
               <Receipt className="mx-auto h-12 w-12 mb-4" />
-              <p>You have not made any cash-out requests.</p>
+              <p>No cash-out requests found for the selected criteria.</p>
             </div>
           )}
         </CardContent>
