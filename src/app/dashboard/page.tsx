@@ -625,11 +625,11 @@ export default function DashboardPage() {
                             <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                             <TrendingUp className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <CardContent>
-                           <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
-                           <Link href="/dashboard/cashout-history" passHref>
-                               <Button variant="outline" size="sm" className="mt-2">
-                                  <Receipt className="mr-2 h-4 w-4"/> View Cash-out History
+                        <CardContent className="flex items-end justify-between">
+                            <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
+                            <Link href="/dashboard/cashout-history" passHref>
+                               <Button variant="outline" size="sm">
+                                  <Receipt className="mr-2 h-4 w-4"/> View History
                                </Button>
                            </Link>
                         </CardContent>
