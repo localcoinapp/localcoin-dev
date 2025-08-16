@@ -578,14 +578,17 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-4">
           <h1 className="text-3xl font-bold font-headline">Merchant Dashboard</h1>
           <div className="flex flex-wrap gap-2">
+            <Link href={`/merchants/${merchantData.id}`} passHref>
+                <Button><Eye className="mr-2 h-4 w-4" /> View My Site</Button>
+            </Link>
             <Link href="/dashboard/add-listing" passHref>
               <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add New Item</Button>
             </Link>
-            <Link href="/dashboard/order-history" passHref>
-              <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
-            </Link>
             <Link href="/dashboard/settings" passHref>
               <Button variant="outline"><Settings className="mr-2 h-4 w-4" /> Store Settings</Button>
+            </Link>
+             <Link href="/dashboard/order-history" passHref>
+              <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
             </Link>
           </div>
         </div>
@@ -658,13 +661,13 @@ export default function DashboardPage() {
                 <div className="grid gap-6 md:grid-cols-2">
                    <Card>
                         <CardContent className="p-0">
-                           <div className="grid grid-cols-2 items-stretch">
+                           <div className="grid grid-cols-2 items-stretch h-full">
                                 <div className="p-6 text-center border-r flex flex-col justify-center">
                                     <p className="text-muted-foreground text-sm">Total Earnings</p>
                                     <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
                                 </div>
                                 <div className="flex items-center justify-center p-3">
-                                    <Button asChild variant="outline" className="w-full h-full">
+                                     <Button asChild variant="outline" className="w-full h-full">
                                         <Link href="/dashboard/cashout-history" className="flex flex-col justify-center items-center h-full">
                                             <Receipt className="mb-1"/>
                                             <span className="text-xs">View Cash-out History</span>
