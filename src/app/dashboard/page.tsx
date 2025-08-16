@@ -625,17 +625,24 @@ export default function DashboardPage() {
                             <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                             <TrendingUp className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <CardContent className="flex items-end justify-between">
-                            <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
-                            <Link href="/dashboard/cashout-history" passHref>
-                               <Button variant="outline" size="sm">
-                                  <Receipt className="mr-2 h-4 w-4"/> View History
-                               </Button>
+                        <CardContent className="p-0">
+                           <div className="grid grid-cols-2 items-center">
+                             <div className="p-6 text-center">
+                               <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
+                             </div>
+                             <Link href="/dashboard/cashout-history" passHref>
+                                <div className="h-full flex items-center justify-center p-6 border-l hover:bg-muted/50 transition-colors cursor-pointer">
+                                   <div className="text-center">
+                                       <Receipt className="mx-auto h-5 w-5 mb-1 text-muted-foreground"/>
+                                       <span className="text-sm font-semibold">View History</span>
+                                   </div>
+                               </div>
                            </Link>
+                           </div>
                         </CardContent>
                    </Card>
                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
                            <Wallet className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
