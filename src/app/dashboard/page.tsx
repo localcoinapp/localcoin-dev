@@ -467,6 +467,7 @@ export default function DashboardPage() {
       .filter(req => req.status === 'approved')
       .reduce((acc, req) => acc + req.amount, 0);
   const totalCommissions = totalCashedOut * siteConfig.commissionRate;
+  const netProfit = totalEarnings - totalCashedOut;
   // -----------------------------
 
   const ChecklistItem = ({ isComplete, children }: { isComplete: boolean; children: React.ReactNode }) => (
@@ -576,79 +577,76 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold">{activeOrders.length}</div>
             </CardContent>
           </Card>
+           <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+              {walletAddress ? (
+                  <div className="space-y-4">
+                      <div className="text-2xl font-bold font-headline">
+                         {isBalanceLoading ? (
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                         ) : (
+                          `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
+                         )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-4">
+                          <CashoutDialog merchant={merchantData}>
+                              <Button variant="outline" size="sm">
+                                  <ArrowDown className="mr-2 h-4 w-4" /> Request Cash Out
+                              </Button>
+                          </CashoutDialog>
+                          <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
+                              {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2 h-4 w-4" />}
+                              Show Seed Phrase
+                          </Button>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="flex flex-col items-start gap-4">
+                      <p className="text-muted-foreground">You have not created a wallet yet.</p>
+                      <Button onClick={handleLaunchStore} disabled={isLaunching}>
+                          {isLaunching ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
+                          Create Wallet
+                      </Button>
+                  </div>
+              )}
+              </CardContent>
+          </Card>
         </div>
 
         {(status === 'live' || status === 'paused') && (
             <div className="mb-8">
                 <h2 className="text-2xl font-bold font-headline mb-4">Financial Overview</h2>
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                        {walletAddress ? (
-                            <div className="space-y-4">
-                                <div className="text-2xl font-bold font-headline">
-                                   {isBalanceLoading ? (
-                                    <Loader2 className="h-6 w-6 animate-spin" />
-                                   ) : (
-                                    `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
-                                   )}
-                                </div>
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                    <CashoutDialog merchant={merchantData}>
-                                        <Button variant="outline" size="sm">
-                                            <ArrowDown className="mr-2 h-4 w-4" /> Request Cash Out
-                                        </Button>
-                                    </CashoutDialog>
-                                    <Button variant="secondary" size="sm" onClick={handleViewSeedPhrase} disabled={isViewingSeed}>
-                                        {isViewingSeed ? <Loader2 className="animate-spin mr-2"/> : <Eye className="mr-2 h-4 w-4" />}
-                                        Show Seed Phrase
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-start gap-4">
-                                <p className="text-muted-foreground">You have not created a wallet yet.</p>
-                                <Button onClick={handleLaunchStore} disabled={isLaunching}>
-                                    {isLaunching ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
-                                    Create Wallet
-                                </Button>
-                            </div>
-                        )}
-                        </CardContent>
-                    </Card>
-
-                   <Card>
+                   <Card className="col-span-2">
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                           <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                           <CardTitle className="text-sm font-medium">Earnings &amp; Payouts</CardTitle>
                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
-                       <CardContent>
-                           <div className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
-                           <p className="text-xs text-muted-foreground">from {recentTransactions.length} completed sales</p>
+                       <CardContent className="flex justify-around pt-4">
+                          <div className="text-center">
+                              <p className="text-xs text-muted-foreground">Total Earnings</p>
+                              <p className="text-2xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</p>
+                          </div>
+                           <div className="text-center">
+                              <p className="text-xs text-muted-foreground">Total Cashed Out</p>
+                              <p className="text-2xl font-bold">{totalCashedOut.toFixed(2)} {siteConfig.token.symbol}</p>
+                          </div>
                        </CardContent>
                    </Card>
-                   <Card>
-                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                           <CardTitle className="text-sm font-medium">Total Cashed Out</CardTitle>
-                           <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                       </CardHeader>
-                       <CardContent>
-                           <div className="text-2xl font-bold">{totalCashedOut.toFixed(2)} {siteConfig.token.symbol}</div>
-                            <p className="text-xs text-muted-foreground">from {cashoutHistory.filter(r=>r.status === 'approved').length} requests</p>
-                       </CardContent>
-                   </Card>
-                   <Card>
-                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                           <CardTitle className="text-sm font-medium">Commissions Paid ({siteConfig.commissionRate * 100}%)</CardTitle>
+                   <Card className="col-span-2">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                           <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
                            <Wallet className="h-4 w-4 text-muted-foreground" />
                        </CardHeader>
                        <CardContent>
-                           <div className="text-2xl font-bold">{totalCommissions.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
-                           <p className="text-xs text-muted-foreground">from total cash outs</p>
+                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <p className="text-xs text-muted-foreground">
+                            After {totalCommissions.toFixed(2)} {siteConfig.fiatCurrency.symbol} in commissions
+                           </p>
                        </CardContent>
                    </Card>
                 </div>
