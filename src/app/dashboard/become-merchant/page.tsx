@@ -35,6 +35,8 @@ import { addDoc, collection, serverTimestamp, where, query, onSnapshot, updateDo
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { geohashForLocation } from "geofire-common";
+import { Checkbox } from "@/components/ui/checkbox";
+import Link from "next/link";
 
 
 const formSchema = z.object({
@@ -50,6 +52,9 @@ const formSchema = z.object({
   website: z.string().url().optional().or(z.literal('')),
   instagram: z.string().optional(),
   description: z.string().min(20, { message: "Description must be at least 20 characters." }),
+  terms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the Merchant Agreement to continue." }),
+  }),
 }).refine(data => {
     if (data.country === 'US') {
         const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
@@ -160,6 +165,7 @@ export default function BecomeMerchantPage() {
       website: "",
       instagram: "",
       description: "",
+      terms: false,
     },
   });
   
@@ -473,6 +479,32 @@ export default function BecomeMerchantPage() {
                       </FormItem>
                     )}
                   />
+
+                <FormField
+                    control={form.control}
+                    name="terms"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                            <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                            <FormLabel>
+                            I accept the{" "}
+                            <Link href="/merchant-agreement" className="underline hover:text-primary" target="_blank">
+                                Merchant Agreement
+                            </Link>
+                            .
+                            </FormLabel>
+                            <FormMessage />
+                        </div>
+                        </FormItem>
+                    )}
+                    />
+
                   <div className="text-center pt-4">
                     <Button type="submit" size="lg" disabled={isSubmitting}>
                       {isSubmitting ? (
