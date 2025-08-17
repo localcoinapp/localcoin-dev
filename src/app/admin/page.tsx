@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -354,7 +353,7 @@ export default function AdminPage() {
           <TabsList className="grid grid-cols-1 sm:grid-cols-7 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
-            <TabsTrigger value="cashout_requests">Cashout Requests</TabsTrigger>
+            <TabsTrigger value="cashout_requests">Cashout Requests ({pendingCashoutRequests.length})</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
             <TabsTrigger value="accounting">Accounting</TabsTrigger>
@@ -721,7 +720,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
-
-    
