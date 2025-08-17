@@ -13,11 +13,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart } from 'lucide-react';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart, Mail, Send } from 'lucide-react';
 import type { User, Merchant, TokenPurchaseRequest, MerchantCashoutRequest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { siteConfig } from '@/config/site';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertTitle, AlertDescription as AlertDescriptionComponent } from '@/components/ui/alert';
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
@@ -42,6 +45,11 @@ export default function AdminPage() {
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+
+  // Email state
+  const [testEmail, setTestEmail] = useState('');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -275,6 +283,31 @@ export default function AdminPage() {
         toast({ title: "Unblocking Failed", description: (error as Error).message, variant: "destructive" });
     }
   };
+  
+  const handleSendTestEmail = async () => {
+    if (!testEmail) {
+        toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive"});
+        return;
+    }
+    setIsSendingTestEmail(true);
+    try {
+        const response = await fetch('/api/admin/send-test-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: testEmail }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to send test email.');
+        }
+        toast({ title: "Success", description: `Test email sent to ${testEmail}.` });
+
+    } catch(error) {
+        toast({ title: "Error Sending Email", description: (error as Error).message, variant: "destructive" });
+    } finally {
+        setIsSendingTestEmail(false);
+    }
+  }
 
 
   if (authLoading || loading) {
@@ -315,13 +348,14 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-7 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
             <TabsTrigger value="cashout_requests">Cashout Requests</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
             <TabsTrigger value="accounting">Accounting</TabsTrigger>
+            <TabsTrigger value="email_settings">Email Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="applications">
@@ -580,6 +614,39 @@ export default function AdminPage() {
                            <p className="text-xs text-muted-foreground">from cashed out tokens</p>
                        </CardContent>
                    </Card>
+                </CardContent>
+             </Card>
+          </TabsContent>
+          
+          <TabsContent value="email_settings">
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center"><Mail className="mr-2 h-5 w-5" />Email Configuration</CardTitle>
+                    <CardDescription>Test your SMTP settings to ensure emails are being sent correctly.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                   <Alert>
+                        <AlertTitle>Configuration Note</AlertTitle>
+                        <AlertDescriptionComponent>
+                            SMTP settings must be configured in your project's server environment variables (e.g., a `.env.local` file). This form only sends a test email using the existing configuration.
+                        </AlertDescriptionComponent>
+                   </Alert>
+                   <div className="space-y-2">
+                        <Label htmlFor="test-email">Recipient Email Address</Label>
+                        <div className="flex gap-2">
+                            <Input 
+                                id="test-email" 
+                                type="email" 
+                                placeholder="recipient@example.com"
+                                value={testEmail}
+                                onChange={(e) => setTestEmail(e.target.value)}
+                            />
+                            <Button onClick={handleSendTestEmail} disabled={isSendingTestEmail}>
+                                {isSendingTestEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                Send Test Email
+                            </Button>
+                        </div>
+                   </div>
                 </CardContent>
              </Card>
           </TabsContent>
