@@ -26,10 +26,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
+  inquiryType: z.enum(["user", "merchant"], {
+    required_error: "Please select the type of inquiry.",
+  }),
   subject: z.string().min(5, { message: "Subject must be at least 5 characters." }),
   message: z.string().min(10, { message: "Message must be at least 10 characters." }),
 });
@@ -61,12 +65,13 @@ export default function KontaktPage() {
         },
         body: JSON.stringify({
           to: process.env.NEXT_PUBLIC_CONTACT_EMAIL, // This should be your support email
-          subject: `Contact Form: ${data.subject}`,
+          subject: `Contact Form (${data.inquiryType}): ${data.subject}`,
           html: `
             <p><strong>Name:</strong> ${data.name}</p>
             <p><strong>Email:</strong> ${data.email}</p>
+            <p><strong>Inquiry Type:</strong> ${data.inquiryType}</p>
             <hr />
-            <p>${data.message.replace(/\\n/g, '<br>')}</p>
+            <p>${data.message.replace(/\n/g, '<br>')}</p>
           `,
         }),
       });
@@ -132,6 +137,29 @@ export default function KontaktPage() {
                   )}
                 />
               </div>
+
+               <FormField
+                control={form.control}
+                name="inquiryType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inquiry Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select what your inquiry is about" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="user">User Inquiry</SelectItem>
+                        <SelectItem value="merchant">Merchant Inquiry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="subject"
