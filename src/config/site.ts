@@ -5,10 +5,10 @@ export const siteConfig = {
   name: "LocalCoin",
   description: "A crypto wallet and marketplace for local communities.",
   mainNav: [
-    {
-      title: "Marketplace",
-      href: "/",
-    },
+    // {
+    //   title: "Marketplace",
+    //   href: "/",
+    // },
   ],
   links: {
     // Add any external links here
