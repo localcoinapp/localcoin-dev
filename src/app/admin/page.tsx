@@ -628,7 +628,7 @@ export default function AdminPage() {
                    <Alert>
                         <AlertTitle>Configuration Note</AlertTitle>
                         <AlertDescriptionComponent>
-                            SMTP settings must be configured in your project's server environment variables (e.g., a `.env.local` file). This form only sends a test email using the existing configuration.
+                            SMTP settings must be configured in your project's server environment variables. This form only sends a test email using the existing configuration.
                         </AlertDescriptionComponent>
                    </Alert>
                    <div className="space-y-2">
