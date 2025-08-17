@@ -7,15 +7,15 @@ interface SendEmailOptions {
   html: string;
 }
 
-// Create a transporter object using Gmail's service for better compatibility
+// Create a transporter object using generic SMTP settings
+// These must be configured in your .env file
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Use 'gmail' service for optimized settings
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
   secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS, // For Gmail, this should be an "App Password" if 2FA is enabled
+    pass: process.env.SMTP_PASS,
   },
 });
 
