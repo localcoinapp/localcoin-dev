@@ -7,31 +7,27 @@ interface SendEmailOptions {
   html: string;
 }
 
-// Create a transporter object using generic SMTP settings
-// These must be configured in your .env file
+// Create a transporter object using Gmail's service settings.
+// This is more reliable for Gmail than generic SMTP.
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  // port: Number(process.env.SMTP_PORT), // Let Nodemailer determine the port
-  secure: process.env.SMTP_PORT === '465', // Use true for port 465, false for others
+  service: 'gmail', // Use the built-in Gmail service
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.SMTP_USER, // Your full Gmail address
+    pass: process.env.SMTP_PASS, // An App Password if 2-Step Verification is enabled
   },
-  tls: {
-    // This is often necessary for servers with self-signed certificates
-    // or certain shared hosting environments.
-    rejectUnauthorized: false
-  }
 });
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   // Verify connection configuration on first use or if there are issues.
-  // In a production app, you might do this less frequently.
   try {
       await transporter.verify();
       console.log("SMTP server connection is ready.");
   } catch(error) {
       console.error("SMTP Connection Error:", error);
+      // Provide a more specific error for App Password issues.
+      if ((error as any).code === 'EAUTH') {
+          throw new Error(`SMTP Connection Failed: Invalid credentials. If you're using Gmail with 2-Step Verification, you must generate and use an App Password. Regular passwords will not work.`);
+      }
       throw new Error(`SMTP Connection Failed: ${(error as Error).message}. Please check your credentials and SMTP settings.`);
   }
 
