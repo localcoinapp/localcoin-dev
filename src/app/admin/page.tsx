@@ -298,11 +298,12 @@ export default function AdminPage() {
         });
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to send test email.');
+            throw new Error(data.details || 'Failed to send test email.');
         }
         toast({ title: "Success", description: `Test email sent to ${testEmail}.` });
 
     } catch(error) {
+        console.error("Full error object from send test email:", error);
         toast({ title: "Error Sending Email", description: (error as Error).message, variant: "destructive" });
     } finally {
         setIsSendingTestEmail(false);
@@ -677,3 +678,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
