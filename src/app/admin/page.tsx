@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart, Mail, Send } from 'lucide-react';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart, Mail, Send, MessageSquare, Sparkles } from 'lucide-react';
 import type { User, Merchant, TokenPurchaseRequest, MerchantCashoutRequest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -20,12 +20,26 @@ import { siteConfig } from '@/config/site';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertTitle, AlertDescription as AlertDescriptionComponent } from '@/components/ui/alert';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { enhanceEmailBody } from '@/ai/flows/enhance-email-body';
 
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
     const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
     return date.toLocaleDateString();
 };
+
+const pushEmailSchema = z.object({
+    recipientGroup: z.enum(['all_users', 'all_merchants', 'both']),
+    subject: z.string().min(5, 'Subject must be at least 5 characters long.'),
+    body: z.string().min(20, 'Email body must be at least 20 characters long.'),
+});
+
+type PushEmailFormValues = z.infer<typeof pushEmailSchema>;
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -48,7 +62,18 @@ export default function AdminPage() {
   // Email state
   const [testEmail, setTestEmail] = useState('');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [isSendingPushEmail, setIsSendingPushEmail] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
+
+  const pushEmailForm = useForm<PushEmailFormValues>({
+    resolver: zodResolver(pushEmailSchema),
+    defaultValues: {
+      recipientGroup: 'all_users',
+      subject: '',
+      body: '',
+    },
+  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -309,6 +334,46 @@ export default function AdminPage() {
     }
   }
 
+  const handleEnhanceBody = async () => {
+    const currentBody = pushEmailForm.getValues('body');
+    if (!currentBody) {
+      toast({ title: "No content", description: "Please write some content in the body before enhancing.", variant: "destructive" });
+      return;
+    }
+    setIsEnhancing(true);
+    try {
+      const result = await enhanceEmailBody({ body: currentBody });
+      pushEmailForm.setValue('body', result.enhancedBody, { shouldValidate: true });
+    } catch (error) {
+      console.error("AI enhancement failed:", error);
+      toast({ title: "Enhancement Failed", description: "Could not enhance the email body.", variant: "destructive" });
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+  
+  const onPushEmailSubmit = async (values: PushEmailFormValues) => {
+    setIsSendingPushEmail(true);
+    try {
+      const response = await fetch('/api/admin/send-push-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.details || 'Failed to send push email.');
+      }
+      toast({ title: "Success", description: `Email successfully sent to ${data.recipientCount} recipient(s).` });
+      pushEmailForm.reset();
+    } catch (error) {
+      toast({ title: "Send Failed", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setIsSendingPushEmail(false);
+    }
+  };
+
 
   if (authLoading || loading) {
     return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
@@ -350,7 +415,7 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-7 w-full">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-8 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
             <TabsTrigger value="cashout_requests">Cashout Requests ({pendingCashoutRequests.length})</TabsTrigger>
@@ -358,6 +423,7 @@ export default function AdminPage() {
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
             <TabsTrigger value="accounting">Accounting</TabsTrigger>
             <TabsTrigger value="email_settings">Email Settings</TabsTrigger>
+            <TabsTrigger value="push_email">Push Email</TabsTrigger>
           </TabsList>
 
           <TabsContent value="applications">
@@ -692,6 +758,64 @@ export default function AdminPage() {
                    </div>
                 </CardContent>
              </Card>
+          </TabsContent>
+          
+          <TabsContent value="push_email">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center"><MessageSquare className="mr-2 h-5 w-5" />Push Email</CardTitle>
+                    <CardDescription>Send a mass email to a selected group of your platform's members.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={pushEmailForm.handleSubmit(onPushEmailSubmit)} className="space-y-6">
+                       <Controller
+                            control={pushEmailForm.control}
+                            name="recipientGroup"
+                            render={({ field }) => (
+                                <div className="space-y-2">
+                                <Label>Recipient Group</Label>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a group" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                    <SelectItem value="all_users">All Users</SelectItem>
+                                    <SelectItem value="all_merchants">All Merchants</SelectItem>
+                                    <SelectItem value="both">Both Users & Merchants</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {pushEmailForm.formState.errors.recipientGroup && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.recipientGroup.message}</p>}
+                                </div>
+                            )}
+                        />
+                        
+                         <div className="space-y-2">
+                            <Label htmlFor="subject">Subject</Label>
+                            <Input id="subject" {...pushEmailForm.register('subject')} />
+                            {pushEmailForm.formState.errors.subject && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.subject.message}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <Label htmlFor="body">Email Body</Label>
+                                <Button type="button" variant="ghost" size="sm" onClick={handleEnhanceBody} disabled={isEnhancing}>
+                                    {isEnhancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                    <span className="ml-2">Enhance with AI</span>
+                                </Button>
+                            </div>
+                            <Textarea id="body" rows={10} {...pushEmailForm.register('body')} />
+                            {pushEmailForm.formState.errors.body && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.body.message}</p>}
+                        </div>
+
+                        <div className="text-right">
+                            <Button type="submit" disabled={isSendingPushEmail}>
+                                {isSendingPushEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                Send Email
+                            </Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
           </TabsContent>
 
         </Tabs>
