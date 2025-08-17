@@ -7,17 +7,13 @@ interface SendEmailOptions {
   html: string;
 }
 
+// Updated transporter configuration for Gmail
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: process.env.SMTP_PORT === '465',
+  service: 'gmail', // Use the 'gmail' service for optimized settings
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    pass: process.env.SMTP_PASS, // This must be a Google App Password
   },
-  tls: {
-    rejectUnauthorized: false
-  }
 });
 
 transporter.verify(function(error, success) {
@@ -42,6 +38,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
     return info;
   } catch (error) {
     console.error('Error sending email:', error);
-    throw new Error(`Failed to send email: ${(error as Error).message}`);
+    // Throw a detailed error to be caught by the API route
+    throw new Error(`Failed to send email: ${(error as Error).message}. Please check your credentials and SMTP settings.`);
   }
 }
