@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: 'Test email sent successfully' });
   } catch (error) {
+    // Log the full error to the server console for debugging
     console.error('Error in /api/admin/send-test-email:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     // Pass the specific error message to the frontend for better debugging.
