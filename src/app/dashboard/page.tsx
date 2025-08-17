@@ -56,7 +56,8 @@ import {
   ArrowDown,
   TrendingUp,
   Wallet,
-  Receipt
+  Receipt,
+  FileText
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -592,6 +593,9 @@ export default function DashboardPage() {
              <Link href="/dashboard/order-history" passHref>
               <Button variant="outline"><History className="mr-2 h-4 w-4" /> Order History</Button>
             </Link>
+             <Link href="/merchant-agreement" passHref>
+              <Button variant="outline"><FileText className="mr-2 h-4 w-4" /> Merchant Agreement</Button>
+            </Link>
           </div>
         </div>
         <p className="text-muted-foreground mb-8">Manage listings, view transactions, and handle incoming orders.</p>
@@ -684,7 +688,7 @@ export default function DashboardPage() {
                             </Select>
                        </CardHeader>
                        <CardContent className="grid grid-cols-2 items-center">
-                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} ${siteConfig.token.symbol}</div>
                            <div className="flex h-full items-center justify-center p-2">
                              <Link href="/dashboard/cashout-history" passHref className="w-full">
                                 <Button variant="outline" className="w-full">
@@ -712,7 +716,7 @@ export default function DashboardPage() {
                             </Select>
                        </CardHeader>
                        <CardContent>
-                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
+                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} ${siteConfig.fiatCurrency.symbol}</div>
                            <p className="text-xs text-muted-foreground">
                             After {siteConfig.commissionRate * 100}% platform commission.
                            </p>
