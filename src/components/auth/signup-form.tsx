@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -26,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Logo } from "../logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
+import { Checkbox } from "../ui/checkbox"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -35,6 +37,9 @@ const formSchema = z.object({
     message: "Password must be at least 8 characters.",
   }),
   country: z.string().min(1, { message: "Please select a country." }),
+  terms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the terms and conditions to continue." }),
+  }),
 })
 
 export function SignupForm() {
@@ -47,6 +52,7 @@ export function SignupForm() {
       email: "",
       password: "",
       country: "",
+      terms: false,
     },
   })
 
@@ -207,6 +213,33 @@ export function SignupForm() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="terms"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                        <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I accept the{" "}
+                           <Link href="/user-agreement" className="underline hover:text-primary" target="_blank">
+                             terms and conditions
+                          </Link>
+                          .
+                        </FormLabel>
+                         <FormMessage />
+                    </div>
+                    </FormItem>
+                )}
+                />
+
+
             <Button type="submit" className="w-full">Create Account</Button>
           </form>
         </Form>
@@ -220,5 +253,3 @@ export function SignupForm() {
     </Card>
   )
 }
-
-    
