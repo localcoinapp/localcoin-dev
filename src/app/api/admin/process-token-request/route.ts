@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -17,11 +18,10 @@ import {
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { TokenPurchaseRequest } from '@/types';
+import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
-// NOTE: We are intentionally not using ed25519-hd-key for this new derivation
-// import { derivePath } from 'ed25519-hd-key';
 import nacl from 'tweetnacl';
+import { sendEmail } from '@/lib/mail';
 
 /**
  * --- UPDATED KEY DERIVATION ---
@@ -64,6 +64,19 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // --- Fetch user email for notification ---
+    const userDocRef = doc(db, 'users', requestData.userId);
+    const userSnap = await getDoc(userDocRef);
+    if (!userSnap.exists()) {
+        throw new Error('User document not found, cannot send email notification.');
+    }
+    const userData = userSnap.data() as User;
+    const userEmail = userData.email;
+    if (!userEmail) {
+        throw new Error('User email not found, cannot send email notification.');
+    }
+    // -----------------------------------------
 
     const recipient = requestData.userWalletAddress;
     const amountWhole = Number(requestData.amount);
@@ -138,6 +151,49 @@ export async function POST(req: NextRequest) {
       transactionSignature: signature,
       toAta: toAta.address.toBase58(),
     });
+
+    // --- Send confirmation email ---
+    const subject = `Your ${siteConfig.name} Purchase is Complete!`;
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Purchase Invoice</h2>
+        <p>Hello ${userData.name || 'Valued Customer'},</p>
+        <p>Your recent purchase of <strong>${siteConfig.token.name}</strong> tokens has been successfully processed. The tokens have been credited to your wallet.</p>
+        <hr>
+        <h3>Invoice Details</h3>
+        <p><strong>Order ID:</strong> ${requestId}</p>
+        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Item</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px;">${siteConfig.token.name} (${siteConfig.token.symbol})</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${amountWhole.toFixed(2)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total Paid:</strong></td>
+              <td style="border: 1px solid #ddd; padding: 8px;"><strong>${amountWhole.toFixed(2)} ${siteConfig.fiatCurrency.symbol}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+        <p>Thank you for your purchase!</p>
+        <p>The ${siteConfig.name} Team</p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: userEmail,
+      subject,
+      html: emailHtml
+    });
+    // ----------------------------
 
     return NextResponse.json({ signature });
   } catch (error: any) {
