@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/hooks/use-auth';
+import { Footer } from '@/components/layout/footer';
 
 export const metadata: Metadata = {
   title: siteConfig.name,
@@ -32,6 +33,7 @@ export default function RootLayout({
             <div className="relative flex min-h-screen flex-col">
               <AppHeader />
               <main className="flex-1">{children}</main>
+              <Footer />
             </div>
             <Toaster />
           </AuthProvider>
