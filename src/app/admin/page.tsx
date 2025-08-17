@@ -102,7 +102,7 @@ export default function AdminPage() {
             toast({ title: 'Success', description: 'Token purchase approved and processed.' });
         } else { // Deny
             const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
-            await updateDoc(requestRef, { status: 'denied' });
+            await updateDoc(requestRef, { status: 'denied', processedAt: serverTimestamp() });
             toast({ title: 'Request Denied', variant: 'destructive' });
         }
     } catch (error) {
@@ -342,6 +342,8 @@ export default function AdminPage() {
     .reduce((acc, req) => acc + req.amount, 0);
 
   const platformProfit = totalTokensCashedOut * siteConfig.commissionRate;
+  
+  const historicalTokenRequests = allTokenRequests.filter(req => req.status !== 'pending');
 
 
   return (
@@ -390,37 +392,78 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="token_requests">
-             <Card>
-                <CardHeader>
-                    <CardTitle>Pending Token Purchase Requests</CardTitle>
-                    <CardDescription>Review and process user requests to buy tokens.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                   <Table>
-                        <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Wallet Address</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {tokenRequests.length > 0 ? tokenRequests.map(req => (
-                                <TableRow key={req.id}>
-                                    <TableCell>{req.userName || req.userId}</TableCell>
-                                    <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
-                                    <TableCell className="font-mono text-xs">{req.userWalletAddress}</TableCell>
-                                    <TableCell>{formatDate(req.createdAt)}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button size="sm" onClick={() => handleProcessTokenRequest(req.id, 'approve')} disabled={processingRequest === req.id}>
-                                                {processingRequest === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Approve
-                                            </Button>
-                                            <Button size="sm" variant="destructive" onClick={() => handleProcessTokenRequest(req.id, 'deny')} disabled={processingRequest === req.id}>
-                                                <X className="mr-2 h-4 w-4" /> Deny
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No pending token requests.</TableCell></TableRow>}
-                        </TableBody>
-                   </Table>
-                </CardContent>
-             </Card>
+             <Tabs defaultValue="pending_tokens" className="w-full">
+                <TabsList className="grid grid-cols-2 w-full">
+                    <TabsTrigger value="pending_tokens">Pending ({tokenRequests.length})</TabsTrigger>
+                    <TabsTrigger value="history_tokens">History ({historicalTokenRequests.length})</TabsTrigger>
+                </TabsList>
+                <TabsContent value="pending_tokens">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Pending Token Purchase Requests</CardTitle>
+                            <CardDescription>Review and process user requests to buy tokens.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                        <Table>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Wallet Address</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {tokenRequests.length > 0 ? tokenRequests.map(req => (
+                                        <TableRow key={req.id}>
+                                            <TableCell>{req.userName || req.userId}</TableCell>
+                                            <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                            <TableCell className="font-mono text-xs">{req.userWalletAddress}</TableCell>
+                                            <TableCell>{formatDate(req.createdAt)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button size="sm" onClick={() => handleProcessTokenRequest(req.id, 'approve')} disabled={processingRequest === req.id}>
+                                                        {processingRequest === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Approve
+                                                    </Button>
+                                                    <Button size="sm" variant="destructive" onClick={() => handleProcessTokenRequest(req.id, 'deny')} disabled={processingRequest === req.id}>
+                                                        <X className="mr-2 h-4 w-4" /> Deny
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No pending token requests.</TableCell></TableRow>}
+                                </TableBody>
+                        </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                 <TabsContent value="history_tokens">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Token Request History</CardTitle>
+                            <CardDescription>A log of all processed token purchase requests.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Processed</TableHead><TableHead className="text-right">Transaction</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                {historicalTokenRequests.length > 0 ? historicalTokenRequests.map(req => (
+                                    <TableRow key={req.id}>
+                                        <TableCell>{req.userName || req.userId}</TableCell>
+                                        <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                        <TableCell><Badge variant={req.status === 'approved' ? 'default' : 'destructive'}>{req.status}</Badge></TableCell>
+                                        <TableCell>{formatDate(req.processedAt)}</TableCell>
+                                        <TableCell className="text-right">
+                                            {req.transactionSignature ? (
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href={`https://explorer.solana.com/tx/${req.transactionSignature}?cluster=devnet`} target="_blank">
+                                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                                        View
+                                                    </Link>
+                                                </Button>
+                                            ) : 'N/A'}
+                                        </TableCell>
+                                    </TableRow>
+                                )) : <TableRow><TableCell colSpan={5} className="text-center h-24">No historical token requests.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+             </Tabs>
           </TabsContent>
 
           <TabsContent value="cashout_requests">
@@ -678,5 +721,7 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
 
     
