@@ -9,6 +9,7 @@ interface SendEmailOptions {
 
 // Generic transporter configuration for any SMTP server
 const transporter = nodemailer.createTransport({
+  pool: true, // Force the use of a connection pool
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
   secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
