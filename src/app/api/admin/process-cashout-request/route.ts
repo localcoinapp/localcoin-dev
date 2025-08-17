@@ -18,6 +18,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { MerchantCashoutRequest, Merchant } from '@/types';
 import * as bip39 from 'bip39';
+import { sendEmail } from '@/lib/mail';
 
 // Derive keypair from mnemonic
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
@@ -63,9 +64,13 @@ export async function POST(req: NextRequest) {
     }
     const merchantData = merchantSnap.data() as Merchant;
     const merchantMnemonic = merchantData.seedPhrase;
+    const merchantEmail = merchantData.contactEmail;
 
     if (!merchantMnemonic) {
       throw new Error('Merchant seed phrase not found. Cannot authorize transfer.');
+    }
+    if (!merchantEmail) {
+        throw new Error("Merchant contact email not found, cannot send notification.");
     }
 
     // --- FIX START: Correctly define platform wallet as recipient ---
@@ -122,6 +127,56 @@ export async function POST(req: NextRequest) {
       processedAt: serverTimestamp(),
       transactionSignature: signature,
     });
+    
+    // --- Send confirmation email ---
+    const commission = amountWhole * siteConfig.commissionRate;
+    const netPayout = amountWhole * (1 - siteConfig.commissionRate);
+    const subject = `Your ${siteConfig.name} Payout is Complete!`;
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Payout Statement</h2>
+        <p>Hello ${merchantData.companyName},</p>
+        <p>Your recent cashout request has been successfully processed. The funds have been settled.</p>
+        <hr>
+        <h3>Payout Details</h3>
+        <p><strong>Request ID:</strong> ${requestId}</p>
+        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Item</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px;">Gross Token Cashout (${siteConfig.token.symbol})</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${amountWhole.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px;">Platform Commission (${(siteConfig.commissionRate * 100).toFixed(0)}%)</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">-${commission.toFixed(2)} ${siteConfig.fiatCurrency.symbol}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Net Payout:</strong></td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>${netPayout.toFixed(2)} ${siteConfig.fiatCurrency.symbol}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+        <p>Thank you for being a part of our community!</p>
+        <p>The ${siteConfig.name} Team</p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: merchantEmail,
+      subject,
+      html: emailHtml
+    });
+    // ----------------------------
+
 
     return NextResponse.json({ signature });
 
