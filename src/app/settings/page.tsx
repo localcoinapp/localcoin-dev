@@ -44,6 +44,8 @@ import { auth, db } from "@/lib/firebase"
 import { deleteUser } from "firebase/auth"
 import { doc, deleteDoc } from "firebase/firestore"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { ChevronRight } from "lucide-react"
 
 const settingsFormSchema = z.object({
   theme: z.string(),
@@ -268,6 +270,28 @@ export default function SettingsPage() {
                         </form>
                     </Form>
                     
+                    <Separator className="my-8" />
+
+                    <div className="space-y-4">
+                        <div>
+                            <h3 className="text-lg font-semibold">Legal & Information</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Review our terms and policies.
+                            </p>
+                        </div>
+                        <Card>
+                            <Link href="/user-agreement">
+                                <CardHeader className="flex flex-row items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
+                                    <div className="space-y-1">
+                                        <CardTitle className="text-base">User Agreement</CardTitle>
+                                        <CardDescription>Read our terms of service.</CardDescription>
+                                    </div>
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                </CardHeader>
+                            </Link>
+                        </Card>
+                    </div>
+
                     <Separator className="my-8" />
 
                     <div className="space-y-4">
