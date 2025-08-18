@@ -117,7 +117,7 @@ const MapView = ({ merchants }: MapViewProps) => {
                 </div>
               </div>
               <p style="margin:0 0 10px; font-size:14px; color:#555;">${merchant.description}</p>
-              <a href="/merchants/${merchant.id}" style="color:blue; text-decoration:underline;">View Details</a>
+              <a href="/merchants/${merchant.id}" style="display:inline-block; padding: 8px 16px; background-color: hsl(var(--accent)); color: hsl(var(--accent-foreground)); text-decoration: none; border-radius: 0.5rem; font-weight: 500; font-size: 14px; text-align: center;">View Details</a>
             </div>
           `;
           const marker = L.marker([merchant.position.lat, merchant.position.lng])
