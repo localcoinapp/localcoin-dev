@@ -31,3 +31,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to send test email.', details: errorMessage }, { status: 500 });
   }
 }
+
+    
