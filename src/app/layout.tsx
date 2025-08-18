@@ -8,6 +8,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/hooks/use-auth';
 import { Footer } from '@/components/layout/footer';
+import { CookieBanner } from '@/components/cookie-banner';
 
 export const metadata: Metadata = {
   title: siteConfig.name,
@@ -36,6 +37,7 @@ export default function RootLayout({
               <Footer />
             </div>
             <Toaster />
+            <CookieBanner />
           </AuthProvider>
         </ThemeProvider>
       </body>
