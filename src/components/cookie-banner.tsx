@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -44,10 +45,9 @@ export function CookieBanner() {
           <div className="flex items-start gap-4">
              <Cookie className="h-8 w-8 text-primary flex-shrink-0 mt-1" />
              <div>
-                <h3 className="font-semibold text-lg">We use cookies</h3>
+                <h3 className="font-semibold text-lg">We value your privacy</h3>
                 <p className="text-sm text-muted-foreground">
-                    This website uses cookies to enhance your browsing experience and analyze our traffic. 
-                    By clicking "Accept," you consent to our use of cookies.
+                    We use essential cookies to manage your login session and preferences. With your consent, we also use analytics cookies to understand how you use our site and improve your experience.
                 </p>
              </div>
           </div>
