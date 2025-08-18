@@ -16,31 +16,32 @@ export async function POST(req: NextRequest) {
     let recipients: string[] = [];
     const usersRef = collection(db, 'users');
     
-    if (recipientGroup === 'all_users' || recipientGroup === 'both') {
-        console.log("Fetching all users...");
-        const usersSnapshot = await getDocs(usersRef);
-        usersSnapshot.forEach(doc => {
-            const user = doc.data() as User;
-            if (user.email) recipients.push(user.email);
-        });
-    }
-    
+    // Fetch merchants if requested
     if (recipientGroup === 'all_merchants' || recipientGroup === 'both') {
-        console.log("Fetching all merchants...");
+        console.log("Fetching merchants...");
         const merchantsQuery = query(usersRef, where('role', '==', 'merchant'));
         const merchantsSnapshot = await getDocs(merchantsQuery);
-        merchantsSnapshot.forEach(doc => {
-            const merchant = doc.data() as User;
-            if (merchant.email) recipients.push(merchant.email);
-        });
+        const merchantEmails = merchantsSnapshot.docs.map(doc => (doc.data() as User).email).filter(Boolean) as string[];
+        recipients.push(...merchantEmails);
+        console.log(`Found ${merchantEmails.length} merchant(s).`);
     }
 
-    // Remove duplicates if 'both' was selected
-    if (recipientGroup === 'both') {
+    // Fetch all users if requested
+    if (recipientGroup === 'all_users' || recipientGroup === 'both') {
+        console.log("Fetching all users...");
+        // Note: This fetches everyone, including merchants and admins.
+        const usersSnapshot = await getDocs(usersRef);
+        const userEmails = usersSnapshot.docs.map(doc => (doc.data() as User).email).filter(Boolean) as string[];
+        recipients.push(...userEmails);
+        console.log(`Found ${userEmails.length} total user(s).`);
+    }
+
+    // Remove duplicates if 'both' was selected, ensuring each person gets only one email
+    if (recipients.length > 0) {
       recipients = [...new Set(recipients)];
     }
     
-    console.log(`Found ${recipients.length} unique recipient(s).`);
+    console.log(`Sending email to ${recipients.length} unique recipient(s).`);
 
     if (recipients.length === 0) {
         return NextResponse.json({ message: 'No recipients found for the selected group.', recipientCount: 0 });
