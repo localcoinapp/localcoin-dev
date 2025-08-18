@@ -16,6 +16,8 @@ import { Globe, Instagram, MapPin, MessageSquare, Loader2, ShoppingCart } from '
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { AuthModal } from '@/components/auth-modal';
+
 
 interface Listing extends MerchantItem {
   title?: string; 
@@ -32,6 +34,7 @@ export default function MerchantPage() {
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
   const [itemQuantities, setItemQuantities] = useState<{[key: string]: number}>({});
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
 
   const merchantId = Array.isArray(id) ? id[0] : id;
@@ -42,17 +45,24 @@ export default function MerchantPage() {
       const unsubscribe = onSnapshot(merchantDocRef, (snapshot) => {
         if (snapshot.exists()) {
           const merchantData = { id: snapshot.id, ...snapshot.data() } as Merchant;
-          setMerchant(merchantData);
-          if (merchantData.listings) {
-            const activeListings = merchantData.listings.filter(l => l.active);
-            setListings(activeListings);
-            // Initialize quantities for all listings to 1
-            const initialQuantities = activeListings.reduce((acc, l) => {
-                acc[l.id] = 1;
-                return acc;
-            }, {} as {[key: string]: number});
-            setItemQuantities(initialQuantities);
+          // Only show page if merchant is live
+          if (merchantData.status === 'live') {
+            setMerchant(merchantData);
+            if (merchantData.listings) {
+              const activeListings = merchantData.listings.filter(l => l.active);
+              setListings(activeListings);
+              // Initialize quantities for all listings to 1
+              const initialQuantities = activeListings.reduce((acc, l) => {
+                  acc[l.id] = 1;
+                  return acc;
+              }, {} as {[key: string]: number});
+              setItemQuantities(initialQuantities);
+            } else {
+              setListings([]);
+            }
           } else {
+            // If merchant is not live, treat as not found
+            setMerchant(null);
             setListings([]);
           }
         } else {
@@ -74,7 +84,11 @@ export default function MerchantPage() {
   }
 
   const handleAddToCart = async (item: MerchantItem) => {
-    if (!user || !merchantId) return;
+    if (!user) {
+        setIsAuthModalOpen(true);
+        return;
+    }
+    if (!merchantId) return;
     
     const quantity = itemQuantities[item.id] || 1;
     if (quantity <= 0) {
@@ -154,10 +168,11 @@ export default function MerchantPage() {
 
 
  const handleMessageMerchant = async () => {
-    if (!user || !merchantId) {
-      toast({ title: "Error", description: "You must be logged in to message a merchant.", variant: "destructive" });
-      return;
+    if (!user) {
+        setIsAuthModalOpen(true);
+        return;
     }
+    if (!merchantId) return;
     
     setIsCreatingChat(true);
 
@@ -236,12 +251,14 @@ export default function MerchantPage() {
   }
 
   if (!merchant) {
-    return <div className="container mx-auto p-4 text-center">Merchant not found.</div>;
+    return <div className="container mx-auto p-4 text-center">Merchant not found or is not live.</div>;
   }
   
   const fullAddress = [merchant.street, merchant.houseNumber, merchant.city, merchant.zipCode].filter(Boolean).join(', ');
 
   return (
+    <>
+    <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="w-full h-48 sm:h-64 md:h-80 bg-muted rounded-lg overflow-hidden mb-8 shadow-lg">
         {merchant.banner ? (
@@ -326,12 +343,10 @@ export default function MerchantPage() {
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
-                    {user && (
-                         <Button onClick={handleMessageMerchant} disabled={isCreatingChat} className="w-full">
-                            {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4"/>}
-                            Message Merchant
-                         </Button>
-                    )}
+                    <Button onClick={handleMessageMerchant} disabled={isCreatingChat} className="w-full">
+                        {isCreatingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4"/>}
+                        Message Merchant
+                    </Button>
                     {merchant.website && (
                       <Button asChild variant="outline" className="w-full">
                         <a href={merchant.website} target="_blank" rel="noopener noreferrer">
@@ -354,6 +369,7 @@ export default function MerchantPage() {
 
       </div>
     </div>
+    </>
   );
 }
 

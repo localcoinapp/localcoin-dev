@@ -23,18 +23,31 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     return null;
   }
 
+  const goToLogin = () => {
+    onClose();
+    router.push('/login');
+  }
+  
+  const goToSignup = () => {
+    onClose();
+    router.push('/signup');
+  }
+
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Create an Account</AlertDialogTitle>
+          <AlertDialogTitle>Authentication Required</AlertDialogTitle>
           <AlertDialogDescription>
-            Join our community to start exploring and interacting with local merchants.
+            You need to be logged in to perform this action. Please sign up or log in to continue.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={() => router.push('/signup')}>
+          <AlertDialogAction onClick={goToLogin}>
+            Log In
+          </AlertDialogAction>
+           <AlertDialogAction onClick={goToSignup}>
             Sign Up
           </AlertDialogAction>
         </AlertDialogFooter>
