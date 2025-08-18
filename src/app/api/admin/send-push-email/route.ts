@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const usersRef = collection(db, 'users');
     
     if (recipientGroup === 'all_users' || recipientGroup === 'both') {
+        console.log("Fetching all users...");
         const usersSnapshot = await getDocs(usersRef);
         usersSnapshot.forEach(doc => {
             const user = doc.data() as User;
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (recipientGroup === 'all_merchants' || recipientGroup === 'both') {
+        console.log("Fetching all merchants...");
         const merchantsQuery = query(usersRef, where('role', '==', 'merchant'));
         const merchantsSnapshot = await getDocs(merchantsQuery);
         merchantsSnapshot.forEach(doc => {
@@ -37,19 +39,23 @@ export async function POST(req: NextRequest) {
     if (recipientGroup === 'both') {
       recipients = [...new Set(recipients)];
     }
+    
+    console.log(`Found ${recipients.length} unique recipient(s).`);
 
     if (recipients.length === 0) {
-        return NextResponse.json({ error: 'No recipients found for the selected group.' }, { status: 404 });
+        return NextResponse.json({ message: 'No recipients found for the selected group.', recipientCount: 0 });
     }
     
     // We send emails one by one to avoid showing all recipients in the "To" field.
     // For large lists, a dedicated bulk email service would be better.
+    console.log(`Attempting to send email to: ${recipients.join(', ')}`);
     for (const email of recipients) {
       await sendEmail({
         to: email,
         subject: subject,
         html: body.replace(/\n/g, '<br>'), // Basic conversion of newlines to <br>
       });
+      console.log(`Successfully queued email for ${email}`);
     }
 
     return NextResponse.json({ message: 'Push email sent successfully.', recipientCount: recipients.length });

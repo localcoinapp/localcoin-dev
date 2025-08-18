@@ -46,6 +46,6 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   } catch (error) {
     console.error('Error sending email:', error);
     // Throw a detailed error to be caught by the API route
-    throw new Error(`Failed to send email: ${(error as Error).message}. Please check your credentials and SMTP settings.`);
+    throw new Error(`Failed to send email via SMTP. Please check your credentials and server settings. Raw error: ${(error as Error).message}`);
   }
 }
