@@ -32,6 +32,11 @@ transporter.verify(function(error, success) {
 });
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
+  // FIX: Explicitly check for the required SMTP_FROM environment variable.
+  if (!process.env.SMTP_FROM) {
+    throw new Error("CRITICAL: Missing SMTP_FROM environment variable. Cannot send email.");
+  }
+  
   const mailOptions = {
     from: `"${process.env.SMTP_FROM_NAME || 'LocalCoin'}" <${process.env.SMTP_FROM}>`,
     to,
@@ -40,8 +45,14 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   };
 
   try {
+    // FIX: Log the exact 'from' address being used.
+    console.log(`Attempting to send email from: ${mailOptions.from}`);
     const info = await transporter.sendMail(mailOptions);
+    
+    // FIX: Log the detailed SMTP response for better debugging.
     console.log('Message sent: %s', info.messageId);
+    console.log('Full SMTP response: %s', info.response);
+
     return info;
   } catch (error) {
     console.error('Error sending email:', error);
