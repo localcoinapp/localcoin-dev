@@ -41,16 +41,17 @@ export async function POST(req: NextRequest) {
 
     // Combine and de-duplicate the lists
     const recipients = [...new Set([...userEmails, ...merchantEmails])];
-    console.log(`Step 4: Combined and de-duplicated list. Total unique recipients: ${recipients.length}.`);
-
+    
     // --- THIS IS THE FINAL CONSOLE LOG YOU REQUESTED ---
-    console.log(`Step 5: Preparing to send email to the following recipients:`, recipients);
+    console.log(`Step 4: Preparing to send email to the following recipients:`, recipients);
     
     if (recipients.length === 0) {
-        console.log("Step 6: No recipients found for the selected group. Exiting.");
+        console.log("Step 5: No recipients found for the selected group. Exiting.");
         return NextResponse.json({ message: 'No recipients found for the selected group.', recipientCount: 0 });
     }
     
+    // This loop is for demonstration and backend logging.
+    // In a real production environment, you would use a bulk email service.
     for (const email of recipients) {
       try {
         await sendEmail({
@@ -61,10 +62,11 @@ export async function POST(req: NextRequest) {
         console.log(`Successfully queued email for ${email}`);
       } catch (emailError) {
         console.error(`Failed to send email to ${email}:`, emailError);
+        // Continue trying to send to other recipients even if one fails
       }
     }
 
-    console.log("Step 7: All emails have been processed by the sendEmail function.");
+    console.log("Step 6: All emails have been processed by the sendEmail function.");
     return NextResponse.json({ message: 'Push email sent successfully.', recipientCount: recipients.length });
 
   } catch (error) {
