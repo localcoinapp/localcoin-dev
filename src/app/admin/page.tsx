@@ -362,10 +362,14 @@ export default function AdminPage() {
       });
 
       const data = await response.json();
+
+      // Log the recipients to the browser console
+      console.log('Recipients the API attempted to email:', data.recipients);
+
       if (!response.ok) {
         throw new Error(data.details || 'Failed to send push email.');
       }
-      toast({ title: "Success", description: `Email successfully sent to ${data.recipientCount} recipient(s).` });
+      toast({ title: "Success", description: `Email process completed. Attempted to send to ${data.recipientCount} recipient(s).` });
       pushEmailForm.reset();
     } catch (error) {
       toast({ title: "Send Failed", description: (error as Error).message, variant: "destructive" });
