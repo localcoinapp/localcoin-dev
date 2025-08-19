@@ -13,9 +13,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     
-    let finalRecipients: string[] = [];
-
-    // --- Fetch ALL potential recipients first ---
+    // --- Step 1: Fetch all potential recipients ---
     const usersSnapshot = await getDocs(collection(db, 'users'));
     const allUserEmails = usersSnapshot.docs
         .map(doc => (doc.data() as User).email)
@@ -25,8 +23,9 @@ export async function POST(req: NextRequest) {
     const allMerchantEmails = merchantsSnapshot.docs
         .map(doc => (doc.data() as Merchant).contactEmail)
         .filter((email): email is string => !!email);
-    
-    // --- Determine the final recipient list based on selection ---
+
+    // --- Step 2: Determine the final recipient list ---
+    let finalRecipients: string[] = [];
     if (recipientGroup === 'all_users') {
         finalRecipients = allUserEmails;
     } else if (recipientGroup === 'all_merchants') {
@@ -35,14 +34,14 @@ export async function POST(req: NextRequest) {
         finalRecipients = [...new Set([...allUserEmails, ...allMerchantEmails])];
     }
     
+    // --- Step 3: Send emails if there are recipients ---
     if (finalRecipients.length > 0) {
-        // We are not logging server-side anymore as per the debugging flow
-        // The list is now returned to the client to be logged there.
         for (const email of finalRecipients) {
             try {
                 await sendEmail({
                     to: email,
                     subject: subject,
+                    // FIX: Correctly pass the body content as the 'html' property.
                     html: body.replace(/\n/g, '<br>'),
                 });
             } catch (emailError) {
@@ -52,7 +51,7 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // Return the list of recipients and the count to the client.
+    // Return the list of recipients and the count to the client for logging.
     return NextResponse.json({ 
         message: 'Push email process completed.', 
         recipientCount: finalRecipients.length,
