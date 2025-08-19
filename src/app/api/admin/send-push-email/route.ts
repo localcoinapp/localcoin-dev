@@ -18,27 +18,26 @@ export async function POST(req: NextRequest) {
 
     let recipients: string[] = [];
     
-    // Logic for fetching 'merchants'
+    // CORRECTED LOGIC: Fetch 'contactEmail' from the 'merchants' collection
     if (recipientGroup === 'all_merchants' || recipientGroup === 'both') {
         console.log("Step 1: Fetching merchants from the 'merchants' collection...");
         const merchantsRef = collection(db, 'merchants');
-        // No specific query needed, we get all merchants and their contact emails
         const merchantsSnapshot = await getDocs(merchantsRef);
         const merchantEmails = merchantsSnapshot.docs
             .map(doc => (doc.data() as Merchant).contactEmail)
-            .filter((email): email is string => !!email); // Ensure email is not null/undefined
+            .filter((email): email is string => !!email);
         recipients.push(...merchantEmails);
         console.log(`Found ${merchantEmails.length} merchant email(s).`);
     }
 
-    // Logic for fetching 'users'
+    // CORRECTED LOGIC: Fetch 'email' from the 'users' collection
     if (recipientGroup === 'all_users' || recipientGroup === 'both') {
         console.log("Step 2: Fetching all users from the 'users' collection...");
         const usersRef = collection(db, 'users');
         const usersSnapshot = await getDocs(usersRef);
         const userEmails = usersSnapshot.docs
             .map(doc => (doc.data() as User).email)
-            .filter((email): email is string => !!email); // Ensure email is not null/undefined
+            .filter((email): email is string => !!email);
         recipients.push(...userEmails);
         console.log(`Found ${userEmails.length} total user email(s).`);
     }
