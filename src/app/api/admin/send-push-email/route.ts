@@ -38,26 +38,23 @@ export async function POST(req: NextRequest) {
 
     const finalRecipients = [...new Set([...userEmails, ...merchantEmails])];
     
-    console.log(`Step 3: Preparing to send email to ${finalRecipients.length} unique recipient(s):`, finalRecipients);
+    console.log(`Step 3: Preparing to send email to ${finalRecipients.length} unique recipient(s).`);
 
     if (finalRecipients.length > 0) {
         for (const email of finalRecipients) {
             try {
-                // FIX: Correctly pass the email body content as the 'html' property.
                 await sendEmail({
                     to: email,
                     subject: subject,
-                    html: body.replace(/\n/g, '<br>'), // Use the 'body' variable destructured from the request
+                    html: body.replace(/\n/g, '<br>'),
                 });
                 console.log(`Successfully sent email to ${email}`);
             } catch (emailError) {
                 console.error(`Failed to send email to ${email}:`, emailError);
-                // Continue to next email even if one fails
             }
         }
     }
 
-    // Return the list of recipients and the count to the client for logging.
     return NextResponse.json({ 
         message: 'Push email process completed.', 
         recipientCount: finalRecipients.length,
