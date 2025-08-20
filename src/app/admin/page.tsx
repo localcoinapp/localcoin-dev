@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart, Mail, Send, MessageSquare, Sparkles } from 'lucide-react';
+import { Loader2, ShieldAlert, Eye, Users, ShieldX, UserCheck, ShieldOff, DollarSign, Check, X, ArrowDown, ExternalLink, TrendingUp, TrendingDown, Wallet, BarChart, Mail, Send, MessageSquare, Sparkles, Settings } from 'lucide-react';
 import type { User, Merchant, TokenPurchaseRequest, MerchantCashoutRequest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -419,15 +419,14 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-8 w-full">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-7 w-full">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
             <TabsTrigger value="cashout_requests">Cashout Requests ({pendingCashoutRequests.length})</TabsTrigger>
             <TabsTrigger value="user_management">User Management</TabsTrigger>
             <TabsTrigger value="merchant_management">Merchant Management</TabsTrigger>
             <TabsTrigger value="accounting">Accounting</TabsTrigger>
-            <TabsTrigger value="email_settings">Email Settings</TabsTrigger>
-            <TabsTrigger value="push_email">Push Email</TabsTrigger>
+            <TabsTrigger value="email">Email Marketing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="applications">
@@ -731,95 +730,102 @@ export default function AdminPage() {
              </Card>
           </TabsContent>
           
-          <TabsContent value="email_settings">
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center"><Mail className="mr-2 h-5 w-5" />Email Configuration</CardTitle>
-                    <CardDescription>Test your SMTP settings to ensure emails are being sent correctly.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                   <Alert>
-                        <AlertTitle>Configuration Note</AlertTitle>
-                        <AlertDescriptionComponent>
-                            SMTP settings must be configured in your project's server environment variables. This form only sends a test email using the existing configuration.
-                        </AlertDescriptionComponent>
-                   </Alert>
-                   <div className="space-y-2">
-                        <Label htmlFor="test-email">Recipient Email Address</Label>
-                        <div className="flex gap-2">
-                            <Input 
-                                id="test-email" 
-                                type="email" 
-                                placeholder="recipient@example.com"
-                                value={testEmail}
-                                onChange={(e) => setTestEmail(e.target.value)}
-                            />
-                            <Button onClick={handleSendTestEmail} disabled={isSendingTestEmail}>
-                                {isSendingTestEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                Send Test Email
-                            </Button>
-                        </div>
-                   </div>
-                </CardContent>
-             </Card>
-          </TabsContent>
-          
-          <TabsContent value="push_email">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center"><MessageSquare className="mr-2 h-5 w-5" />Push Email</CardTitle>
-                    <CardDescription>Send a mass email to a selected group of your platform's members.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={pushEmailForm.handleSubmit(onPushEmailSubmit)} className="space-y-6">
-                       <Controller
-                            control={pushEmailForm.control}
-                            name="recipientGroup"
-                            render={({ field }) => (
-                                <div className="space-y-2">
-                                <Label>Recipient Group</Label>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a group" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                    <SelectItem value="all_users">All Users</SelectItem>
-                                    <SelectItem value="all_merchants">All Merchants</SelectItem>
-                                    <SelectItem value="both">Both Users & Merchants</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {pushEmailForm.formState.errors.recipientGroup && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.recipientGroup.message}</p>}
+          <TabsContent value="email">
+            <Tabs defaultValue="compose" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="compose">Compose Email</TabsTrigger>
+                    <TabsTrigger value="config">Configuration</TabsTrigger>
+                </TabsList>
+                <TabsContent value="compose">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center"><MessageSquare className="mr-2 h-5 w-5" />Push Email</CardTitle>
+                            <CardDescription>Send a mass email to a selected group of your platform's members.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={pushEmailForm.handleSubmit(onPushEmailSubmit)} className="space-y-6">
+                               <Controller
+                                    control={pushEmailForm.control}
+                                    name="recipientGroup"
+                                    render={({ field }) => (
+                                        <div className="space-y-2">
+                                        <Label>Recipient Group</Label>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a group" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                            <SelectItem value="all_users">All Users</SelectItem>
+                                            <SelectItem value="all_merchants">All Merchants</SelectItem>
+                                            <SelectItem value="both">Both Users & Merchants</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        {pushEmailForm.formState.errors.recipientGroup && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.recipientGroup.message}</p>}
+                                        </div>
+                                    )}
+                                />
+                                
+                                 <div className="space-y-2">
+                                    <Label htmlFor="subject">Subject</Label>
+                                    <Input id="subject" {...pushEmailForm.register('subject')} />
+                                    {pushEmailForm.formState.errors.subject && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.subject.message}</p>}
                                 </div>
-                            )}
-                        />
-                        
-                         <div className="space-y-2">
-                            <Label htmlFor="subject">Subject</Label>
-                            <Input id="subject" {...pushEmailForm.register('subject')} />
-                            {pushEmailForm.formState.errors.subject && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.subject.message}</p>}
-                        </div>
 
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <Label htmlFor="body">Email Body</Label>
-                                <Button type="button" variant="ghost" size="sm" onClick={handleEnhanceBody} disabled={isEnhancing}>
-                                    {isEnhancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                                    <span className="ml-2">Enhance with AI</span>
-                                </Button>
-                            </div>
-                            <Textarea id="body" rows={10} {...pushEmailForm.register('body')} />
-                            {pushEmailForm.formState.errors.body && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.body.message}</p>}
-                        </div>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <Label htmlFor="body">Email Body</Label>
+                                        <Button type="button" variant="ghost" size="sm" onClick={handleEnhanceBody} disabled={isEnhancing}>
+                                            {isEnhancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                            <span className="ml-2">Enhance with AI</span>
+                                        </Button>
+                                    </div>
+                                    <Textarea id="body" rows={10} {...pushEmailForm.register('body')} />
+                                    {pushEmailForm.formState.errors.body && <p className="text-sm font-medium text-destructive">{pushEmailForm.formState.errors.body.message}</p>}
+                                </div>
 
-                        <div className="text-right">
-                            <Button type="submit" disabled={isSendingPushEmail}>
-                                {isSendingPushEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                Send Email
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+                                <div className="text-right">
+                                    <Button type="submit" disabled={isSendingPushEmail}>
+                                        {isSendingPushEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                        Send Email
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="config">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center"><Settings className="mr-2 h-5 w-5" />Email Configuration</CardTitle>
+                            <CardDescription>Test your SMTP settings to ensure emails are being sent correctly.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                           <Alert>
+                                <AlertTitle>Configuration Note</AlertTitle>
+                                <AlertDescriptionComponent>
+                                    SMTP settings must be configured in your project's server environment variables. This form only sends a test email using the existing configuration.
+                                </AlertDescriptionComponent>
+                           </Alert>
+                           <div className="space-y-2">
+                                <Label htmlFor="test-email">Recipient Email Address</Label>
+                                <div className="flex gap-2">
+                                    <Input 
+                                        id="test-email" 
+                                        type="email" 
+                                        placeholder="recipient@example.com"
+                                        value={testEmail}
+                                        onChange={(e) => setTestEmail(e.target.value)}
+                                    />
+                                    <Button onClick={handleSendTestEmail} disabled={isSendingTestEmail}>
+                                        {isSendingTestEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                        Send Test Email
+                                    </Button>
+                                </div>
+                           </div>
+                        </CardContent>
+                     </Card>
+                </TabsContent>
+            </Tabs>
           </TabsContent>
 
         </Tabs>
@@ -848,5 +854,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
