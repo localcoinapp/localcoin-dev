@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
   pool: true, // Force the use of a connection pool
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+  secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -46,7 +46,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
 
   try {
     // FIX: Log the exact 'from' address being used.
-    console.log(`Attempting to send email from: ${mailOptions.from}`);
+    console.log(`Attempting to send email from: ${mailOptions.from} to: ${to}`);
     const info = await transporter.sendMail(mailOptions);
     
     // FIX: Log the detailed SMTP response for better debugging.

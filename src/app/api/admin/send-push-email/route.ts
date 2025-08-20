@@ -39,6 +39,9 @@ export async function POST(req: NextRequest) {
     const finalRecipients = [...new Set([...userEmails, ...merchantEmails])];
     
     console.log(`Step 3: Preparing to send email to ${finalRecipients.length} unique recipient(s).`);
+    // This log will now appear in the BROWSER console from the frontend component
+    // console.log(`Step 4: Preparing to send email to ${finalRecipients.length} unique recipient(s):`, finalRecipients);
+
 
     if (finalRecipients.length > 0) {
         for (const email of finalRecipients) {
@@ -51,6 +54,7 @@ export async function POST(req: NextRequest) {
                 console.log(`Successfully sent email to ${email}`);
             } catch (emailError) {
                 console.error(`Failed to send email to ${email}:`, emailError);
+                // Optionally continue to the next email or stop the process
             }
         }
     }
