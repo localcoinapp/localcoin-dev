@@ -1,6 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/mail';
 import { siteConfig } from '@/config/site';
 
 export async function POST(req: NextRequest) {
@@ -19,17 +18,24 @@ export async function POST(req: NextRequest) {
       <br/>
       <p>Sent at: ${new Date().toUTCString()}</p>
     `;
+    
+    const origin = req.nextUrl.origin;
+    const response = await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, html }),
+    });
 
-    await sendEmail({ to, subject, html });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to send test email via API route.');
+    }
 
     return NextResponse.json({ message: 'Test email sent successfully' });
+
   } catch (error) {
-    // Log the full error to the server console for debugging
     console.error('Error in /api/admin/send-test-email:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-    // Pass the specific error message to the frontend for better debugging.
     return NextResponse.json({ error: 'Failed to send test email.', details: errorMessage }, { status: 500 });
   }
 }
-
-    

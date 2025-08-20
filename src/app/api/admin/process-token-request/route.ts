@@ -22,7 +22,6 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
 import nacl from 'tweetnacl';
-import { sendEmail } from '@/lib/mail';
 
 /**
  * --- UPDATED KEY DERIVATION ---
@@ -189,10 +188,11 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await sendEmail({
-      to: userEmail,
-      subject,
-      html: emailHtml
+    const origin = req.nextUrl.origin;
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: userEmail, subject, html: emailHtml }),
     });
     // ----------------------------
 
@@ -217,5 +217,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-    

@@ -18,7 +18,6 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { MerchantCashoutRequest, Merchant } from '@/types';
 import * as bip39 from 'bip39';
-import { sendEmail } from '@/lib/mail';
 
 // Derive keypair from mnemonic
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
@@ -170,10 +169,11 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await sendEmail({
-      to: merchantEmail,
-      subject,
-      html: emailHtml
+    const origin = req.nextUrl.origin;
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: merchantEmail, subject, html: emailHtml }),
     });
     // ----------------------------
 
