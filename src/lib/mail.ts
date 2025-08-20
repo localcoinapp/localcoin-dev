@@ -36,8 +36,10 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
     throw new Error("CRITICAL: Missing SMTP_FROM environment variable. Cannot send email.");
   }
   
+  const fromName = process.env.SMTP_FROM_NAME || 'LocalCoin';
+
   const mailOptions = {
-    from: `"${process.env.SMTP_FROM_NAME || siteConfig.name}" <${process.env.SMTP_FROM}>`,
+    from: `"${fromName}" <${process.env.SMTP_FROM}>`,
     to,
     subject,
     html,
