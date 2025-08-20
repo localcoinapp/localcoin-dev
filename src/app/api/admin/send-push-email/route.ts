@@ -38,10 +38,9 @@ export async function POST(req: NextRequest) {
 
     const finalRecipients = [...new Set([...userEmails, ...merchantEmails])];
     
-    console.log(`Step 3: Preparing to send email to ${finalRecipients.length} unique recipient(s).`);
-    // This log will now appear in the BROWSER console from the frontend component
-    // console.log(`Step 4: Preparing to send email to ${finalRecipients.length} unique recipient(s):`, finalRecipients);
-
+    // This log is for the SERVER console (your terminal)
+    console.log(`Step 3: Preparing to send email to ${finalRecipients.length} unique recipient(s):`, finalRecipients);
+    
 
     if (finalRecipients.length > 0) {
         for (const email of finalRecipients) {
@@ -53,12 +52,13 @@ export async function POST(req: NextRequest) {
                 });
                 console.log(`Successfully sent email to ${email}`);
             } catch (emailError) {
+                // Log the error for the specific email but continue to the next
                 console.error(`Failed to send email to ${email}:`, emailError);
-                // Optionally continue to the next email or stop the process
             }
         }
     }
 
+    // Return the recipient list to the client for browser-side logging
     return NextResponse.json({ 
         message: 'Push email process completed.', 
         recipientCount: finalRecipients.length,
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
+    // This will catch errors in fetching from Firestore, etc.
     console.error('CRITICAL Error in /api/admin/send-push-email:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown server error occurred.';
     return NextResponse.json({ error: 'Failed to send push email.', details: errorMessage }, { status: 500 });
