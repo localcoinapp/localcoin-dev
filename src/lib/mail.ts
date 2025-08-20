@@ -38,7 +38,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   }
   
   const mailOptions = {
-    from: `"${process.env.SMTP_FROM_NAME || 'LocalCoin'}" <${process.env.SMTP_FROM}>`,
+    from: process.env.SMTP_FROM, // Simplified 'from' address
     to,
     subject,
     html,
