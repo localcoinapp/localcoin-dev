@@ -19,7 +19,7 @@ import {
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
-import type { User, Merchant, CartItem, OrderStatus, MerchantItem } from '@/types';
+import type { User, Merchant, CartItem, MerchantItem } from '@/types';
 import * as bip39 from 'bip39';
 
 // Helper function to find and update inventory
@@ -179,20 +179,30 @@ export async function POST(req: NextRequest) {
     if (order && order.userId && order.merchantId) {
         try {
             await runTransaction(db, async (transaction) => {
-                const userDocRef = doc(db, 'users', order.userId);
-                const merchantDocRef = doc(db, 'merchants', order.merchantId);
+                const merchantDocRef = doc(db, 'merchants', order!.merchantId);
+                const userDocRef = doc(db, 'users', order!.userId);
 
-                const merchantSnap = await transaction.get(merchantDocRef);
+                const [merchantSnap, userSnap] = await Promise.all([
+                    transaction.get(merchantDocRef),
+                    transaction.get(userDocRef)
+                ]);
 
-                if (!merchantSnap.exists()) return;
+                if (!merchantSnap.exists() || !userSnap.exists()) return;
 
                 const merchantData = merchantSnap.data() as Merchant;
+                const userData = userSnap.data() as User;
 
-                // Update order status to 'failed' in merchant doc
-                const failedOrder = { ...order, status: 'failed' as 'failed', error: error.message };
+                const failedOrderInCart = { ...order, status: 'failed' as 'failed', error: error.message };
+                const failedOrderForMerchant = { ...order, title: order.title, status: 'failed' as 'failed', error: error.message };
                 
+                // Remove from pending, add to recent transactions with 'failed' status
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
-                const updatedRecentTransactions = arrayUnion({ ...failedOrder, title: order.title });
+                const updatedRecentTransactions = arrayUnion(failedOrderForMerchant);
+
+                // Update user's cart item to 'failed'
+                const updatedUserCart = (userData.cart || []).map(item => 
+                    item.orderId === order!.orderId ? failedOrderInCart : item
+                );
 
                 // Return stock to inventory
                  const updatedListings = updateInventory(
@@ -206,6 +216,7 @@ export async function POST(req: NextRequest) {
                     recentTransactions: updatedRecentTransactions,
                     listings: updatedListings,
                 });
+                transaction.update(userDocRef, { cart: updatedUserCart });
             });
              console.log(`Firestore updated for failed order ${order.orderId}`);
         } catch (dbError) {
