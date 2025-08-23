@@ -94,7 +94,8 @@
     --input: 185 14% 90%;             /* Input field background */
     --ring: 202 100% 62%;             /* Focus ring color */
     --radius: 0.75rem;                /* Component border radius */
-    --hero-banner-image: url('https://placehold.co/1200x300/00c2ff/ffffff.png?text=Tropics');
+    --gradient-hero: linear-gradient(135deg, hsl(199 89% 35%), hsl(180 75% 55%));
+    --hero-banner-image: url('https://travelcuba.live/assets/hero-beach-CYkRGuro.jpg');
   }
   .dark.theme-tropics {
     --background: 195 25% 15%;
