@@ -3,13 +3,14 @@
 
 import * as React from "react"
 
-type Theme = "theme-default-eco" | "theme-tropics" | "theme-berlin";
+type Theme = "theme-default-eco" | "theme-tropics" | "theme-berlin" | "theme-tropic2";
 type Mode = "light" | "dark" | "system";
 
 const FONT_MAP: Record<Theme, { header: string; body: string }> = {
   "theme-default-eco": { header: "'Bitter', serif", body: "'Open Sans', sans-serif" },
   "theme-tropics": { header: "'Nerko One', cursive", body: "'Montserrat', sans-serif" },
   "theme-berlin": { header: "'Exo 2', sans-serif", body: "'Ubuntu', sans-serif" },
+  "theme-tropic2": { header: "'DynaPuff', cursive", body: "'Julius Sans One', sans-serif" },
 };
 
 
@@ -62,7 +63,7 @@ export function ThemeProvider({
 
   React.useEffect(() => {
     const root = window.document.documentElement
-    root.classList.remove("theme-default-eco", "theme-tropics", "theme-berlin", "light", "dark")
+    root.classList.remove("theme-default-eco", "theme-tropics", "theme-berlin", "theme-tropic2", "light", "dark")
 
     if (mode === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
@@ -108,3 +109,5 @@ export const useTheme = () => {
 
   return context
 }
+
+    

@@ -178,6 +178,7 @@ export default function SettingsPage() {
                                                 <SelectContent>
                                                     <SelectItem value="theme-default-eco">Default</SelectItem>
                                                     <SelectItem value="theme-tropics">Tropics</SelectItem>
+                                                    <SelectItem value="theme-tropic2">Tropic2</SelectItem>
                                                     <SelectItem value="theme-berlin">Berlin</SelectItem>
                                                 </SelectContent>
                                             </Select>
@@ -343,3 +344,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    
