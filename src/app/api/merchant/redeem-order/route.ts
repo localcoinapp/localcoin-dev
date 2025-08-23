@@ -18,7 +18,7 @@ import {
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/firestore';
 import type { User, Merchant, CartItem, MerchantItem } from '@/types';
 import * as bip39 from 'bip39';
 
@@ -154,7 +154,8 @@ export async function POST(req: NextRequest) {
             o.orderId !== order!.orderId
         );
         
-        const updatedTransactions = [...(freshMerchantData.recentTransactions || []), completedOrder];
+        // Use arrayUnion to safely add the completed order to recent transactions
+        const updatedTransactions = arrayUnion(completedOrder);
         
         const newMerchantBalance = (freshMerchantData.walletBalance || 0) + order!.price;
         const newUserBalance = (freshUserData.walletBalance || 0) - order!.price;
@@ -189,8 +190,8 @@ export async function POST(req: NextRequest) {
                 const merchantData = merchantSnap.data() as Merchant;
                 const userData = userSnap.data() as User;
 
-                const failedOrderInCart = { ...order, status: 'failed' as 'failed', error: error.message };
-                const failedOrderForMerchant = { ...order, status: 'failed' as 'failed', error: error.message };
+                const failedOrderInCart: CartItem = { ...order, status: 'failed' as const, error: error.message };
+                const failedOrderForMerchant: CartItem = { ...order, status: 'failed' as const, error: error.message, redeemedAt: new Date() };
                 
                 // Remove from pending, add to recent transactions with 'failed' status
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
