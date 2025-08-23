@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { Separator } from "../ui/separator"
+import { loadStripe } from '@stripe/stripe-js';
 
 interface RampDialogProps {
   type: 'buy';
@@ -39,6 +40,9 @@ const generateUniqueCode = (userId: string) => {
     const datePart = Date.now().toString().slice(-6);
     return `${userPart}-${datePart}`;
 };
+
+// Initialize Stripe outside of the component to avoid re-creating it on every render.
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export function RampDialog({ type, children }: RampDialogProps) {
     const { user } = useAuth();
@@ -96,6 +100,53 @@ export function RampDialog({ type, children }: RampDialogProps) {
         }
 
         setIsLoading(true);
+
+        // --- Stripe Payment Flow ---
+        if (paymentMethod === 'stripe') {
+            try {
+                const response = await fetch('/api/stripe/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: parseFloat(amount),
+                        currency: currency,
+                        userId: user.id,
+                        userName: user.name || user.email,
+                        userWalletAddress: user.walletAddress,
+                    }),
+                });
+
+                const { sessionId, error: apiError } = await response.json();
+                
+                if (apiError || !response.ok) {
+                    throw new Error(apiError || "Failed to create Stripe session.");
+                }
+
+                const stripe = await stripePromise;
+                if (!stripe) throw new Error("Stripe.js has not loaded yet.");
+
+                const { error } = await stripe.redirectToCheckout({ sessionId });
+
+                if (error) {
+                    toast({
+                        title: "Stripe Error",
+                        description: error.message || "An unexpected error occurred during redirection.",
+                        variant: "destructive"
+                    });
+                }
+            } catch (error) {
+                 toast({
+                    title: "Request Failed",
+                    description: (error as Error).message,
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
+
+        // --- Bank Transfer Flow ---
         try {
             const requestsCollection = collection(db, 'tokenPurchaseRequests');
             await addDoc(requestsCollection, {
@@ -223,30 +274,17 @@ export function RampDialog({ type, children }: RampDialogProps) {
                             <DialogHeader>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="icon" onClick={() => setStep('method')}><ArrowLeft/></Button>
-                                    <DialogTitle>Pay with Stripe</DialogTitle>
+                                    <DialogTitle>Pay with Card</DialogTitle>
                                 </div>
                                 <DialogDescription>
-                                    You are about to purchase tokens worth {amount} {currency}.
+                                    You will be redirected to Stripe to securely complete your purchase of tokens worth {amount} {currency}.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="py-4 text-center">
-                                {/* ====================================================================== */}
-                                {/* FUTURE STRIPE INTEGRATION POINT                                        */}
-                                {/* ====================================================================== */}
-                                {/*                                                                        */}
-                                {/* 1. Create a server-side API endpoint (e.g., /api/create-stripe-session). */}
-                                {/* 2. In that endpoint, use the Stripe Node.js library to create a         */}
-                                {/*    Checkout Session with the amount and currency.                        */}
-                                {/* 3. On this page, call that API endpoint to get the session ID.           */}
-                                {/* 4. Use the Stripe.js library to redirect to the Stripe-hosted checkout.  */}
-                                {/*    (e.g., stripe.redirectToCheckout({ sessionId: 'YOUR_SESSION_ID' })) */}
-                                {/* 5. For now, this is a placeholder.                                     */}
-                                {/*                                                                        */}
-                                {/* ====================================================================== */}
-                                <Alert>
-                                    <AlertTitle>Stripe Integration Coming Soon</AlertTitle>
+                               <Alert>
+                                    <AlertTitle>Redirecting to Stripe</AlertTitle>
                                     <AlertDescription>
-                                        This is a placeholder for the Stripe Checkout integration. Press "Confirm Purchase" to submit your request for now. We are using the {currency === 'EUR' ? 'EU' : 'US'} Stripe processor.
+                                        Press "Continue to Payment" to proceed to our secure payment page.
                                     </AlertDescription>
                                 </Alert>
                             </div>
@@ -256,8 +294,8 @@ export function RampDialog({ type, children }: RampDialogProps) {
                                     onClick={handleSubmit} 
                                     disabled={isLoading} 
                                 >
-                                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Confirm Purchase
+                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Continue to Payment
                                 </Button>
                             </DialogFooter>
                         </>
@@ -346,3 +384,5 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
+
+    
