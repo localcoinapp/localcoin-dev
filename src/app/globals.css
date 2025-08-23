@@ -46,7 +46,7 @@
     --input: 220 13% 91%;              /* Input field background */
     --ring: var(--gold);               /* Focus ring color */
     --radius: 0.5rem;                  /* Component border radius */
-    --hero-banner-image: url('https://placehold.co/1200x300.png?text=Default+Eco');
+    --hero-banner-image: url('https://placehold.co/1200x300/f3e5b5/4f4639.png?text=Default+Eco');
   }
   .dark.theme-default-eco {
     --background: 30 14% 15%;
@@ -94,7 +94,7 @@
     --input: 185 14% 90%;             /* Input field background */
     --ring: 202 100% 62%;             /* Focus ring color */
     --radius: 0.75rem;                /* Component border radius */
-    --hero-banner-image: url('https://placehold.co/1200x300.png?text=Tropics');
+    --hero-banner-image: url('https://placehold.co/1200x300/00c2ff/ffffff.png?text=Tropics');
   }
   .dark.theme-tropics {
     --background: 195 25% 15%;
@@ -142,7 +142,7 @@
     --input: 0 0% 85%;                 /* Input field background */
     --ring: 60 95% 55%;                /* Focus ring color */
     --radius: 0rem;                    /* Component border radius */
-    --hero-banner-image: url('https://placehold.co/1200x300.png?text=Berlin');
+    --hero-banner-image: url('https://placehold.co/1200x300/ffff00/000000.png?text=Berlin');
   }
   .dark.theme-berlin {
     --background: 0 0% 10%;
