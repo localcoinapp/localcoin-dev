@@ -37,12 +37,16 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 const HeroBanner = () => {
   return (
     <div
-      className="relative rounded-lg py-12 px-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
-      style={{ backgroundImage: "var(--hero-banner-image)" }}
+      className="relative rounded-lg py-16 px-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
+      style={{ }}
       data-ai-hint="tropical beach"
     >
       <div 
-        className="absolute inset-0 rounded-lg"
+        className="absolute inset-0 rounded-lg bg-cover bg-center"
+        style={{ backgroundImage: "var(--hero-banner-image)" }}
+      ></div>
+      <div 
+        className="absolute inset-0 rounded-lg opacity-50"
         style={{ backgroundImage: "var(--gradient-hero)" }}
       ></div>
       <div className="relative z-10">
@@ -86,11 +90,11 @@ export default function MarketplacePage() {
   }, [toast]);
   
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-0">
       <HeroBanner />
 
-      <Tabs defaultValue="list" className="mt-4">
-        <div className="bg-card p-4 rounded-lg shadow-md mb-8 sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <Tabs defaultValue="list" className="w-full">
+        <div className="bg-card p-4 rounded-lg shadow-md mt-0 sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="w-full sm:w-auto flex-grow flex flex-col sm:flex-row gap-4">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -119,7 +123,7 @@ export default function MarketplacePage() {
             </TabsList>
         </div>
         
-        <TabsContent value="list">
+        <TabsContent value="list" className="pt-8">
             {loading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <Skeleton className="h-80 w-full" />
@@ -140,7 +144,7 @@ export default function MarketplacePage() {
               </div>
             )}
         </TabsContent>
-        <TabsContent value="map">
+        <TabsContent value="map" className="pt-8">
           <div className="w-full h-[600px] rounded-lg overflow-hidden">
             <MapView merchants={merchants} />
           </div>
