@@ -60,8 +60,12 @@ export default function OrderHistoryPage() {
       const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          // CORRECTED: Fetch from recentTransactions instead of pendingOrders
-          const history: CartItem[] = data?.recentTransactions || [];
+          // Fetch from both pending and recent to get all historical items
+          const pending = data?.pendingOrders || [];
+          const recent = data?.recentTransactions || [];
+          const allOrders = [...pending, ...recent];
+          const historicalStatuses: OrderStatus[] = ['completed', 'rejected', 'cancelled', 'refunded'];
+          const history = allOrders.filter((order: CartItem) => historicalStatuses.includes(order.status));
           setOrderHistory(history);
         } else {
           setOrderHistory([]);
@@ -164,7 +168,6 @@ export default function OrderHistoryPage() {
                   <TableRow key={order.orderId}>
                     <TableCell className="font-mono text-xs">{order.orderId.substring(0, 8)}...</TableCell>
                     <TableCell>{order.userName}</TableCell>
-                    {/* CORRECTED: Use order.title instead of order.name */}
                     <TableCell>{order.title}</TableCell>
                     <TableCell>{order.price.toFixed(2)}</TableCell>
                     <TableCell>
