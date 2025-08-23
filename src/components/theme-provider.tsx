@@ -9,7 +9,7 @@ type Mode = "light" | "dark" | "system";
 const FONT_MAP: Record<Theme, { header: string; body: string }> = {
   "theme-default-eco": { header: "'Bitter', serif", body: "'Open Sans', sans-serif" },
   "theme-tropics": { header: "'Nerko One', cursive", body: "'Montserrat', sans-serif" },
-  "theme-berlin": { header: "'Exo 2', sans-serif", body: "'Ubuntu', sans-serif" },
+  "theme-berlin": { header: "'Belanosima', sans-serif", body: "'Ubuntu', sans-serif" },
   "theme-tropic2": { header: "'DynaPuff', cursive", body: "'Julius Sans One', sans-serif" },
 };
 
