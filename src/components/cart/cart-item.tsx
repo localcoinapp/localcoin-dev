@@ -30,7 +30,18 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 export function CartItemCard({ cartItem, onCancel, onRedeem, isRedeemDialogOpen, onOpenChange }: CartItemCardProps) {
     const config = statusConfig[cartItem.status];
-    const requestedAt = cartItem.timestamp?.toDate ? formatDistanceToNow(cartItem.timestamp.toDate(), { addSuffix: true }) : 'some time ago';
+    
+    const getRelativeDate = (timestamp: any) => {
+      if (!timestamp) return 'some time ago';
+      // Check if it's a Firestore Timestamp
+      if (typeof timestamp.toDate === 'function') {
+        return formatDistanceToNow(timestamp.toDate(), { addSuffix: true });
+      }
+      // Otherwise, assume it's already a JS Date or a string that can be parsed
+      return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+    };
+
+    const requestedAt = getRelativeDate(cartItem.timestamp);
 
     return (
         <Card className={cn("overflow-hidden", cartItem.status === 'rejected' && 'bg-muted/50')}>

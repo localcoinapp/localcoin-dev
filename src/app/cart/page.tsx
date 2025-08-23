@@ -25,7 +25,7 @@ import { CartItemCard } from "@/components/cart/cart-item";
 
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, runTransaction, arrayUnion } from "firebase/firestore";
+import { doc, onSnapshot, runTransaction, arrayUnion, Timestamp } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import type { CartItem, OrderStatus, Merchant } from '@/types';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
@@ -206,7 +206,12 @@ export default function CartPage() {
     .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded', 'failed'].includes(item.status))
     .filter(item => historyFilter === 'all' || item.status === historyFilter)
     .sort((a, b) => {
-        const getDate = (item: CartItem) => item.redeemedAt?.toDate() || item.timestamp?.toDate();
+        const getDate = (item: CartItem) => {
+          const timestampField = item.redeemedAt || item.timestamp;
+          if (!timestampField) return 0;
+          // Check if it's a Firestore Timestamp and convert, otherwise assume it's a JS Date
+          return typeof timestampField.toDate === 'function' ? timestampField.toDate() : timestampField;
+        };
         const timeA = getDate(a)?.getTime() || 0;
         const timeB = getDate(b)?.getTime() || 0;
 
