@@ -35,20 +35,10 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 });
 
 const HeroBanner = () => {
-  const { theme } = useTheme();
-
-  // Define banner styles based on theme
-  const bannerStyles: { [key: string]: React.CSSProperties } = {
-    'theme-default-eco': { backgroundImage: "url('https://placehold.co/1200x300/f3e5b5/4f4639.png?text=Local+Eco')" , backgroundPosition: 'center', backgroundSize: 'cover' },
-    'theme-tropics': { backgroundImage: "url('https://placehold.co/1200x300/00c2ff/ffffff.png?text=Tropics')" , backgroundPosition: 'center', backgroundSize: 'cover' },
-    'theme-berlin': { backgroundImage: "url('https://placehold.co/1200x300/ffff00/000000.png?text=Berlin')" , backgroundPosition: 'center', backgroundSize: 'cover' },
-    'theme-tropic2': { backgroundImage: "url('https://placehold.co/1200x300/ff4f00/ffffff.png?text=Tropic2')" , backgroundPosition: 'center', backgroundSize: 'cover' },
-  };
-
   return (
     <div
-      className="mb-8 rounded-lg p-12 text-center text-background shadow-lg transition-all duration-300"
-      style={bannerStyles[theme]}
+      className="mb-8 rounded-lg p-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
+      style={{ backgroundImage: "var(--hero-banner-image)" }}
       data-ai-hint="tropical beach"
     >
         <h1 className="text-4xl font-headline font-bold text-white drop-shadow-md">Discover Local Services</h1>
