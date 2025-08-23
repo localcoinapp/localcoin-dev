@@ -230,6 +230,19 @@ export function RampDialog({ type, children }: RampDialogProps) {
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="py-4 text-center">
+                                {/* ====================================================================== */}
+                                {/* FUTURE STRIPE INTEGRATION POINT                                        */}
+                                {/* ====================================================================== */}
+                                {/*                                                                        */}
+                                {/* 1. Create a server-side API endpoint (e.g., /api/create-stripe-session). */}
+                                {/* 2. In that endpoint, use the Stripe Node.js library to create a         */}
+                                {/*    Checkout Session with the amount and currency.                        */}
+                                {/* 3. On this page, call that API endpoint to get the session ID.           */}
+                                {/* 4. Use the Stripe.js library to redirect to the Stripe-hosted checkout.  */}
+                                {/*    (e.g., stripe.redirectToCheckout({ sessionId: 'YOUR_SESSION_ID' })) */}
+                                {/* 5. For now, this is a placeholder.                                     */}
+                                {/*                                                                        */}
+                                {/* ====================================================================== */}
                                 <Alert>
                                     <AlertTitle>Stripe Integration Coming Soon</AlertTitle>
                                     <AlertDescription>
