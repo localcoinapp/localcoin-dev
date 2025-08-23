@@ -1,4 +1,6 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body: { order: CartItem } = await req.json();
- console.log('Received request body:', body);
+    console.log('Received request body:', body);
     order = body.order;
 
     if (!order || !order.userId || !order.merchantId) {
@@ -167,8 +169,8 @@ export async function POST(req: NextRequest) {
         });
     });
 
- const successResponse = { signature };
- return NextResponse.json(successResponse);
+    const successResponse = { signature };
+    return NextResponse.json(successResponse);
 
   } catch (error: any) {
     console.error(`Error in redeem-order API for orderId ${order?.orderId}:`, error);
@@ -214,12 +216,12 @@ export async function POST(req: NextRequest) {
                     listings: updatedListings,
                 });
                 transaction.update(userDocRef, { cart: updatedUserCart });
- console.log(`Firestore updated successfully for failed order ${order.orderId}`);
+                console.log(`Firestore updated successfully for failed order ${order.orderId}`);
             });
 
         } catch (dbError) {
             console.error(`CRITICAL: Failed to update Firestore after redemption error for order ${order.orderId}:`, dbError);
- console.error('Original redemption error was:', error);
+            console.error('Original redemption error was:', error);
         }
     }
     // --- END FAILURE SCENARIO ---
