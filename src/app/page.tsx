@@ -37,13 +37,13 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 const HeroBanner = () => {
   return (
     <div
-      className="relative mb-4 rounded-lg py-8 px-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
-      style={{ backgroundImage: "var(--hero-banner-image, none)" }}
+      className="relative rounded-lg py-12 px-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
+      style={{ backgroundImage: "var(--hero-banner-image)" }}
       data-ai-hint="tropical beach"
     >
       <div 
         className="absolute inset-0 rounded-lg"
-        style={{ backgroundImage: "var(--gradient-hero, none)" }}
+        style={{ backgroundImage: "var(--gradient-hero)" }}
       ></div>
       <div className="relative z-10">
         <h1 className="text-4xl font-headline font-bold text-white drop-shadow-md">Discover Local Services</h1>
@@ -86,10 +86,10 @@ export default function MarketplacePage() {
   }, [toast]);
   
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
       <HeroBanner />
 
-      <Tabs defaultValue="list">
+      <Tabs defaultValue="list" className="mt-4">
         <div className="bg-card p-4 rounded-lg shadow-md mb-8 sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="w-full sm:w-auto flex-grow flex flex-col sm:flex-row gap-4">
             <div className="relative flex-grow">
