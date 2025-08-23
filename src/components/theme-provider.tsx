@@ -75,10 +75,12 @@ export function ThemeProvider({
 
     root.classList.add(theme);
 
-    // Set font CSS variables
-    const selectedFonts = FONT_MAP[theme];
-    root.style.setProperty('--font-header', selectedFonts.header);
-    root.style.setProperty('--font-body', selectedFonts.body);
+    // Set font CSS variables only if theme is defined
+    if (theme && FONT_MAP[theme]) {
+        const selectedFonts = FONT_MAP[theme];
+        root.style.setProperty('--font-header', selectedFonts.header);
+        root.style.setProperty('--font-body', selectedFonts.body);
+    }
 
     try {
       localStorage.setItem(storageKey, `${theme}:${mode}`)
@@ -109,5 +111,3 @@ export const useTheme = () => {
 
   return context
 }
-
-    
