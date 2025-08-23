@@ -143,7 +143,7 @@
     --input: 0 0% 85%;                 /* Input field background */
     --ring: 60 95% 55%;                /* Focus ring color */
     --radius: 0rem;                    /* Component border radius */
-    --hero-banner-image: url('https://placehold.co/1200x300/ffff00/000000.png?text=Berlin');
+    --hero-banner-image: url('https://berlin.localcoin.cloud/assets/berlin-street-art-hero-BBVZ5ceD.jpg');
   }
   .dark.theme-berlin {
     --background: 0 0% 10%;
@@ -216,3 +216,6 @@
     --ring: 212.7 26.8% 83.9%;
   }
 }
+
+
+    
