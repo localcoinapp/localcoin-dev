@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, Timestamp } from "firebase/firestore";
 import type { CartItem, OrderStatus } from "@/types";
+import { cn } from "@/lib/utils";
 
 type SortOption = 'date-desc' | 'date-asc' | 'price-asc' | 'price-desc';
 
