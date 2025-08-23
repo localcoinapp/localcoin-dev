@@ -24,11 +24,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
       </head>
-      <body
-        className={cn(
-          'min-h-screen bg-background font-body antialiased',
-        )}
-      >
+      <body>
         <ThemeProvider>
           <AuthProvider>
             <div className="relative flex min-h-screen flex-col">

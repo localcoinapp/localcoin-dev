@@ -6,6 +6,13 @@ import * as React from "react"
 type Theme = "theme-default-eco" | "theme-tropics" | "theme-berlin";
 type Mode = "light" | "dark" | "system";
 
+const FONT_MAP: Record<Theme, { header: string; body: string }> = {
+  "theme-default-eco": { header: "'Bitter', serif", body: "'Open Sans', sans-serif" },
+  "theme-tropics": { header: "'Nerko One', cursive", body: "'Montserrat', sans-serif" },
+  "theme-berlin": { header: "'Exo 2', sans-serif", body: "'Ubuntu', sans-serif" },
+};
+
+
 type ThemeProviderState = {
   theme: Theme
   setTheme: (theme: Theme) => void
@@ -65,7 +72,13 @@ export function ThemeProvider({
         root.classList.add(mode)
     }
 
-    root.classList.add(theme)
+    root.classList.add(theme);
+
+    // Set font CSS variables
+    const selectedFonts = FONT_MAP[theme];
+    root.style.setProperty('--font-header', selectedFonts.header);
+    root.style.setProperty('--font-body', selectedFonts.body);
+
     try {
       localStorage.setItem(storageKey, `${theme}:${mode}`)
     } catch (e) {
