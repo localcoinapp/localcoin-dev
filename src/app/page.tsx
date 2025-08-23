@@ -37,8 +37,8 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 const HeroBanner = () => {
   return (
     <div
-      className="relative mb-8 rounded-lg p-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
-      style={{ backgroundImage: "var(--hero-banner-image)" }}
+      className="relative mb-4 rounded-lg py-8 px-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
+      style={{ backgroundImage: "var(--hero-banner-image, none)" }}
       data-ai-hint="tropical beach"
     >
       <div 
@@ -86,7 +86,7 @@ export default function MarketplacePage() {
   }, [toast]);
   
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
       <HeroBanner />
 
       <Tabs defaultValue="list">
