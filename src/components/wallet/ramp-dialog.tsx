@@ -58,21 +58,6 @@ export function RampDialog({ type, children }: RampDialogProps) {
         return null;
     }, [user]);
 
-    const bankDetails = {
-        EUR: {
-            beneficiary: "LocalCoin EU, S.L.",
-            iban: "ES85 2100 0000 0000 0000 0000",
-            bic: "CAIXESBBXXX",
-            bank: "CaixaBank, S.A."
-        },
-        USD: {
-            beneficiary: "LocalCoin US, Inc.",
-            achRouting: "021000021",
-            accountNumber: "8901234567",
-            bank: "JPMorgan Chase Bank, N.A."
-        }
-    }
-
     const resetState = () => {
         setAmount('');
         setStep('amount');
@@ -266,7 +251,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
                     )
                 }
                 if (paymentMethod === 'bank') {
-                    const details = bankDetails[currency];
+                    const details = siteConfig.bankDetails[currency];
                     return (
                         <>
                            <DialogHeader>
@@ -303,7 +288,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
                                                     <p className="text-sm text-muted-foreground">IBAN</p>
                                                     <p className="font-mono">{details.iban}</p>
                                                 </div>
-                                                 <Button variant="ghost" size="icon" onClick={() => handleCopyToClipboard(details.iban, 'iban')}>
+                                                 <Button variant="ghost" size="icon" onClick={() => handleCopyToClipboard(details.iban!, 'iban')}>
                                                     {hasCopiedIban ? <Check className="h-4 w-4 text-green-500"/> : <Copy className="h-4 w-4" />}
                                                 </Button>
                                             </div>
