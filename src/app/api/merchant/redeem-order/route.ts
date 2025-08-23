@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     const mintInfo = await getMint(connection, tokenMintPublicKey);
     const decimals = mintInfo.decimals;
-    const rawAmount = BigInt(order.price * (10 ** decimals));
+    const rawAmount = BigInt(Math.round(order.price * (10 ** decimals)));
 
     // Get or create Associated Token Accounts for both user and merchant
     const fromAta = await getOrCreateAssociatedTokenAccount(
@@ -123,30 +123,33 @@ export async function POST(req: NextRequest) {
         const freshUserData = freshUserSnap.data();
         const freshMerchantData = freshMerchantSnap.data();
 
-        const completedOrder = { 
-            ...order, 
+        // CORRECTED: Ensure the completed order has the `title` field
+        const completedOrder: CartItem = { 
+            ...order,
+            title: order.title, // Explicitly carry over the title
             status: 'completed', 
             redeemedAt: new Date(),
             transactionSignature: signature 
         };
 
-        // Update user's cart
+        // Update user's cart: find the item and update its status.
         const updatedUserCart = (freshUserData.cart || []).map((cartItem: CartItem) =>
             cartItem.orderId === order.orderId ? completedOrder : cartItem
         );
         
-        // This is the array for the merchant's view of active orders
+        // Remove the order from the merchant's active pending orders
         const updatedPendingOrders = (freshMerchantData.pendingOrders || []).filter((o: CartItem) => 
             o.orderId !== order.orderId
         );
         
-        // This is the historical log. We add the completed order here.
+        // Add the completed order to the historical log for the merchant.
         const updatedTransactions = [...(freshMerchantData.recentTransactions || []), completedOrder];
         const updatedReserved = (freshMerchantData.reserved || []).filter((r: any) => r.orderId !== order.orderId);
         
         const newMerchantBalance = (freshMerchantData.walletBalance || 0) + order.price;
+        const newUserBalance = (freshUserData.walletBalance || 0) - order.price;
 
-        transaction.update(userDocRef, { cart: updatedUserCart });
+        transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newUserBalance });
         transaction.update(merchantDocRef, {
             pendingOrders: updatedPendingOrders,
             recentTransactions: updatedTransactions,

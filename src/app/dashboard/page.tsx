@@ -75,7 +75,8 @@ import {
   collection,
   query,
   where,
-  Timestamp
+  Timestamp,
+  arrayUnion
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -182,7 +183,7 @@ export default function DashboardPage() {
           const data = { id: doc.id, ...doc.data() } as Merchant;
           setMerchantData(data);
           const active = (data.pendingOrders || []).filter((order: any) => 
-              !['completed', 'rejected', 'cancelled'].includes(order.status)
+              !['completed', 'rejected', 'cancelled', 'refunded'].includes(order.status)
           );
           setActiveOrders(active);
         } else {
@@ -316,7 +317,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDenyOrder = async (orderId: string, userId: string) => {
+  const handleDenyOrder = async (orderId: string, userId: string, listingId: string, quantity: number) => {
     if (!user || !user.merchantId) return;
   
     const merchantDocRef = doc(db, 'merchants', user.merchantId);
@@ -334,10 +335,7 @@ export default function DashboardPage() {
         const merchantData = merchantDoc.data();
         const userData = userDoc.data();
   
-        const orderToDeny = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === orderId);
-        if (!orderToDeny) throw new Error("Order not found.");
-  
-        const updatedPendingOrders = merchantData.pendingOrders.map((o: CartItem) => 
+        const updatedPendingOrders = (merchantData.pendingOrders || []).map((o: CartItem) => 
             o.orderId === orderId ? { ...o, status: 'rejected' } : o
         );
         const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
@@ -346,14 +344,17 @@ export default function DashboardPage() {
   
         const updatedListings = updateInventory(
             merchantData.listings || [],
-            orderToDeny.listingId,
-            orderToDeny.quantity
+            listingId,
+            quantity
         );
 
         const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== orderId);
-  
+
+        const rejectedOrder = updatedPendingOrders.find(o => o.orderId === orderId);
+
         transaction.update(merchantDocRef, {
-          pendingOrders: updatedPendingOrders,
+          pendingOrders: updatedPendingOrders.filter(o => o.orderId !== orderId),
+          recentTransactions: arrayUnion(rejectedOrder),
           listings: updatedListings,
           reserved: updatedReserved
         });
@@ -798,7 +799,7 @@ export default function DashboardPage() {
                             </Select>
                        </CardHeader>
                        <CardContent className="grid grid-cols-2 items-center">
-                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} ${siteConfig.token.symbol}</div>
+                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
                            <div className="flex h-full items-center justify-center p-2">
                              <Link href="/dashboard/cashout-history" passHref className="w-full">
                                 <Button variant="outline" className="w-full">
@@ -826,7 +827,7 @@ export default function DashboardPage() {
                             </Select>
                        </CardHeader>
                        <CardContent>
-                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} ${siteConfig.fiatCurrency.symbol}</div>
+                           <div className="text-3xl font-bold text-green-600">{netProfit.toFixed(2)} {siteConfig.fiatCurrency.symbol}</div>
                            <p className="text-xs text-muted-foreground">
                             After {siteConfig.commissionRate * 100}% platform commission.
                            </p>
@@ -858,7 +859,7 @@ export default function DashboardPage() {
                             {order.status === 'pending_approval' && (
                               <div className="flex justify-end gap-2">
                                 <Button size="sm" variant="outline" onClick={() => handleApproveOrder(order.orderId, order.userId)}><Check className="mr-1 h-4 w-4" /> Approve</Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDenyOrder(order.orderId, order.userId)}><X className="mr-1 h-4 w-4" /> Deny</Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleDenyOrder(order.orderId, order.userId, order.listingId, order.quantity)}><X className="mr-1 h-4 w-4" /> Deny</Button>
                               </div>
                             )}
                             {order.status === 'approved' && <Badge variant="secondary">Awaiting User</Badge>}
@@ -937,4 +938,5 @@ export default function DashboardPage() {
     
 
     
+
 

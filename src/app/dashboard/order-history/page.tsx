@@ -59,10 +59,8 @@ export default function OrderHistoryPage() {
       const unsubscribe = onSnapshot(merchantDocRef, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          const allOrders = data?.pendingOrders || [];
-          const history: CartItem[] = allOrders.filter((order: any) => 
-            ['completed', 'rejected', 'cancelled', 'refunded'].includes(order.status)
-          );
+          // CORRECTED: Fetch from recentTransactions instead of pendingOrders
+          const history: CartItem[] = data?.recentTransactions || [];
           setOrderHistory(history);
         } else {
           setOrderHistory([]);
@@ -165,7 +163,8 @@ export default function OrderHistoryPage() {
                   <TableRow key={order.orderId}>
                     <TableCell className="font-mono text-xs">{order.orderId.substring(0, 8)}...</TableCell>
                     <TableCell>{order.userName}</TableCell>
-                    <TableCell>{order.name}</TableCell>
+                    {/* CORRECTED: Use order.title instead of order.name */}
+                    <TableCell>{order.title}</TableCell>
                     <TableCell>{order.price.toFixed(2)}</TableCell>
                     <TableCell>
                         <Badge 
@@ -175,7 +174,10 @@ export default function OrderHistoryPage() {
                                 : order.status === 'refunded' ? 'secondary'
                                 : 'outline'
                             }
-                            className={order.status === 'refunded' ? 'bg-blue-500 text-white' : ''}
+                            className={cn(
+                                order.status === 'completed' ? 'bg-green-600 text-white' : '',
+                                order.status === 'refunded' ? 'bg-blue-500 text-white' : ''
+                             )}
                         >
                             {order.status}
                         </Badge>
