@@ -37,19 +37,18 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 const HeroBanner = () => {
   return (
     <div
-      className="relative rounded-lg py-16 px-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
-      style={{ }}
+      className="relative w-full h-48 sm:h-64 md:h-80 bg-muted rounded-lg overflow-hidden mb-8 shadow-lg flex items-center justify-center text-center text-background"
       data-ai-hint="tropical beach"
     >
       <div 
-        className="absolute inset-0 rounded-lg bg-cover bg-center"
+        className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "var(--hero-banner-image)" }}
       ></div>
       <div 
-        className="absolute inset-0 rounded-lg opacity-50"
+        className="absolute inset-0 opacity-50"
         style={{ backgroundImage: "var(--gradient-hero)" }}
       ></div>
-      <div className="relative z-10">
+      <div className="relative z-10 p-4">
         <h1 className="text-4xl font-headline font-bold text-white drop-shadow-md">Discover Local Services</h1>
         <p className="mt-2 text-white/90 drop-shadow-md">
           Explore and connect with merchants in your area.
@@ -90,11 +89,11 @@ export default function MarketplacePage() {
   }, [toast]);
   
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-0">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <HeroBanner />
 
       <Tabs defaultValue="list" className="w-full">
-        <div className="bg-card p-4 rounded-lg shadow-md mt-0 sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="bg-card p-4 rounded-lg shadow-md sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="w-full sm:w-auto flex-grow flex flex-col sm:flex-row gap-4">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
