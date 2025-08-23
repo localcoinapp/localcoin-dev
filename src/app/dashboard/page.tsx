@@ -59,6 +59,7 @@ import {
   Receipt,
   FileText,
   Upload,
+  Download,
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -672,7 +673,7 @@ export default function DashboardPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-4">
           <h1 className="text-3xl font-bold font-headline">Merchant Dashboard</h1>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href={`/merchants/${merchantData.id}`} passHref>
                 <Button><Eye className="mr-2 h-4 w-4" /> View My Site</Button>
             </Link>
@@ -690,6 +691,12 @@ export default function DashboardPage() {
                 {isUploadingCsv ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Import from CSV
             </Button>
+             <Button variant="link" asChild className="p-0 h-auto">
+                <a href="/inventory_template.csv" download>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Template
+                </a>
+             </Button>
             <Link href="/dashboard/settings" passHref>
               <Button variant="outline"><Settings className="mr-2 h-4 w-4" /> Store Settings</Button>
             </Link>

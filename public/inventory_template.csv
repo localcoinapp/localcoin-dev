@@ -1,4 +1,5 @@
 name,price,category,quantity,description
-"Single Origin Espresso",2.50,"Cafe",50,"A rich and bold espresso shot made from single-origin beans."
-"Croissant",3.00,"Cafe",30,"A flaky, buttery croissant, baked fresh daily."
-"Catered Lunch for 10",250,"Events",5,"A fully catered lunch service for up to 10 people, includes sandwiches, salads, and drinks."
+"Artisanal Coffee Beans",15.50,"Cafe",100,"Single-origin coffee beans from the highlands of Ethiopia, with notes of blueberry and dark chocolate."
+"Freshly Baked Croissant",3.25,"Cafe",50,"A buttery, flaky croissant, baked fresh every morning."
+"Paella for Two",55.00,"Restaurant",20,"A classic Spanish paella with saffron rice, chorizo, chicken, and fresh seafood. Perfect for a shared dinner."
+"Day Pass",25.00,"Coworking",-1,"Enjoy a full day of access to our productive coworking space, including high-speed internet and free coffee. -1 for unlimited."
