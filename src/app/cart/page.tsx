@@ -206,12 +206,21 @@ export default function CartPage() {
     .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded', 'failed'].includes(item.status))
     .filter(item => historyFilter === 'all' || item.status === historyFilter)
     .sort((a, b) => {
-        const getDate = (item: CartItem) => {
-          const timestampField = item.redeemedAt || item.timestamp;
-          if (!timestampField) return 0;
-          // Check if it's a Firestore Timestamp and convert, otherwise assume it's a JS Date
-          return typeof timestampField.toDate === 'function' ? timestampField.toDate() : timestampField;
+        const getDate = (item: CartItem): Date | null => {
+            const timestampField = item.redeemedAt || item.timestamp;
+            if (!timestampField) return null;
+            
+            if (timestampField instanceof Timestamp) {
+                return timestampField.toDate();
+            }
+            if (timestampField instanceof Date) {
+                return timestampField;
+            }
+            // Handle cases where it might be a string or number
+            const date = new Date(timestampField);
+            return isNaN(date.getTime()) ? null : date;
         };
+
         const timeA = getDate(a)?.getTime() || 0;
         const timeB = getDate(b)?.getTime() || 0;
 
