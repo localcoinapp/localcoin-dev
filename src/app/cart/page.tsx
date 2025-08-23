@@ -176,9 +176,13 @@ export default function CartPage() {
     .sort((a, b) => {
         switch (historySort) {
             case 'date-desc':
-                return (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0) - (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0);
+                const dateA = a.redeemedAt?.toDate() || a.timestamp?.toDate();
+                const dateB = b.redeemedAt?.toDate() || b.timestamp?.toDate();
+                return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
             case 'date-asc':
-                return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
+                const dateAscA = a.redeemedAt?.toDate() || a.timestamp?.toDate();
+                const dateAscB = b.redeemedAt?.toDate() || b.timestamp?.toDate();
+                return (dateAscA?.getTime() || 0) - (dateAscB?.getTime() || 0);
             case 'price-asc':
                 return a.price - b.price;
             case 'price-desc':
