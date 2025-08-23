@@ -25,9 +25,9 @@ import { CartItemCard } from "@/components/cart/cart-item";
 
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, runTransaction } from "firebase/firestore";
+import { doc, onSnapshot, runTransaction, arrayUnion } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
-import type { CartItem, OrderStatus } from '@/types';
+import type { CartItem, OrderStatus, Merchant } from '@/types';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import { getAccount } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
@@ -172,17 +172,51 @@ export default function CartPage() {
         if (!userSnap.exists() || !merchantSnap.exists()) throw new Error("User or merchant document not found");
 
         const userData = userSnap.data();
-        const merchantData = merchantSnap.data();
+        const merchantData = merchantSnap.data() as Merchant;
 
         const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
           item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
-        const updatedPendingOrders = (merchantData.pendingOrders || []).map((item: CartItem) =>
-          item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
-        );
+        
+        let orderFoundAndUpdated = false;
+        
+        // Update in pendingOrders if it exists there
+        const updatedPendingOrders = (merchantData.pendingOrders || []).map((item: CartItem) => {
+          if(item.orderId === order.orderId) {
+            orderFoundAndUpdated = true;
+            return { ...item, status: 'ready_to_redeem' };
+          }
+          return item;
+        });
+
+        // If not found in pending, check recentTransactions (less common, but for robustness)
+        let updatedRecentTransactions;
+        if (!orderFoundAndUpdated) {
+            updatedRecentTransactions = (merchantData.recentTransactions || []).map((item: CartItem) => {
+                if (item.orderId === order.orderId) {
+                    orderFoundAndUpdated = true;
+                    return { ...item, status: 'ready_to_redeem' };
+                }
+                return item;
+            });
+        }
+        
+        if (!orderFoundAndUpdated) {
+            // This is a fallback if the order somehow isn't in a list the merchant can see.
+            // We'll add it to their pending orders. This is better than a silent failure.
+            console.warn(`Order ${order.orderId} not found in merchant's lists. Adding it to pendingOrders.`);
+            const orderToUpdate: CartItem = { ...order, status: 'ready_to_redeem' };
+            tx.update(merchantDocRef, {
+                pendingOrders: arrayUnion(orderToUpdate)
+            });
+        } else {
+             tx.update(merchantDocRef, { 
+                pendingOrders: updatedPendingOrders,
+                ...(updatedRecentTransactions && { recentTransactions: updatedRecentTransactions })
+             });
+        }
 
         tx.update(userDocRef, { cart: updatedUserCart });
-        tx.update(merchantDocRef, { pendingOrders: updatedPendingOrders });
       });
 
       toast({
@@ -194,7 +228,7 @@ export default function CartPage() {
       console.error("Error approving to redeem:", error);
       toast({
         title: "Error",
-        description: "There was an error updating the order status.",
+        description: (error as Error).message || "There was an error updating the order status.",
         variant: "destructive",
       });
     }
@@ -206,24 +240,19 @@ export default function CartPage() {
   const approved = cartItems.filter((item) => ['approved', 'ready_to_redeem'].includes(item.status));
   
   const history = cartItems
-    .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded'].includes(item.status))
+    .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded', 'failed'].includes(item.status))
     .filter(item => historyFilter === 'all' || item.status === historyFilter)
     .sort((a, b) => {
+        const getDate = (item: CartItem) => item.redeemedAt?.toDate() || item.timestamp?.toDate();
+        const timeA = getDate(a)?.getTime() || 0;
+        const timeB = getDate(b)?.getTime() || 0;
+
         switch (historySort) {
-            case 'date-desc':
-                const dateA = a.redeemedAt?.toDate() || a.timestamp?.toDate();
-                const dateB = b.redeemedAt?.toDate() || b.timestamp?.toDate();
-                return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
-            case 'date-asc':
-                const dateAscA = a.redeemedAt?.toDate() || a.timestamp?.toDate();
-                const dateAscB = b.redeemedAt?.toDate() || b.timestamp?.toDate();
-                return (dateAscA?.getTime() || 0) - (dateAscB?.getTime() || 0);
-            case 'price-asc':
-                return a.price - b.price;
-            case 'price-desc':
-                return b.price - a.price;
-            default:
-                return 0;
+            case 'date-desc': return timeB - timeA;
+            case 'date-asc': return timeA - timeB;
+            case 'price-asc': return a.price - b.price;
+            case 'price-desc': return b.price - a.price;
+            default: return 0;
         }
     });
 
@@ -341,5 +370,3 @@ export default function CartPage() {
     </div>
   );
 }
-
-    
