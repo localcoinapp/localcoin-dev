@@ -183,7 +183,7 @@ export default function DashboardPage() {
           const data = { id: doc.id, ...doc.data() } as Merchant;
           setMerchantData(data);
           const active = (data.pendingOrders || []).filter((order: any) => 
-              !['completed', 'rejected', 'cancelled', 'refunded'].includes(order.status)
+              !['completed', 'rejected', 'cancelled', 'refunded', 'failed'].includes(order.status)
           );
           setActiveOrders(active);
         } else {
@@ -335,9 +335,11 @@ export default function DashboardPage() {
         const merchantData = merchantDoc.data();
         const userData = userDoc.data();
   
-        const updatedPendingOrders = (merchantData.pendingOrders || []).map((o: CartItem) => 
-            o.orderId === orderId ? { ...o, status: 'rejected' } : o
-        );
+        const orderToDeny = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === orderId);
+
+        if (!orderToDeny) throw new Error("Order not found in pending orders.");
+
+        const updatedPendingOrders = (merchantData.pendingOrders || []).filter((o: CartItem) => o.orderId !== orderId);
         const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
             item.orderId === orderId ? { ...item, status: 'rejected' } : item
         );
@@ -349,12 +351,11 @@ export default function DashboardPage() {
         );
 
         const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== orderId);
-
-        const rejectedOrder = updatedPendingOrders.find(o => o.orderId === orderId);
+        const updatedRecentTransactions = arrayUnion({ ...orderToDeny, status: 'rejected' });
 
         transaction.update(merchantDocRef, {
-          pendingOrders: updatedPendingOrders.filter(o => o.orderId !== orderId),
-          recentTransactions: arrayUnion(rejectedOrder),
+          pendingOrders: updatedPendingOrders,
+          recentTransactions: updatedRecentTransactions,
           listings: updatedListings,
           reserved: updatedReserved
         });
@@ -587,18 +588,16 @@ export default function DashboardPage() {
   const interval = getTimeframeInterval(timeframe);
 
   const filteredTransactions = interval
-    ? recentTransactions.filter(tx => tx.redeemedAt && isWithinInterval(tx.redeemedAt.toDate(), interval))
-    : recentTransactions;
+    ? recentTransactions.filter(tx => tx.status === 'completed' && tx.redeemedAt && isWithinInterval(tx.redeemedAt.toDate(), interval))
+    : recentTransactions.filter(tx => tx.status === 'completed');
 
   const filteredCashoutHistory = interval
-    ? cashoutHistory.filter(req => req.processedAt && isWithinInterval(req.processedAt.toDate(), interval))
-    : cashoutHistory;
+    ? cashoutHistory.filter(req => req.status === 'approved' && req.processedAt && isWithinInterval(req.processedAt.toDate(), interval))
+    : cashoutHistory.filter(req => req.status === 'approved');
   
   const totalEarnings = filteredTransactions.reduce((acc, tx) => acc + tx.price, 0);
 
-  const totalCashedOut = filteredCashoutHistory
-      .filter(req => req.status === 'approved')
-      .reduce((acc, req) => acc + req.amount, 0);
+  const totalCashedOut = filteredCashoutHistory.reduce((acc, req) => acc + req.amount, 0);
   const netProfit = totalCashedOut * (1 - siteConfig.commissionRate);
   // -----------------------------
 
@@ -612,12 +611,12 @@ export default function DashboardPage() {
   const renderDashboardHeader = () => {
     if (status === 'live' || status === 'paused') {
         return (
-            <Alert className={cn("mb-8", isStoreLive ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50")}>
+            <Alert className={cn("mb-8", isStoreLive ? "border-green-300 bg-green-50 dark:bg-green-900/20" : "border-amber-300 bg-amber-50 dark:bg-amber-900/20")}>
                 <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {isStoreLive ? <Power className="h-5 w-5 text-green-600"/> : <PowerOff className="h-5 w-5 text-amber-600"/>}
                     <div>
-                    <AlertDescriptionComponent className={cn("font-semibold", isStoreLive ? "text-green-800" : "text-amber-800")}>
+                    <AlertDescriptionComponent className={cn("font-semibold", isStoreLive ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300")}>
                         Your store is currently {isStoreLive ? 'Live' : 'Paused'}.
                     </AlertDescriptionComponent>
                     <p className="text-xs text-muted-foreground">{isStoreLive ? "It is visible to customers in the marketplace." : "Customers cannot see your store."}</p>
@@ -770,9 +769,9 @@ export default function DashboardPage() {
               ) : (
                   <div className="flex flex-col items-start gap-4">
                       <p className="text-muted-foreground">You have not created a wallet yet.</p>
-                      <Button onClick={handleLaunchStore} disabled={isLaunching}>
+                      <Button onClick={handleLaunchStore} disabled={isLaunching || !canLaunch}>
                           {isLaunching ? <Loader2 className="animate-spin mr-2"/> : <KeyRound className="mr-2" />}
-                          Create Wallet
+                          Create Wallet & Launch
                       </Button>
                   </div>
               )}
@@ -802,7 +801,7 @@ export default function DashboardPage() {
                             </Select>
                        </CardHeader>
                        <CardContent className="grid grid-cols-2 items-center">
-                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} {siteConfig.token.symbol}</div>
+                           <div className="text-3xl font-bold">{totalEarnings.toFixed(2)} ${siteConfig.token.symbol}</div>
                            <div className="flex h-full items-center justify-center p-2">
                              <Link href="/dashboard/cashout-history" passHref className="w-full">
                                 <Button variant="outline" className="w-full">
@@ -939,8 +938,3 @@ export default function DashboardPage() {
 }
 
     
-
-    
-
-
-

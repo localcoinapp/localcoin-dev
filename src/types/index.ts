@@ -38,6 +38,7 @@ export type Merchant = {
   description: string
   listings: MerchantItem[]
   pendingOrders?: CartItem[];
+  recentTransactions?: CartItem[];
   walletAddress?: string;
   seedPhrase?: string; // Should be encrypted
   street?: string;
@@ -127,6 +128,7 @@ export type CartItem = {
   userName: string;
   category: string;
   error?: string;
+  transactionSignature?: string;
 }
 
 export type TokenPurchaseRequest = {
@@ -153,3 +155,5 @@ export type MerchantCashoutRequest = {
   transactionSignature?: string;
   error?: string;
 };
+
+    

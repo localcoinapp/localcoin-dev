@@ -19,11 +19,11 @@ import {
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
-import type { User, Merchant, CartItem, OrderStatus } from '@/types';
+import type { User, Merchant, CartItem, OrderStatus, MerchantItem } from '@/types';
 import * as bip39 from 'bip39';
 
 // Helper function to find and update inventory
-const updateInventory = (listings: any[], itemId: string, quantityChange: number): any[] => {
+const updateInventory = (listings: MerchantItem[], itemId: string, quantityChange: number): MerchantItem[] => {
     const listingIndex = listings.findIndex(item => item.id === itemId);
 
     if (listingIndex > -1) {
@@ -157,6 +157,7 @@ export async function POST(req: NextRequest) {
             o.orderId !== order!.orderId
         );
         
+        // Ensure recentTransactions is an array before pushing
         const updatedTransactions = [...(freshMerchantData.recentTransactions || []), completedOrder];
         const updatedReserved = (freshMerchantData.reserved || []).filter((r: any) => r.orderId !== order!.orderId);
         
@@ -192,25 +193,34 @@ export async function POST(req: NextRequest) {
                 if (!merchantSnap.exists() || !userSnap.exists()) return;
 
                 const merchantData = merchantSnap.data() as Merchant;
+                const userData = userSnap.data() as User;
 
                 // Update order status to 'failed' in both user and merchant docs
                 const failedOrder = { ...order, status: 'failed' as 'failed', error: error.message };
 
-                const updatedUserCart = (userSnap.data().cart || []).map((item: CartItem) =>
+                const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
                     item.orderId === order!.orderId ? failedOrder : item
                 );
                 
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
                 const updatedRecentTransactions = arrayUnion(failedOrder);
 
-                // Return stock to inventory
-                const updatedListings = updateInventory(merchantData.listings, order!.listingId, order!.quantity);
+                // Return stock to inventory if it was a physical item
+                 const updatedListings = updateInventory(
+                    merchantData.listings || [],
+                    order.listingId,
+                    order.quantity
+                 );
+
+                 const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== order!.orderId);
+
 
                 transaction.update(userDocRef, { cart: updatedUserCart });
                 transaction.update(merchantDocRef, {
                     pendingOrders: updatedPendingOrders,
                     recentTransactions: updatedRecentTransactions,
-                    listings: updatedListings
+                    listings: updatedListings,
+                    reserved: updatedReserved,
                 });
             });
              console.log(`Firestore updated for failed order ${order.orderId}`);
@@ -226,3 +236,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+    
