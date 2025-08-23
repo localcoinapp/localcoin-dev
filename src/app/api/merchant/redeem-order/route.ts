@@ -70,10 +70,10 @@ export async function POST(req: NextRequest) {
     ]);
 
     if (!userSnap.exists()) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        throw new Error('User not found');
     }
     if (!merchantSnap.exists()) {
-        return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
+        throw new Error('Merchant not found');
     }
 
     const userData = userSnap.data() as User;
@@ -81,13 +81,13 @@ export async function POST(req: NextRequest) {
 
     // Validate necessary data for the transaction
     if (!userData.seedPhrase) {
-        return NextResponse.json({ error: 'User seed phrase not found' }, { status: 400 });
+        throw new Error('User seed phrase not found. Cannot authorize transfer.');
     }
     if (!merchantData.walletAddress) {
-        return NextResponse.json({ error: 'Merchant wallet address not found' }, { status: 400 });
+        throw new Error('Merchant wallet address not found. Cannot receive funds.');
     }
     if (order.price <= 0) {
-        return NextResponse.json({ error: 'Invalid order price' }, { status: 400 });
+        throw new Error('Invalid order price. Price must be greater than zero.');
     }
 
     // --- Start Solana Transaction ---
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     const signature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
     console.log('Redemption Transfer Signature:', signature);
 
-    // --- Update Firestore Documents ---
+    // --- Update Firestore Documents on Success ---
     await runTransaction(db, async (transaction) => {
         const freshUserSnap = await transaction.get(userDocRef);
         const freshMerchantSnap = await transaction.get(merchantDocRef);
@@ -157,9 +157,7 @@ export async function POST(req: NextRequest) {
             o.orderId !== order!.orderId
         );
         
-        // Ensure recentTransactions is an array before pushing
         const updatedTransactions = [...(freshMerchantData.recentTransactions || []), completedOrder];
-        const updatedReserved = (freshMerchantData.reserved || []).filter((r: any) => r.orderId !== order!.orderId);
         
         const newMerchantBalance = (freshMerchantData.walletBalance || 0) + order!.price;
         const newUserBalance = (freshUserData.walletBalance || 0) - order!.price;
@@ -168,7 +166,6 @@ export async function POST(req: NextRequest) {
         transaction.update(merchantDocRef, {
             pendingOrders: updatedPendingOrders,
             recentTransactions: updatedTransactions,
-            reserved: updatedReserved,
             walletBalance: newMerchantBalance,
         });
     });
@@ -178,49 +175,36 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error(`Error in redeem-order API for orderId ${order?.orderId}:`, error);
 
-    // --- FAILURE SCENARIO: UPDATE FIRESTORE ---
+    // --- ROBUST FAILURE SCENARIO: UPDATE FIRESTORE & GUARANTEE JSON RESPONSE ---
     if (order && order.userId && order.merchantId) {
         try {
-            const userDocRef = doc(db, 'users', order.userId);
-            const merchantDocRef = doc(db, 'merchants', order.merchantId);
-            
             await runTransaction(db, async (transaction) => {
-                const [merchantSnap, userSnap] = await Promise.all([
-                    transaction.get(merchantDocRef),
-                    transaction.get(userDocRef)
-                ]);
+                const userDocRef = doc(db, 'users', order.userId);
+                const merchantDocRef = doc(db, 'merchants', order.merchantId);
 
-                if (!merchantSnap.exists() || !userSnap.exists()) return;
+                const merchantSnap = await transaction.get(merchantDocRef);
+
+                if (!merchantSnap.exists()) return;
 
                 const merchantData = merchantSnap.data() as Merchant;
-                const userData = userSnap.data() as User;
 
-                // Update order status to 'failed' in both user and merchant docs
+                // Update order status to 'failed' in merchant doc
                 const failedOrder = { ...order, status: 'failed' as 'failed', error: error.message };
-
-                const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
-                    item.orderId === order!.orderId ? failedOrder : item
-                );
                 
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
                 const updatedRecentTransactions = arrayUnion({ ...failedOrder, title: order.title });
 
-                // Return stock to inventory if it was a physical item
+                // Return stock to inventory
                  const updatedListings = updateInventory(
                     merchantData.listings || [],
                     order.listingId,
                     order.quantity
                  );
 
-                 const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== order!.orderId);
-
-
-                transaction.update(userDocRef, { cart: updatedUserCart });
                 transaction.update(merchantDocRef, {
                     pendingOrders: updatedPendingOrders,
                     recentTransactions: updatedRecentTransactions,
                     listings: updatedListings,
-                    reserved: updatedReserved,
                 });
             });
              console.log(`Firestore updated for failed order ${order.orderId}`);
@@ -230,8 +214,9 @@ export async function POST(req: NextRequest) {
     }
     // --- END FAILURE SCENARIO ---
 
+    // Return a guaranteed JSON response on error
     return NextResponse.json(
-      { error: 'Failed to redeem order.', details: String(error?.message || error) },
+      { error: 'Failed to redeem order.', details: String(error?.message || 'An unknown error occurred.') },
       { status: 500 }
     );
   }
