@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -57,7 +57,8 @@ import {
   TrendingUp,
   Wallet,
   Receipt,
-  FileText
+  FileText,
+  Upload,
 } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,10 @@ export default function DashboardPage() {
   const [isBalanceLoading, setIsBalanceLoading] = useState(true);
   
   const [timeframe, setTimeframe] = useState('total');
+
+  // CSV Upload
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingCsv, setIsUploadingCsv] = useState(false);
 
 
   // Function to fetch balance
@@ -423,6 +428,93 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user || !user.merchantId) return;
+
+    setIsUploadingCsv(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const requiredHeaders = ['name', 'price', 'category', 'quantity', 'description'];
+
+        if (!requiredHeaders.every(h => headers.includes(h))) {
+            toast({
+                title: "Invalid CSV format",
+                description: "CSV must include headers: name, price, category, quantity, description.",
+                variant: "destructive"
+            });
+            setIsUploadingCsv(false);
+            return;
+        }
+
+        const newItems: MerchantItem[] = [];
+        const errors: string[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const data = lines[i].split(',');
+            const row: any = {};
+            headers.forEach((header, index) => {
+                row[header] = data[index]?.trim() || '';
+            });
+
+            const price = parseFloat(row.price);
+            const quantity = parseInt(row.quantity, 10);
+
+            if (!row.name || isNaN(price) || !row.category || isNaN(quantity)) {
+                errors.push(`Skipping invalid data in row ${i + 1}.`);
+                continue;
+            }
+
+            newItems.push({
+                id: `${Date.now()}-${i}`,
+                active: true,
+                name: row.name,
+                price: price,
+                category: row.category,
+                quantity: quantity,
+                description: row.description || '',
+            });
+        }
+        
+        if (errors.length > 0) {
+            toast({
+                title: "Import Warning",
+                description: errors.join(' '),
+                variant: "destructive"
+            })
+        }
+        
+        if (newItems.length > 0 && merchantData) {
+            try {
+                const merchantRef = doc(db, "merchants", user.merchantId);
+                const updatedListings = [...merchantData.listings, ...newItems];
+                await updateDoc(merchantRef, { listings: updatedListings });
+                toast({
+                    title: "Import Successful",
+                    description: `Successfully added ${newItems.length} new listings.`
+                });
+            } catch (error) {
+                 toast({
+                    title: "Import Failed",
+                    description: "An error occurred while saving the new listings.",
+                    variant: "destructive"
+                });
+            }
+        }
+        
+        setIsUploadingCsv(false);
+        if (csvInputRef.current) {
+            csvInputRef.current.value = ""; // Reset file input
+        }
+    };
+    reader.readAsText(file);
+  };
+
+
   if (isLoading) {
     return <div className="container text-center"><p>Loading dashboard...</p></div>;
   }
@@ -587,6 +679,17 @@ export default function DashboardPage() {
             <Link href="/dashboard/add-listing" passHref>
               <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add New Item</Button>
             </Link>
+            <input 
+                type="file" 
+                ref={csvInputRef} 
+                className="hidden" 
+                accept=".csv" 
+                onChange={handleCsvUpload} 
+            />
+            <Button variant="outline" onClick={() => csvInputRef.current?.click()} disabled={isUploadingCsv}>
+                {isUploadingCsv ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                Import from CSV
+            </Button>
             <Link href="/dashboard/settings" passHref>
               <Button variant="outline"><Settings className="mr-2 h-4 w-4" /> Store Settings</Button>
             </Link>
@@ -823,5 +926,7 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    
 
     
