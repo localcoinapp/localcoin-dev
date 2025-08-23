@@ -752,6 +752,9 @@ export default function DashboardPage() {
                           `${tokenBalance.toFixed(2)} ${siteConfig.token.symbol}`
                          )}
                       </div>
+                       <p className="text-xs text-muted-foreground pt-2 break-all">
+                        Address: {walletAddress}
+                      </p>
                       <div className="flex flex-wrap gap-2 mt-4">
                           <CashoutDialog merchant={merchantData}>
                               <Button variant="outline" size="sm">
@@ -938,5 +941,6 @@ export default function DashboardPage() {
     
 
     
+
 
 
