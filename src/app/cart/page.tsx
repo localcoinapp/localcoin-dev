@@ -150,86 +150,49 @@ export default function CartPage() {
 
   const handleApproveToRedeem = async (order: CartItem) => {
     if (!user?.id) return;
-    
-    // The balance check is now primarily handled when opening the dialog,
-    // but we can keep a check here as a fallback using the potentially stale session data.
-    const currentBalance = user?.walletBalance || 0;
-    if (currentBalance < order.price) {
-      toast({
-        title: "Insufficient Funds",
-        description: "Sorry, you do not have enough funds. Please top up your wallet.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  
     const userDocRef = doc(db, 'users', user.id);
     const merchantDocRef = doc(db, 'merchants', order.merchantId);
-
+  
     try {
-      await runTransaction(db, async (tx) => {
-        const [userSnap, merchantSnap] = await Promise.all([tx.get(userDocRef), tx.get(merchantDocRef)]);
-        if (!userSnap.exists() || !merchantSnap.exists()) throw new Error("User or merchant document not found");
-
+      await runTransaction(db, async (transaction) => {
+        const [userSnap, merchantSnap] = await Promise.all([
+          transaction.get(userDocRef),
+          transaction.get(merchantDocRef),
+        ]);
+  
+        if (!userSnap.exists()) throw new Error('User document not found');
+        if (!merchantSnap.exists()) throw new Error('Merchant document not found');
+  
         const userData = userSnap.data();
         const merchantData = merchantSnap.data() as Merchant;
-
+  
+        // 1. Update the user's cart
         const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
           item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
-        
-        let orderFoundAndUpdated = false;
-        
-        // Update in pendingOrders if it exists there
+  
+        // 2. Update the merchant's pending orders
         const updatedPendingOrders = (merchantData.pendingOrders || []).map((item: CartItem) => {
-          if(item.orderId === order.orderId) {
-            orderFoundAndUpdated = true;
+          if (item.orderId === order.orderId) {
             return { ...item, status: 'ready_to_redeem' };
           }
           return item;
         });
-
-        // If not found in pending, check recentTransactions (less common, but for robustness)
-        let updatedRecentTransactions;
-        if (!orderFoundAndUpdated) {
-            updatedRecentTransactions = (merchantData.recentTransactions || []).map((item: CartItem) => {
-                if (item.orderId === order.orderId) {
-                    orderFoundAndUpdated = true;
-                    return { ...item, status: 'ready_to_redeem' };
-                }
-                return item;
-            });
-        }
-        
-        if (!orderFoundAndUpdated) {
-            // This is a fallback if the order somehow isn't in a list the merchant can see.
-            // We'll add it to their pending orders. This is better than a silent failure.
-            console.warn(`Order ${order.orderId} not found in merchant's lists. Adding it to pendingOrders.`);
-            const orderToUpdate: CartItem = { ...order, status: 'ready_to_redeem' };
-            tx.update(merchantDocRef, {
-                pendingOrders: arrayUnion(orderToUpdate)
-            });
-        } else {
-             tx.update(merchantDocRef, { 
-                pendingOrders: updatedPendingOrders,
-                ...(updatedRecentTransactions && { recentTransactions: updatedRecentTransactions })
-             });
-        }
-
-        tx.update(userDocRef, { cart: updatedUserCart });
+  
+        // 3. Commit the changes
+        transaction.update(userDocRef, { cart: updatedUserCart });
+        transaction.update(merchantDocRef, { pendingOrders: updatedPendingOrders });
       });
-
-      toast({
-        title: "Ready to Go!",
-        description: "The merchant has been notified. They will complete the transaction on their end."
-      });
-      // NOTE: We do NOT close the dialog here. The user must do it manually.
+  
+      // Toast on success is handled by the RedeemDialog component now
+  
     } catch (error) {
-      console.error("Error approving to redeem:", error);
+      console.error('Error approving to redeem:', error);
       toast({
-        title: "Error",
-        description: (error as Error).message || "There was an error updating the order status.",
-        variant: "destructive",
+        title: 'Error',
+        description: (error as Error).message || 'There was an error updating the order status.',
+        variant: 'destructive',
       });
     }
   };
