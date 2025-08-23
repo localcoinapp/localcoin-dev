@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
                 );
                 
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
-                const updatedRecentTransactions = arrayUnion(failedOrder);
+                const updatedRecentTransactions = arrayUnion({ ...failedOrder, title: order.title });
 
                 // Return stock to inventory if it was a physical item
                  const updatedListings = updateInventory(
@@ -236,5 +236,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-    

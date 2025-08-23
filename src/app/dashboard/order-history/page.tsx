@@ -64,7 +64,7 @@ export default function OrderHistoryPage() {
           const pending = data?.pendingOrders || [];
           const recent = data?.recentTransactions || [];
           const allOrders = [...pending, ...recent];
-          const historicalStatuses: OrderStatus[] = ['completed', 'rejected', 'cancelled', 'refunded'];
+          const historicalStatuses: OrderStatus[] = ['completed', 'rejected', 'cancelled', 'refunded', 'failed'];
           const history = allOrders.filter((order: CartItem) => historicalStatuses.includes(order.status));
           setOrderHistory(history);
         } else {
@@ -86,9 +86,13 @@ export default function OrderHistoryPage() {
     .sort((a, b) => {
       switch (sortOption) {
         case 'date-desc':
-            return (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0) - (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0);
+            const dateB = (b.redeemedAt?.toDate() || b.timestamp?.toDate())?.getTime() || 0;
+            const dateA = (a.redeemedAt?.toDate() || a.timestamp?.toDate())?.getTime() || 0;
+            return dateB - dateA;
         case 'date-asc':
-            return (a.redeemedAt?.toDate() || a.timestamp?.toDate() || 0) - (b.redeemedAt?.toDate() || b.timestamp?.toDate() || 0);
+            const dateAscA = (a.redeemedAt?.toDate() || a.timestamp?.toDate())?.getTime() || 0;
+            const dateAscB = (b.redeemedAt?.toDate() || b.timestamp?.toDate())?.getTime() || 0;
+            return dateAscA - dateAscB;
         case 'price-asc':
           return a.price - b.price;
         case 'price-desc':
@@ -135,6 +139,7 @@ export default function OrderHistoryPage() {
                         <SelectItem value="rejected">Rejected</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                         <SelectItem value="refunded">Refunded</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
                     </SelectContent>
                 </Select>
                  <Select value={sortOption} onValueChange={(value) => setSortOption(value as any)}>
@@ -174,7 +179,7 @@ export default function OrderHistoryPage() {
                         <Badge 
                             variant={
                                 order.status === 'completed' ? 'default' 
-                                : order.status === 'rejected' ? 'destructive' 
+                                : ['rejected', 'failed'].includes(order.status) ? 'destructive' 
                                 : order.status === 'refunded' ? 'secondary'
                                 : 'outline'
                             }
