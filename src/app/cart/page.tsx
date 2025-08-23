@@ -28,6 +28,9 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, runTransaction } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import type { CartItem, OrderStatus } from '@/types';
+import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { getAccount } from '@solana/spl-token';
+import { siteConfig } from '@/config/site';
 
 type SortOption = 'date-desc' | 'date-asc' | 'price-asc' | 'price-desc';
 
@@ -95,20 +98,50 @@ export default function CartPage() {
     }
   };
   
-  const handleRedeemDialogOpenChange = (isOpen: boolean, order: CartItem) => {
+  const handleRedeemDialogOpenChange = async (isOpen: boolean, order: CartItem) => {
     if (isOpen) {
-      // Check wallet balance BEFORE opening the dialog
-      const currentBalance = user?.walletBalance || 0;
-      if (currentBalance < order.price) {
-        toast({
-          title: "Insufficient Funds",
-          description: "Sorry, you do not have enough funds. Please top up your wallet.",
-          variant: "destructive"
-        });
-        setOpenRedeemDialogId(null); // Explicitly keep it closed
-        return;
-      }
-      setOpenRedeemDialogId(order.orderId);
+        if (!user || !user.walletAddress) {
+            toast({ title: "Error", description: "Wallet not found.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+            const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
+            const userPublicKey = new PublicKey(user.walletAddress);
+
+            // This part is simplified and assumes the Associated Token Account exists.
+            // A more robust implementation would use getOrCreateAssociatedTokenAccount if needed.
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(userPublicKey, {
+                mint: tokenMintPublicKey,
+            });
+
+            let currentBalance = 0;
+            if (tokenAccounts.value.length > 0) {
+                currentBalance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount || 0;
+            }
+            
+            if (currentBalance < order.price) {
+                toast({
+                    title: "Insufficient Funds",
+                    description: `Your balance is ${currentBalance.toFixed(2)} LCL, but you need ${order.price.toFixed(2)} LCL. Please top up your wallet.`,
+                    variant: "destructive"
+                });
+                setOpenRedeemDialogId(null);
+                return;
+            }
+            setOpenRedeemDialogId(order.orderId);
+
+        } catch (error) {
+            console.error("Failed to verify balance:", error);
+            toast({
+                title: "Error",
+                description: "Could not verify your wallet balance. Please try again.",
+                variant: "destructive"
+            });
+            setOpenRedeemDialogId(null);
+            return;
+        }
     } else {
       setOpenRedeemDialogId(null);
     }
@@ -118,6 +151,8 @@ export default function CartPage() {
   const handleApproveToRedeem = async (order: CartItem) => {
     if (!user?.id) return;
     
+    // The balance check is now primarily handled when opening the dialog,
+    // but we can keep a check here as a fallback using the potentially stale session data.
     const currentBalance = user?.walletBalance || 0;
     if (currentBalance < order.price) {
       toast({
@@ -306,3 +341,5 @@ export default function CartPage() {
     </div>
   );
 }
+
+    
