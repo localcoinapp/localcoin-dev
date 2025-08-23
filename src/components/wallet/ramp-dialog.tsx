@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { Separator } from "../ui/separator"
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 
 interface RampDialogProps {
   type: 'buy';
@@ -41,8 +41,17 @@ const generateUniqueCode = (userId: string) => {
     return `${userPart}-${datePart}`;
 };
 
-// Initialize Stripe outside of the component to avoid re-creating it on every render.
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+// Function to get the correct Stripe promise based on currency
+const getStripePromise = (currency: Currency) => {
+    const publishableKey = currency === 'EUR' 
+        ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR
+        : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD;
+
+    if (!publishableKey) {
+        throw new Error(`Stripe publishable key for ${currency} is not set.`);
+    }
+    return loadStripe(publishableKey);
+};
 
 export function RampDialog({ type, children }: RampDialogProps) {
     const { user } = useAuth();
@@ -122,7 +131,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
                     throw new Error(apiError || "Failed to create Stripe session.");
                 }
 
-                const stripe = await stripePromise;
+                const stripe = await getStripePromise(currency);
                 if (!stripe) throw new Error("Stripe.js has not loaded yet.");
 
                 const { error } = await stripe.redirectToCheckout({ sessionId });
@@ -384,5 +393,3 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
-
-    
