@@ -37,14 +37,20 @@ const MapView = dynamic(() => import('@/components/map-view'), {
 const HeroBanner = () => {
   return (
     <div
-      className="mb-8 rounded-lg p-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
+      className="relative mb-8 rounded-lg p-12 text-center text-background shadow-lg transition-all duration-300 bg-cover bg-center"
       style={{ backgroundImage: "var(--hero-banner-image)" }}
       data-ai-hint="tropical beach"
     >
+      <div 
+        className="absolute inset-0 rounded-lg"
+        style={{ backgroundImage: "var(--gradient-hero, none)" }}
+      ></div>
+      <div className="relative z-10">
         <h1 className="text-4xl font-headline font-bold text-white drop-shadow-md">Discover Local Services</h1>
         <p className="mt-2 text-white/90 drop-shadow-md">
           Explore and connect with merchants in your area.
         </p>
+      </div>
     </div>
   );
 };
