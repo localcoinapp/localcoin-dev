@@ -1,4 +1,6 @@
 
+'use client';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -133,11 +135,12 @@ export async function POST(req: NextRequest) {
             cartItem.orderId === order.orderId ? completedOrder : cartItem
         );
         
-        // Update merchant's pending orders
-        const updatedPendingOrders = (freshMerchantData.pendingOrders || []).map((o: CartItem) => 
-            o.orderId === order.orderId ? completedOrder : o
+        // This is the array for the merchant's view of active orders
+        const updatedPendingOrders = (freshMerchantData.pendingOrders || []).filter((o: CartItem) => 
+            o.orderId !== order.orderId
         );
         
+        // This is the historical log. We add the completed order here.
         const updatedTransactions = [...(freshMerchantData.recentTransactions || []), completedOrder];
         const updatedReserved = (freshMerchantData.reserved || []).filter((r: any) => r.orderId !== order.orderId);
         
