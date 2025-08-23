@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
     const body: { order: CartItem } = await req.json();
     order = body.order;
 
-    if (!order) {
-      return NextResponse.json({ error: 'Missing order data' }, { status: 400 });
+    if (!order || !order.userId || !order.merchantId) {
+      return NextResponse.json({ error: 'Missing critical order data (userId or merchantId)' }, { status: 400 });
     }
 
     // Fetch user and merchant documents from Firestore
@@ -101,16 +101,14 @@ export async function POST(req: NextRequest) {
     const decimals = mintInfo.decimals;
     const rawAmount = BigInt(Math.round(order.price * (10 ** decimals)));
 
+    // VERIFY USER BALANCE BEFORE ATTEMPTING TRANSACTION
     const fromAta = await getOrCreateAssociatedTokenAccount(
         connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey
     );
-
-    // --- PRE-TRANSACTION BALANCE CHECK ---
     const fromAtaInfo = await getAccount(connection, fromAta.address);
     if (fromAtaInfo.amount < rawAmount) {
         throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / (10 ** decimals)}, but requires ${order.price}.`);
     }
-    // --- END BALANCE CHECK ---
 
     const toAta = await getOrCreateAssociatedTokenAccount(
         connection, userKeypair, tokenMintPublicKey, merchantPublicKey
@@ -143,7 +141,6 @@ export async function POST(req: NextRequest) {
 
         const completedOrder: CartItem = { 
             ...order,
-            title: order.title,
             status: 'completed', 
             redeemedAt: new Date(),
             transactionSignature: signature 
@@ -193,12 +190,11 @@ export async function POST(req: NextRequest) {
                 const userData = userSnap.data() as User;
 
                 const failedOrderInCart = { ...order, status: 'failed' as 'failed', error: error.message };
-                const failedOrderForMerchant = { ...order, title: order.title, status: 'failed' as 'failed', error: error.message };
+                const failedOrderForMerchant = { ...order, status: 'failed' as 'failed', error: error.message };
                 
                 // Remove from pending, add to recent transactions with 'failed' status
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
-                const updatedRecentTransactions = arrayUnion(failedOrderForMerchant);
-
+                
                 // Update user's cart item to 'failed'
                 const updatedUserCart = (userData.cart || []).map(item => 
                     item.orderId === order!.orderId ? failedOrderInCart : item
@@ -213,7 +209,7 @@ export async function POST(req: NextRequest) {
 
                 transaction.update(merchantDocRef, {
                     pendingOrders: updatedPendingOrders,
-                    recentTransactions: updatedRecentTransactions,
+                    recentTransactions: arrayUnion(failedOrderForMerchant),
                     listings: updatedListings,
                 });
                 transaction.update(userDocRef, { cart: updatedUserCart });
