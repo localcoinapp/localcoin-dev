@@ -14,12 +14,27 @@ import {
   getOrCreateAssociatedTokenAccount,
   createTransferCheckedInstruction,
   getMint,
+  getAccount, // Import getAccount to check balance
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
+
+// Helper function to find and update inventory
+const updateInventory = (listings: any[], itemId: string, quantityChange: number): any[] => {
+    const listingIndex = listings.findIndex(item => item.id === itemId);
+
+    if (listingIndex > -1) {
+        const updatedListings = [...listings];
+        const updatedItem = { ...updatedListings[listingIndex] };
+        updatedItem.quantity = (updatedItem.quantity || 0) + quantityChange;
+        updatedListings[listingIndex] = updatedItem;
+        return updatedListings;
+    }
+    return listings;
+};
 
 // This function derives a keypair from a mnemonic, which is necessary for signing transactions.
 function keypairFromMnemonic(mnemonic: string): Keypair {
@@ -35,10 +50,11 @@ function getRpcUrl() {
 
 export async function POST(req: NextRequest) {
   console.log('--- Received POST /api/merchant/redeem-order ---');
-  let orderId: string | null = null;
+  let order: CartItem | null = null;
+  
   try {
-    const { order }: { order: CartItem } = await req.json();
-    orderId = order.orderId;
+    const body: { order: CartItem } = await req.json();
+    order = body.order;
 
     if (!order) {
       return NextResponse.json({ error: 'Missing order data' }, { status: 400 });
@@ -78,7 +94,6 @@ export async function POST(req: NextRequest) {
     const connection = new Connection(getRpcUrl(), 'confirmed');
     const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
     
-    // Create keypair for the user (sender) from their seed phrase
     const userKeypair = keypairFromMnemonic(userData.seedPhrase);
     const merchantPublicKey = new PublicKey(merchantData.walletAddress);
 
@@ -86,15 +101,21 @@ export async function POST(req: NextRequest) {
     const decimals = mintInfo.decimals;
     const rawAmount = BigInt(Math.round(order.price * (10 ** decimals)));
 
-    // Get or create Associated Token Accounts for both user and merchant
     const fromAta = await getOrCreateAssociatedTokenAccount(
         connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey
     );
+
+    // --- PRE-TRANSACTION BALANCE CHECK ---
+    const fromAtaInfo = await getAccount(connection, fromAta.address);
+    if (fromAtaInfo.amount < rawAmount) {
+        throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / (10 ** decimals)}, but requires ${order.price}.`);
+    }
+    // --- END BALANCE CHECK ---
+
     const toAta = await getOrCreateAssociatedTokenAccount(
         connection, userKeypair, tokenMintPublicKey, merchantPublicKey
     );
 
-    // Build the transaction
     const ix = createTransferCheckedInstruction(
         fromAta.address,
         tokenMintPublicKey,
@@ -105,11 +126,8 @@ export async function POST(req: NextRequest) {
     );
     const tx = new Transaction().add(ix);
     
-    // Sign and send the transaction
     const signature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
     console.log('Redemption Transfer Signature:', signature);
-
-    // --- End Solana Transaction ---
 
     // --- Update Firestore Documents ---
     await runTransaction(db, async (transaction) => {
@@ -120,34 +138,30 @@ export async function POST(req: NextRequest) {
             throw new Error("User or Merchant document vanished during transaction");
         }
 
-        const freshUserData = freshUserSnap.data();
-        const freshMerchantData = freshMerchantSnap.data();
+        const freshUserData = freshUserSnap.data() as User;
+        const freshMerchantData = freshMerchantSnap.data() as Merchant;
 
-        // CORRECTED: Ensure the completed order has the `title` field
         const completedOrder: CartItem = { 
             ...order,
-            title: order.title, // Explicitly carry over the title
+            title: order.title,
             status: 'completed', 
             redeemedAt: new Date(),
             transactionSignature: signature 
         };
 
-        // Update user's cart: find the item and update its status.
         const updatedUserCart = (freshUserData.cart || []).map((cartItem: CartItem) =>
-            cartItem.orderId === order.orderId ? completedOrder : cartItem
+            cartItem.orderId === order!.orderId ? completedOrder : cartItem
         );
         
-        // Remove the order from the merchant's active pending orders
         const updatedPendingOrders = (freshMerchantData.pendingOrders || []).filter((o: CartItem) => 
-            o.orderId !== order.orderId
+            o.orderId !== order!.orderId
         );
         
-        // Add the completed order to the historical log for the merchant.
         const updatedTransactions = [...(freshMerchantData.recentTransactions || []), completedOrder];
-        const updatedReserved = (freshMerchantData.reserved || []).filter((r: any) => r.orderId !== order.orderId);
+        const updatedReserved = (freshMerchantData.reserved || []).filter((r: any) => r.orderId !== order!.orderId);
         
-        const newMerchantBalance = (freshMerchantData.walletBalance || 0) + order.price;
-        const newUserBalance = (freshUserData.walletBalance || 0) - order.price;
+        const newMerchantBalance = (freshMerchantData.walletBalance || 0) + order!.price;
+        const newUserBalance = (freshUserData.walletBalance || 0) - order!.price;
 
         transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newUserBalance });
         transaction.update(merchantDocRef, {
@@ -161,8 +175,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ signature });
 
   } catch (error: any) {
-    console.error(`Error in redeem-order API for orderId ${orderId}:`, error);
-    // Optionally update the order to a 'failed' state in Firestore here
+    console.error(`Error in redeem-order API for orderId ${order?.orderId}:`, error);
+
+    // --- FAILURE SCENARIO: UPDATE FIRESTORE ---
+    if (order && order.userId && order.merchantId) {
+        try {
+            const userDocRef = doc(db, 'users', order.userId);
+            const merchantDocRef = doc(db, 'merchants', order.merchantId);
+            
+            await runTransaction(db, async (transaction) => {
+                const [merchantSnap, userSnap] = await Promise.all([
+                    transaction.get(merchantDocRef),
+                    transaction.get(userDocRef)
+                ]);
+
+                if (!merchantSnap.exists() || !userSnap.exists()) return;
+
+                const merchantData = merchantSnap.data() as Merchant;
+
+                // Update order status to 'failed' in both user and merchant docs
+                const failedOrder = { ...order, status: 'rejected' as 'rejected', error: error.message };
+
+                const updatedUserCart = (userSnap.data().cart || []).map((item: CartItem) =>
+                    item.orderId === order!.orderId ? failedOrder : item
+                );
+                
+                const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
+                const updatedRecentTransactions = arrayUnion(failedOrder);
+
+                // Return stock to inventory
+                const updatedListings = updateInventory(merchantData.listings, order!.listingId, order!.quantity);
+
+                transaction.update(userDocRef, { cart: updatedUserCart });
+                transaction.update(merchantDocRef, {
+                    pendingOrders: updatedPendingOrders,
+                    recentTransactions: updatedRecentTransactions,
+                    listings: updatedListings
+                });
+            });
+             console.log(`Firestore updated for failed order ${order.orderId}`);
+        } catch (dbError) {
+            console.error(`CRITICAL: Failed to update Firestore after redemption error for order ${order.orderId}:`, dbError);
+        }
+    }
+    // --- END FAILURE SCENARIO ---
+
     return NextResponse.json(
       { error: 'Failed to redeem order.', details: String(error?.message || error) },
       { status: 500 }
