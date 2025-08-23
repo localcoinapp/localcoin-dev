@@ -1,5 +1,4 @@
 
-
 import type { Timestamp } from 'firebase/firestore';
 
 export type NavItem = {
@@ -141,6 +140,9 @@ export type TokenPurchaseRequest = {
   createdAt: Timestamp;
   processedAt?: Timestamp;
   transactionSignature?: string;
+  currency?: 'USD' | 'EUR';
+  paymentMethod?: 'stripe' | 'bank';
+  transferCode?: string | null;
 };
 
 export type MerchantCashoutRequest = {
@@ -155,5 +157,3 @@ export type MerchantCashoutRequest = {
   transactionSignature?: string;
   error?: string;
 };
-
-    
