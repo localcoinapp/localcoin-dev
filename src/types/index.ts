@@ -108,7 +108,7 @@ export type Chat = {
 };
 
 
-export type OrderStatus = 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'completed' | 'ready_to_redeem' | 'refunded';
+export type OrderStatus = 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'completed' | 'ready_to_redeem' | 'refunded' | 'failed';
 
 export type CartItem = {
   orderId: string;
@@ -126,6 +126,7 @@ export type CartItem = {
   userId: string;
   userName: string;
   category: string;
+  error?: string;
 }
 
 export type TokenPurchaseRequest = {

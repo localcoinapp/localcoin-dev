@@ -14,12 +14,12 @@ import {
   getOrCreateAssociatedTokenAccount,
   createTransferCheckedInstruction,
   getMint,
-  getAccount, // Import getAccount to check balance
+  getAccount,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
-import type { User, Merchant, CartItem } from '@/types';
+import type { User, Merchant, CartItem, OrderStatus } from '@/types';
 import * as bip39 from 'bip39';
 
 // Helper function to find and update inventory
@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
                 const merchantData = merchantSnap.data() as Merchant;
 
                 // Update order status to 'failed' in both user and merchant docs
-                const failedOrder = { ...order, status: 'rejected' as 'rejected', error: error.message };
+                const failedOrder = { ...order, status: 'failed' as 'failed', error: error.message };
 
                 const updatedUserCart = (userSnap.data().cart || []).map((item: CartItem) =>
                     item.orderId === order!.orderId ? failedOrder : item
