@@ -26,11 +26,39 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { storeCategories } from '@/data/store-categories';
+import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/theme-provider';
 
 const MapView = dynamic(() => import('@/components/map-view'), {
   ssr: false,
   loading: () => <Skeleton className="h-[600px] w-full" />,
 });
+
+const HeroBanner = () => {
+  const { theme } = useTheme();
+
+  // Define banner styles based on theme
+  const bannerStyles: { [key: string]: React.CSSProperties } = {
+    'theme-default-eco': { backgroundImage: "url('https://placehold.co/1200x300/f3e5b5/4f4639.png?text=Local+Eco')" , backgroundPosition: 'center', backgroundSize: 'cover' },
+    'theme-tropics': { backgroundImage: "url('https://placehold.co/1200x300/00c2ff/ffffff.png?text=Tropics')" , backgroundPosition: 'center', backgroundSize: 'cover' },
+    'theme-berlin': { backgroundImage: "url('https://placehold.co/1200x300/ffff00/000000.png?text=Berlin')" , backgroundPosition: 'center', backgroundSize: 'cover' },
+    'theme-tropic2': { backgroundImage: "url('https://placehold.co/1200x300/ff4f00/ffffff.png?text=Tropic2')" , backgroundPosition: 'center', backgroundSize: 'cover' },
+  };
+
+  return (
+    <div
+      className="mb-8 rounded-lg p-12 text-center text-background shadow-lg transition-all duration-300"
+      style={bannerStyles[theme]}
+      data-ai-hint="tropical beach"
+    >
+        <h1 className="text-4xl font-headline font-bold text-white drop-shadow-md">Discover Local Services</h1>
+        <p className="mt-2 text-white/90 drop-shadow-md">
+          Explore and connect with merchants in your area.
+        </p>
+    </div>
+  );
+};
+
 
 export default function MarketplacePage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
@@ -63,12 +91,7 @@ export default function MarketplacePage() {
   
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-headline font-bold">Discover Local Services</h1>
-        <p className="text-muted-foreground mt-2">
-          Explore and connect with merchants in your area.
-        </p>
-      </div>
+      <HeroBanner />
 
       <Tabs defaultValue="list">
         <div className="bg-card p-4 rounded-lg shadow-md mb-8 sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
