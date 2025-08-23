@@ -9,6 +9,7 @@ import {
   Transaction,
   sendAndConfirmTransaction,
   clusterApiUrl,
+  LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import {
   getOrCreateAssociatedTokenAccount,
@@ -102,7 +103,13 @@ export async function POST(req: NextRequest) {
     const decimals = mintInfo.decimals;
     const rawAmount = BigInt(Math.round(order.price * (10 ** decimals)));
 
-    // VERIFY USER BALANCE BEFORE ATTEMPTING TRANSACTION
+    // VERIFY USER SOL BALANCE FOR TRANSACTION FEES
+    const userSolBalance = await connection.getBalance(userKeypair.publicKey);
+    if (userSolBalance < 5000) { // 5000 lamports is a safe minimum for a simple transfer
+        throw new Error(`Insufficient SOL balance for transaction fees. Please ensure the user wallet has at least 0.000005 SOL.`);
+    }
+
+    // VERIFY USER TOKEN BALANCE BEFORE ATTEMPTING TRANSACTION
     const fromAta = await getOrCreateAssociatedTokenAccount(
         connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey
     );
@@ -111,8 +118,12 @@ export async function POST(req: NextRequest) {
         throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / (10 ** decimals)}, but requires ${order.price}.`);
     }
 
+    // Get or create the merchant's token account, with the USER paying the fee if creation is needed
     const toAta = await getOrCreateAssociatedTokenAccount(
-        connection, userKeypair, tokenMintPublicKey, merchantPublicKey
+        connection, 
+        userKeypair, // User (sender) pays the fee
+        tokenMintPublicKey, 
+        merchantPublicKey
     );
 
     const ix = createTransferCheckedInstruction(
