@@ -182,13 +182,10 @@ export function RampDialog({ type, children }: RampDialogProps) {
         }
     }
 
-    type PriceV3Map = Record<string, {
-      data: any;
-      usdPrice: number;
-      blockId: number;
-      decimals: number;
-      priceChange24h: number;
-    }>;
+    type PriceV3Map = Record<
+      string,
+      { usdPrice: number; blockId: number; decimals: number; priceChange24h: number }
+    >;
   
     const fetchPriceAndCalculateAmount = async (token: TokenInfo) => {
         if (!amount) return;
@@ -201,9 +198,9 @@ export function RampDialog({ type, children }: RampDialogProps) {
       
           const prices: PriceV3Map = await response.json();
           
-          const priceData = prices.data[token.mint];
+          const priceObj = prices[token.mint];
       
-          if (!priceData) {
+          if (!priceObj) {
             throw new Error(`No price available for ${token.symbol ?? token.mint}`);
           }
           
@@ -213,7 +210,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
             purchaseAmountUsd = purchaseAmountUsd * eurUsd;
           }
       
-          const requiredAmount = purchaseAmountUsd / priceData.price;
+          const requiredAmount = purchaseAmountUsd / priceObj.usdPrice;
           setRequiredTokenAmount(requiredAmount);
         } catch (error) {
           console.error("Price fetch error:", error);
@@ -249,7 +246,8 @@ export function RampDialog({ type, children }: RampDialogProps) {
                     userWallet: user.walletAddress,
                     inputMint: selectedToken.mint,
                     outputMint: siteConfig.token.mintAddress,
-                    amount: parseFloat(amount) * (10 ** siteConfig.token.decimals), // Send amount in lamports
+                    // Note: Jupiter expects amount in the smallest unit (lamports)
+                    amount: requiredTokenAmount * (10 ** selectedToken.balance), 
                 }),
             });
             const { swapTransaction, error } = await response.json();
@@ -677,3 +675,5 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
+
+    
