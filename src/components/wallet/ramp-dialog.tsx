@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, ArrowLeft, Copy, Check, Wallet } from "lucide-react"
+import { Loader2, ArrowLeft, Copy, Check, Wallet, Coins } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
@@ -27,6 +27,7 @@ import { Separator } from "../ui/separator"
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Skeleton } from "../ui/skeleton"
+import { cn } from "@/lib/utils"
 
 interface RampDialogProps {
   type: 'buy';
@@ -40,6 +41,8 @@ type TokenInfo = {
     mint: string;
     balance: number;
     name?: string; // Optional name for display (e.g., "SOL")
+    symbol?: string; // e.g., 'SOL'
+    logo?: string; // e.g., url to logo
 }
 
 
@@ -72,9 +75,13 @@ export function RampDialog({ type, children }: RampDialogProps) {
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
     const [hasCopiedCode, setHasCopiedCode] = useState(false);
     const [hasCopiedIban, setHasCopiedIban] = useState(false);
+    
+    // Crypto payment state
     const [isScanningWallet, setIsScanningWallet] = useState(false);
     const [walletTokens, setWalletTokens] = useState<TokenInfo[]>([]);
-
+    const [selectedToken, setSelectedToken] = useState<TokenInfo | null>(null);
+    const [isFetchingPrice, setIsFetchingPrice] = useState(false);
+    const [requiredTokenAmount, setRequiredTokenAmount] = useState<number | null>(null);
 
     const uniqueTransferCode = useMemo(() => {
         if (user) return generateUniqueCode(user.id);
@@ -89,6 +96,9 @@ export function RampDialog({ type, children }: RampDialogProps) {
         setIsLoading(false);
         setWalletTokens([]);
         setIsScanningWallet(false);
+        setSelectedToken(null);
+        setRequiredTokenAmount(null);
+        setIsFetchingPrice(false);
     }
     
     const handleOpenChange = (isOpen: boolean) => {
@@ -109,27 +119,31 @@ export function RampDialog({ type, children }: RampDialogProps) {
         }
     };
     
-    const handleScanWallet = async () => {
+     const handleScanWallet = async () => {
         if (!user || !user.walletAddress) {
             toast({ title: "Wallet not found", description: "Your wallet address is not available.", variant: "destructive" });
             return;
         }
         setIsScanningWallet(true);
         setWalletTokens([]);
+        setSelectedToken(null);
+        setRequiredTokenAmount(null);
+
         try {
             const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
             const walletPublicKey = new PublicKey(user.walletAddress);
 
+            const allTokens: TokenInfo[] = [];
             // --- 1. Fetch native SOL balance ---
             const solBalanceLamports = await connection.getBalance(walletPublicKey);
             const solBalance = solBalanceLamports / LAMPORTS_PER_SOL;
-            const allTokens: TokenInfo[] = [];
-
             if (solBalance > 0) {
                 allTokens.push({
-                    name: 'SOL',
+                    name: 'Solana',
+                    symbol: 'SOL',
                     mint: 'So11111111111111111111111111111111111111112', // Native SOL mint address
                     balance: solBalance,
+                    logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
                 });
             }
 
@@ -138,12 +152,13 @@ export function RampDialog({ type, children }: RampDialogProps) {
                 programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
             });
             
-            const splTokens = tokenAccounts.value
+            const splTokens: TokenInfo[] = tokenAccounts.value
                 .map(account => {
                     const parsedInfo = account.account.data.parsed.info;
                     return {
                         mint: parsedInfo.mint,
                         balance: parsedInfo.tokenAmount.uiAmount,
+                        symbol: parsedInfo.tokenAmount.symbol, // May not exist
                     };
                 })
                 .filter(token => token.balance > 0); // Only show tokens with a balance
@@ -164,6 +179,38 @@ export function RampDialog({ type, children }: RampDialogProps) {
         }
     }
 
+    const fetchPriceAndCalculateAmount = async (token: TokenInfo) => {
+        if (!amount) return;
+        setIsFetchingPrice(true);
+        setRequiredTokenAmount(null);
+        try {
+            // USDC is a good base for USD-pegged values
+            const response = await fetch(`https://price.jup.ag/v4/price?ids=${token.mint}&vsToken=USDC`);
+            if (!response.ok) throw new Error("Failed to fetch price from Jupiter API.");
+            
+            const data = await response.json();
+            const priceData = data.data[token.mint];
+
+            if (!priceData) throw new Error(`Could not find price for token ${token.symbol || token.mint}`);
+
+            const tokenPriceInUsd = priceData.price;
+            const purchaseAmountUsd = parseFloat(amount);
+            
+            const requiredAmount = purchaseAmountUsd / tokenPriceInUsd;
+            setRequiredTokenAmount(requiredAmount);
+
+        } catch (error) {
+            console.error("Price fetch error:", error);
+            toast({ title: "Error Fetching Price", description: (error as Error).message, variant: "destructive" });
+        } finally {
+            setIsFetchingPrice(false);
+        }
+    }
+
+    const handleTokenSelect = (token: TokenInfo) => {
+        setSelectedToken(token);
+        fetchPriceAndCalculateAmount(token);
+    };
 
     const handleSubmit = async () => {
         if (!user || !user.walletAddress || !amount || !paymentMethod) {
@@ -192,10 +239,10 @@ export function RampDialog({ type, children }: RampDialogProps) {
                     }),
                 });
 
-                const { sessionId, error: apiError } = await response.json();
+                const { sessionId, error: apiError, details } = await response.json();
                 
                 if (apiError || !response.ok) {
-                    throw new Error(apiError || "Failed to create Stripe session.");
+                    throw new Error(details || "Failed to create Stripe session.");
                 }
 
                 const stripe = await getStripePromise(currency);
@@ -469,41 +516,56 @@ export function RampDialog({ type, children }: RampDialogProps) {
                                     {isScanningWallet ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wallet className="mr-2 h-4 w-4" />}
                                     Scan my wallet for tokens
                                 </Button>
-
-                                <div className="p-4 border rounded-md space-y-3 text-sm text-muted-foreground min-h-[150px]">
-                                     <p className="font-semibold text-foreground">Your Tokens</p>
+                                
+                                <div className="max-h-48 overflow-y-auto space-y-2 p-2 border rounded-md">
                                     {isScanningWallet ? (
-                                        <div className="space-y-2">
-                                            <Skeleton className="h-4 w-full" />
-                                            <Skeleton className="h-4 w-5/6" />
+                                        <div className="space-y-2 p-2">
+                                            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
                                         </div>
                                     ) : walletTokens.length > 0 ? (
-                                        <div className="space-y-2">
-                                            {walletTokens.map(token => (
-                                                <div key={token.mint} className="flex justify-between items-center text-foreground">
+                                        walletTokens.map(token => (
+                                            <div key={token.mint} onClick={() => handleTokenSelect(token)} className={cn("flex justify-between items-center p-2 rounded-md cursor-pointer hover:bg-muted", selectedToken?.mint === token.mint && "bg-muted border border-primary")}>
+                                                <div className="flex items-center gap-3">
+                                                     {token.logo ? <img src={token.logo} alt={token.name} className="h-6 w-6 rounded-full"/> : <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center text-xs"><Coins/></div>}
                                                     <div>
-                                                        <span className="font-semibold">{token.name || 'Token'}</span>
-                                                        <span className="font-mono text-xs block break-all pr-2">{token.name ? '' : token.mint}</span>
+                                                        <p className="font-semibold">{token.name || token.symbol || 'Token'}</p>
+                                                        <p className="text-xs text-muted-foreground font-mono break-all">{!token.name && !token.symbol ? token.mint : ''}</p>
                                                     </div>
-                                                    <span className="font-semibold">{token.balance.toLocaleString()}</span>
                                                 </div>
-                                            ))}
-                                        </div>
+                                                <p className="font-semibold">{token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p>
+                                            </div>
+                                        ))
                                     ) : (
-                                        <p>Your tokens will appear here after scanning.</p>
+                                        <p className="text-center text-sm text-muted-foreground p-4">Your tokens will appear here after scanning.</p>
                                     )}
-                                    <Separator />
-                                    <p className="font-semibold text-foreground pt-2">Next Steps</p>
-                                    <p>Select a token from the list above to proceed with the swap.</p>
                                 </div>
+
+                                {selectedToken && (
+                                <Alert>
+                                    <AlertTitle className="flex items-center gap-2">
+                                        {isFetchingPrice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Coins className="h-4 w-4" />}
+                                        Exchange Details
+                                    </AlertTitle>
+                                    <AlertDescription>
+                                        {requiredTokenAmount !== null ? (
+                                            <>You will pay approximately <strong>{requiredTokenAmount.toFixed(6)} {selectedToken.symbol || 'tokens'}</strong> for <strong>{amount} LCL</strong>.</>
+                                        ) : isFetchingPrice ? (
+                                            'Fetching latest price...'
+                                        ) : (
+                                            'Ready to calculate price.'
+                                        )}
+                                    </AlertDescription>
+                                </Alert>
+                                )}
+
                             </div>
                             <DialogFooter>
                                 <Button 
                                     type="submit" 
                                     onClick={handleSubmit} 
-                                    disabled={true} // Disabled until full swap logic is implemented
+                                    disabled={true} // Full swap requires backend integration for security
                                 >
-                                    Pay with Crypto (Coming Soon)
+                                    Pay with {selectedToken?.symbol || "Crypto"} (Coming Soon)
                                 </Button>
                             </DialogFooter>
                         </>
@@ -525,3 +587,5 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
+
+    
