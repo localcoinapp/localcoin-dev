@@ -106,6 +106,21 @@ export default function WalletPage() {
             
             toast({ title: "Wallet Created!", description: "Your new Solana wallet is ready."});
 
+            // Issue initial SOL
+            try {
+                const issueSolResponse = await fetch('/api/admin/issue-sol', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ walletAddress }),
+                });
+                const issueSolData = await issueSolResponse.json();
+                toast({ title: issueSolData.status, description: issueSolData.message });
+            } catch (issueSolError) {
+                console.error("Failed to issue initial SOL", issueSolError);
+                toast({ title: "Error", description: "Failed to issue initial SOL.", variant: "destructive" });
+            }
         } catch(e) {
             console.error("Wallet creation failed", e);
             toast({ title: "Error", description: (e as Error).message, variant: "destructive"});

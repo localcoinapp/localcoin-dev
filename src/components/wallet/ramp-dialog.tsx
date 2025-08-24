@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, ArrowLeft, Copy, Check } from "lucide-react"
+import { Loader2, ArrowLeft, Copy, Check, Wallet } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
@@ -33,7 +33,7 @@ interface RampDialogProps {
 
 type PaymentStep = 'amount' | 'method' | 'details';
 type Currency = 'EUR' | 'USD';
-type PaymentMethod = 'stripe' | 'bank';
+type PaymentMethod = 'stripe' | 'bank' | 'crypto';
 
 const generateUniqueCode = (userId: string) => {
     const userPart = userId.substring(0, 4).toUpperCase();
@@ -155,7 +155,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
             return;
         }
 
-        // --- Bank Transfer Flow ---
+        // --- Bank Transfer & Crypto placeholder Flow ---
         try {
             const requestsCollection = collection(db, 'tokenPurchaseRequests');
             await addDoc(requestsCollection, {
@@ -248,19 +248,26 @@ export function RampDialog({ type, children }: RampDialogProps) {
                         </DialogHeader>
                         <div className="py-4">
                             <RadioGroup value={paymentMethod || ''} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
-                                <Label htmlFor="stripe" className="flex justify-between items-center p-4 border rounded-md has-[:checked]:border-primary">
+                                <Label htmlFor="stripe" className="flex justify-between items-center p-4 border rounded-md has-[:checked]:border-primary cursor-pointer">
                                     <div>
                                         <p className="font-semibold">Credit/Debit Card (Stripe)</p>
                                         <p className="text-sm text-muted-foreground">Pay instantly with your card.</p>
                                     </div>
                                     <RadioGroupItem value="stripe" id="stripe" />
                                 </Label>
-                                <Label htmlFor="bank" className="flex justify-between items-center p-4 border rounded-md has-[:checked]:border-primary">
+                                <Label htmlFor="bank" className="flex justify-between items-center p-4 border rounded-md has-[:checked]:border-primary cursor-pointer">
                                     <div>
                                         <p className="font-semibold">Bank Transfer</p>
                                         <p className="text-sm text-muted-foreground">Manually transfer from your bank.</p>
                                     </div>
                                     <RadioGroupItem value="bank" id="bank" />
+                                </Label>
+                                <Label htmlFor="crypto" className="flex justify-between items-center p-4 border rounded-md has-[:checked]:border-primary cursor-pointer">
+                                    <div>
+                                        <p className="font-semibold">Pay with Crypto</p>
+                                        <p className="text-sm text-muted-foreground">Use another token in your wallet.</p>
+                                    </div>
+                                    <RadioGroupItem value="crypto" id="crypto" />
                                 </Label>
                             </RadioGroup>
                         </div>
@@ -377,6 +384,68 @@ export function RampDialog({ type, children }: RampDialogProps) {
                         </>
                     )
                 }
+                if (paymentMethod === 'crypto') {
+                    return (
+                         <>
+                           <DialogHeader>
+                                <div className="flex items-center gap-2">
+                                    <Button variant="ghost" size="icon" onClick={() => setStep('method')}><ArrowLeft/></Button>
+                                    <DialogTitle>Pay with Crypto</DialogTitle>
+                                </div>
+                                <DialogDescription>
+                                   Pay for {amount} {siteConfig.token.symbol} tokens by swapping another token from your wallet.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-4 py-4">
+                                <Button className="w-full" variant="outline">
+                                    <Wallet className="mr-2 h-4 w-4" /> Scan my wallet for tokens
+                                </Button>
+
+                                {/* 
+                                  // ================== DEVELOPER TODO ==================
+                                  // This section is a placeholder for the crypto payment UI.
+                                  // You would need to implement the following logic here:
+                                  //
+                                  // 1. **Scan Wallet**: On button click, use Connection.getParsedTokenAccountsByOwner(user.walletAddress)
+                                  //    to find all tokens the user holds.
+                                  //
+                                  // 2. **Get Prices**: For each token found, use a price oracle API (e.g., Jupiter aggregator)
+                                  //    to get its current price in USD.
+                                  //
+                                  // 3. **Display Tokens**: Populate a list or a <Select> component with the tokens the user can afford to swap.
+                                  //    For each token, show the user's balance and its USD value.
+                                  //
+                                  // 4. **Calculate Swap**: When a user selects a token, calculate how much of that token is
+                                  //    needed to equal the value of the LCL tokens they want to buy (e.g., $50 of LCL = $50 of USDC).
+                                  //
+                                  // 5. **Execute Swap**: On confirmation, use a library like @solana/web3.js to construct and
+                                  //    send a transaction that transfers the selected token from the user's wallet to the admin's wallet.
+                                  // ======================================================
+                                */}
+                                <div className="p-4 border rounded-md space-y-3 text-sm text-muted-foreground">
+                                    <p className="font-semibold text-foreground">1. Your Tokens</p>
+                                    <p>After scanning, your available tokens will appear here.</p>
+                                    
+                                    <p className="font-semibold text-foreground pt-3 border-t">2. Select Token to Pay With</p>
+                                    <p>Select a token from the list above.</p>
+
+                                    <p className="font-semibold text-foreground pt-3 border-t">3. Confirm Swap</p>
+                                    <p>You will be asked to approve the transaction to swap your token for {amount} {siteConfig.token.symbol}.</p>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button 
+                                    type="submit" 
+                                    onClick={handleSubmit} 
+                                    disabled={true} // Disabled until wallet integration is complete
+                                >
+                                    Pay with Crypto (Coming Soon)
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )
+                }
                 return null;
         }
     }
@@ -393,3 +462,5 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
+
+    
