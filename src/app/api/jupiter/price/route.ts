@@ -1,36 +1,39 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-// This route acts as a proxy to the Jupiter Price API to avoid CORS issues.
-// It uses the v6 endpoint, which is more current.
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const ids = searchParams.get('ids');
-  
   if (!ids) {
     return NextResponse.json({ error: 'Missing required query parameter: ids' }, { status: 400 });
   }
 
-  // Corrected to use the v6 endpoint and removed the unsupported 'vsToken' parameter.
-  const JUPITER_API_URL = `https://quote-api.jup.ag/v6/price?ids=${ids}`;
+  const upstream = `https://lite-api.jup.ag/v3/price?ids=${encodeURIComponent(ids)}`;
 
   try {
-    const response = await fetch(JUPITER_API_URL, {
-      method: 'GET',
+    const resp = await fetch(upstream, {
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
+      next: { revalidate: 0 }, // avoid caching
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Jupiter API Error:', errorText);
-      return NextResponse.json({ error: 'Failed to fetch price from Jupiter API.', details: errorText }, { status: response.status });
+    const body = await resp.text();
+    if (!resp.ok) {
+      console.error('Jupiter API Error:', body);
+      return NextResponse.json(
+        { error: 'Failed to fetch price from Jupiter Price API.', details: body },
+        { status: resp.status }
+      );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
-
+    // Pass through the JSON as-is
+    return new NextResponse(body, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
   } catch (error) {
     console.error('Error proxying Jupiter API:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown server error occurred.';
