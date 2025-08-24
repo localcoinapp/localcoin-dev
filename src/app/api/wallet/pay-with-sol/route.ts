@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
 
     // --- Perform SOL Transfer ---
     const connection = new Connection(getRpcUrl(), 'confirmed');
-    const lamportsToSend = solAmount * LAMPORTS_PER_SOL;
+    // FIX: Round the result of the multiplication to get a whole number.
+    const lamportsToSend = Math.round(solAmount * LAMPORTS_PER_SOL);
 
     // Verify user balance
     const balance = await connection.getBalance(userKeypair.publicKey);
