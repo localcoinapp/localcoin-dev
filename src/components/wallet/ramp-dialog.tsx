@@ -55,7 +55,7 @@ const generateUniqueCode = (userId: string) => {
 // Function to get the correct Stripe promise based on currency
 const getStripePromise = (currency: Currency) => {
     const publishableKey = currency === 'EUR' 
-        ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR
+        ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR 
         : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD;
 
     if (!publishableKey) {
@@ -184,9 +184,9 @@ export function RampDialog({ type, children }: RampDialogProps) {
         setIsFetchingPrice(true);
         setRequiredTokenAmount(null);
         try {
-            // USDC is a good base for USD-pegged values
-            const response = await fetch(`https://quote-api.jup.ag/v4/price?ids=${token.mint}&vsToken=USDC`);
-            if (!response.ok) throw new Error("Failed to fetch price from Jupiter API.");
+            // Use our internal API route which proxies to Jupiter
+            const response = await fetch(`/api/jupiter/price?ids=${token.mint}&vsToken=USDC`);
+            if (!response.ok) throw new Error("Failed to fetch price from the server.");
             
             const data = await response.json();
             const priceData = data.data[token.mint];
@@ -587,7 +587,3 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
-
-    
-
-    
