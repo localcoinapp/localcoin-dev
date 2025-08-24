@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState, useMemo, useEffect } from "react"
@@ -188,40 +189,40 @@ export function RampDialog({ type, children }: RampDialogProps) {
     >;
   
     const fetchPriceAndCalculateAmount = async (token: TokenInfo) => {
-        if (!amount) return;
-        setIsFetchingPrice(true);
-        setRequiredTokenAmount(null);
-      
-        try {
-          const response = await fetch(`/api/jupiter/price?ids=${encodeURIComponent(token.mint)}`);
-          if (!response.ok) throw new Error("Failed to fetch price from the server.");
-      
-          const prices: PriceV3Map = await response.json();
-          
-          const priceObj = prices[token.mint];
-      
-          if (!priceObj) {
-            throw new Error(`No price available for ${token.symbol ?? token.mint}`);
-          }
-          
-          let purchaseAmountUsd = parseFloat(amount);
-          if (currency === 'EUR') {
-            const eurUsd = Number(process.env.NEXT_PUBLIC_EURUSD_RATE ?? '1.08');
-            purchaseAmountUsd = purchaseAmountUsd * eurUsd;
-          }
-      
-          const requiredAmount = purchaseAmountUsd / priceObj.usdPrice;
-          setRequiredTokenAmount(requiredAmount);
-        } catch (error) {
-          console.error("Price fetch error:", error);
-          toast({
-            title: "Error Fetching Price",
-            description: (error as Error).message,
-            variant: "destructive",
-          });
-        } finally {
-          setIsFetchingPrice(false);
+      if (!amount) return;
+      setIsFetchingPrice(true);
+      setRequiredTokenAmount(null);
+    
+      try {
+        const response = await fetch(`/api/jupiter/price?ids=${encodeURIComponent(token.mint)}`);
+        if (!response.ok) throw new Error("Failed to fetch price from the server.");
+    
+        const prices: PriceV3Map = await response.json();
+        
+        const priceObj = prices[token.mint];
+    
+        if (!priceObj) {
+          throw new Error(`No price available for ${token.symbol ?? token.mint}`);
         }
+        
+        let purchaseAmountUsd = parseFloat(amount);
+        if (currency === 'EUR') {
+          const eurUsd = Number(process.env.NEXT_PUBLIC_EURUSD_RATE ?? '1.08');
+          purchaseAmountUsd = purchaseAmountUsd * eurUsd;
+        }
+    
+        const requiredAmount = purchaseAmountUsd / priceObj.usdPrice;
+        setRequiredTokenAmount(requiredAmount);
+      } catch (error) {
+        console.error("Price fetch error:", error);
+        toast({
+          title: "Error Fetching Price",
+          description: (error as Error).message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsFetchingPrice(false);
+      }
     };
 
     const handleTokenSelect = (token: TokenInfo) => {
@@ -230,74 +231,58 @@ export function RampDialog({ type, children }: RampDialogProps) {
     };
     
     const handleCryptoPayment = async () => {
-      if (!user || !user.seedPhrase || !selectedToken || requiredTokenAmount === null) {
-          toast({ title: "Error", description: "Missing required information for the swap.", variant: "destructive" });
-          return;
-      }
-      setIsSwapping(true);
-      try {
-          // 1. Get the swap transaction from the backend API
-          const response = await fetch('/api/wallet/swap-tokens', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  userWallet: user.walletAddress,
-                  inputToken: selectedToken.mint,
-                  outputToken: siteConfig.token.mintAddress,
-                  // The amount here is the amount of the INPUT token we want to spend
-                  amount: requiredTokenAmount * (10 ** selectedToken.decimals),
-              }),
-          });
-          const { swapTransaction, error } = await response.json();
-          if (error) {
-              throw new Error(`Jupiter Swap API Error: ${error}`);
-          }
-          
-          // 2. Deserialize the transaction
-          const transactionBuffer = Buffer.from(swapTransaction, 'base64');
-          const transaction = Transaction.from(transactionBuffer);
-          
-          // 3. Sign the transaction on the client-side
-          // This requires the full Keypair, not just the seed phrase
-          const userKeypair = Keypair.fromSeed(bip39.mnemonicToSeedSync(user.seedPhrase).slice(0, 32));
-          transaction.sign([userKeypair]);
-          
-          // 4. Send the signed transaction to the network
-          const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-          const rawTransaction = transaction.serialize();
-          const txid = await connection.sendRawTransaction(rawTransaction, {
-              skipPreflight: true,
-              maxRetries: 2
-          });
-          
-          await connection.confirmTransaction(txid);
+        if (!user || !user.id || !selectedToken || requiredTokenAmount === null) {
+            toast({ title: "Error", description: "Missing required information for payment.", variant: "destructive" });
+            return;
+        }
+        setIsSwapping(true);
+        try {
+            // Only handle SOL for now as per the user's request.
+            if (selectedToken.mint !== 'So11111111111111111111111111111111111111112') {
+                throw new Error("Currently, only paying with SOL is supported.");
+            }
+            
+            const response = await fetch('/api/wallet/pay-with-sol', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    amount: requiredTokenAmount, // This is the SOL amount
+                }),
+            });
 
-          toast({ title: "Swap Successful!", description: `Transaction ID: ${txid}` });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.details || "SOL payment failed.");
+            }
 
-          // 5. Finalize by creating a token purchase request for records
-           const requestsCollection = collection(db, 'tokenPurchaseRequests');
+            const { signature } = result;
+            toast({ title: "Payment Successful!", description: `Transaction ID: ${signature.substring(0, 20)}...` });
+            
+            // Create a token purchase request for record-keeping
+            const requestsCollection = collection(db, 'tokenPurchaseRequests');
             await addDoc(requestsCollection, {
                 userId: user.id,
                 userName: user.name || user.email,
                 userWalletAddress: user.walletAddress,
                 amount: parseFloat(amount), // This is the amount of LCL they get
-                status: 'approved', // Auto-approve crypto payments
+                status: 'approved',
                 createdAt: serverTimestamp(),
                 processedAt: serverTimestamp(),
                 currency: currency,
                 paymentMethod: 'crypto',
-                transactionSignature: txid
+                transactionSignature: signature,
             });
 
-          handleOpenChange(false);
+            handleOpenChange(false);
 
-      } catch (err) {
-          console.error("Crypto payment failed:", err);
-          toast({ title: "Swap Failed", description: (err as Error).message, variant: 'destructive' });
-      } finally {
-          setIsSwapping(false);
-      }
-    }
+        } catch (err) {
+            console.error("Crypto payment failed:", err);
+            toast({ title: "Payment Failed", description: (err as Error).message, variant: 'destructive' });
+        } finally {
+            setIsSwapping(false);
+        }
+    };
 
     const handleSubmit = async () => {
         if (!user || !user.walletAddress || !amount || !paymentMethod) {
@@ -673,5 +658,3 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
-
-    
