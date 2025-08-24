@@ -189,40 +189,42 @@ export function RampDialog({ type, children }: RampDialogProps) {
     >;
   
     const fetchPriceAndCalculateAmount = async (token: TokenInfo) => {
-      if (!amount) return;
-      setIsFetchingPrice(true);
-      setRequiredTokenAmount(null);
-    
-      try {
-        const response = await fetch(`/api/jupiter/price?ids=${encodeURIComponent(token.mint)}`);
-        if (!response.ok) throw new Error("Failed to fetch price from the server.");
-    
-        const prices: PriceV3Map = await response.json();
-        
-        const priceObj = prices[token.mint];
-    
-        if (!priceObj) {
-          throw new Error(`No price available for ${token.symbol ?? token.mint}`);
+        if (!amount) return;
+        setIsFetchingPrice(true);
+        setRequiredTokenAmount(null);
+
+        try {
+            // Call your own proxy (server route already fixed to /price/v3)
+            const response = await fetch(`/api/jupiter/price?ids=${encodeURIComponent(token.mint)}`);
+            if (!response.ok) throw new Error("Failed to fetch price from the server.");
+
+            const prices: PriceV3Map = await response.json();
+
+            // ✅ v3 shape: top-level map keyed by mint
+            const priceObj = prices[token.mint];
+            if (!priceObj) {
+            throw new Error(`No price available for ${token.symbol ?? token.mint}`);
+            }
+
+            // Jupiter returns USD only; if your UI amount is EUR, convert it first.
+            let purchaseAmountUsd = parseFloat(amount);
+            if (currency === 'EUR') {
+            const eurUsd = Number(process.env.NEXT_PUBLIC_EURUSD_RATE ?? '1.08');
+            purchaseAmountUsd = purchaseAmountUsd * eurUsd;
+            }
+
+            const requiredAmount = purchaseAmountUsd / priceObj.usdPrice; // tokens needed
+            setRequiredTokenAmount(requiredAmount);
+        } catch (error) {
+            console.error("Price fetch error:", error);
+            toast({
+            title: "Error Fetching Price",
+            description: (error as Error).message,
+            variant: "destructive",
+            });
+        } finally {
+            setIsFetchingPrice(false);
         }
-        
-        let purchaseAmountUsd = parseFloat(amount);
-        if (currency === 'EUR') {
-          const eurUsd = Number(process.env.NEXT_PUBLIC_EURUSD_RATE ?? '1.08');
-          purchaseAmountUsd = purchaseAmountUsd * eurUsd;
-        }
-    
-        const requiredAmount = purchaseAmountUsd / priceObj.usdPrice;
-        setRequiredTokenAmount(requiredAmount);
-      } catch (error) {
-        console.error("Price fetch error:", error);
-        toast({
-          title: "Error Fetching Price",
-          description: (error as Error).message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsFetchingPrice(false);
-      }
     };
 
     const handleTokenSelect = (token: TokenInfo) => {
@@ -237,7 +239,6 @@ export function RampDialog({ type, children }: RampDialogProps) {
         }
         setIsSwapping(true);
         try {
-            // Only handle SOL for now as per the user's request.
             if (selectedToken.mint !== 'So11111111111111111111111111111111111111112') {
                 throw new Error("Currently, only paying with SOL is supported.");
             }
@@ -247,7 +248,9 @@ export function RampDialog({ type, children }: RampDialogProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userId: user.id,
-                    amount: requiredTokenAmount, // This is the SOL amount
+                    solAmount: requiredTokenAmount,
+                    lclAmount: parseFloat(amount),
+                    currency: currency,
                 }),
             });
 
@@ -256,24 +259,8 @@ export function RampDialog({ type, children }: RampDialogProps) {
                 throw new Error(result.details || "SOL payment failed.");
             }
 
-            const { signature } = result;
-            toast({ title: "Payment Successful!", description: `Transaction ID: ${signature.substring(0, 20)}...` });
+            toast({ title: "Payment Successful!", description: `You have received ${amount} LCL.` });
             
-            // Create a token purchase request for record-keeping
-            const requestsCollection = collection(db, 'tokenPurchaseRequests');
-            await addDoc(requestsCollection, {
-                userId: user.id,
-                userName: user.name || user.email,
-                userWalletAddress: user.walletAddress,
-                amount: parseFloat(amount), // This is the amount of LCL they get
-                status: 'approved',
-                createdAt: serverTimestamp(),
-                processedAt: serverTimestamp(),
-                currency: currency,
-                paymentMethod: 'crypto',
-                transactionSignature: signature,
-            });
-
             handleOpenChange(false);
 
         } catch (err) {

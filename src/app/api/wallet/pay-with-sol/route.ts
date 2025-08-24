@@ -1,4 +1,6 @@
 
+'use client';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -10,10 +12,16 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
+import {
+  createTransferCheckedInstruction,
+  getMint,
+  getOrCreateAssociatedTokenAccount,
+} from '@solana/spl-token';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import type { User } from '@/types';
 import * as bip39 from 'bip39';
+import { siteConfig } from '@/config/site';
 
 // Helper to get a Keypair from a mnemonic
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
@@ -29,10 +37,10 @@ export async function POST(req: NextRequest) {
   console.log('--- Received POST /api/wallet/pay-with-sol ---');
 
   try {
-    const { userId, amount: solAmount } = await req.json();
+    const { userId, solAmount, lclAmount, currency } = await req.json();
 
-    if (!userId || !solAmount || solAmount <= 0) {
-      return NextResponse.json({ error: 'User ID and a positive SOL amount are required' }, { status: 400 });
+    if (!userId || !solAmount || solAmount <= 0 || !lclAmount || lclAmount <= 0) {
+      return NextResponse.json({ error: 'User ID, a positive SOL amount, and a positive LCL amount are required' }, { status: 400 });
     }
 
     // --- Get User's Seed Phrase from Firestore ---
@@ -55,9 +63,8 @@ export async function POST(req: NextRequest) {
     const platformKeypair = keypairFromMnemonic(platformMnemonic, process.env.LOCALCOIN_PASSPHRASE || '');
     const recipientPublicKey = platformKeypair.publicKey;
 
-    // --- Perform SOL Transfer ---
+    // --- 1. Perform SOL Transfer (User -> Platform) ---
     const connection = new Connection(getRpcUrl(), 'confirmed');
-    // FIX: Round the result of the multiplication to get a whole number.
     const lamportsToSend = Math.round(solAmount * LAMPORTS_PER_SOL);
 
     // Verify user balance
@@ -66,7 +73,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`Insufficient SOL balance. Required: ${solAmount}, Available: ${balance / LAMPORTS_PER_SOL}`);
     }
 
-    const transaction = new Transaction().add(
+    const solTransaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: userKeypair.publicKey,
         toPubkey: recipientPublicKey,
@@ -74,11 +81,58 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // Sign with the SENDER's (user's) keypair
-    const signature = await sendAndConfirmTransaction(connection, transaction, [userKeypair]);
-    console.log('SOL transfer signature:', signature);
+    const solSignature = await sendAndConfirmTransaction(connection, solTransaction, [userKeypair]);
+    console.log('SOL transfer signature:', solSignature);
 
-    return NextResponse.json({ signature });
+    // --- 2. Perform LCL Transfer (Platform -> User) ---
+    const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
+    const userPublicKey = new PublicKey(userData.walletAddress!);
+    
+    const mintInfo = await getMint(connection, tokenMintPublicKey);
+    const decimals = mintInfo.decimals;
+    const rawLclAmount = BigInt(Math.round(lclAmount * (10 ** decimals)));
+
+    const fromAta = await getOrCreateAssociatedTokenAccount(
+        connection, platformKeypair, tokenMintPublicKey, platformKeypair.publicKey
+    );
+    const toAta = await getOrCreateAssociatedTokenAccount(
+        connection, platformKeypair, tokenMintPublicKey, userPublicKey
+    );
+
+    const lclIx = createTransferCheckedInstruction(
+        fromAta.address,
+        tokenMintPublicKey,
+        toAta.address,
+        platformKeypair.publicKey, // Platform is the owner and signer
+        rawLclAmount,
+        decimals
+    );
+    const lclTx = new Transaction().add(lclIx);
+    const lclSignature = await sendAndConfirmTransaction(connection, lclTx, [platformKeypair]);
+    console.log('LCL transfer signature:', lclSignature);
+
+
+    // --- 3. Create Approved Purchase Record ---
+    const requestsCollection = collection(db, 'tokenPurchaseRequests');
+    await addDoc(requestsCollection, {
+      userId: user.id,
+      userName: userData.name || userData.email,
+      userWalletAddress: userData.walletAddress,
+      amount: parseFloat(lclAmount), // The amount of LCL they bought
+      status: 'approved',
+      createdAt: serverTimestamp(),
+      processedAt: serverTimestamp(),
+      currency: currency,
+      paymentMethod: 'crypto',
+      transactionSignature: lclSignature, // Record the LCL transfer signature
+      notes: `Paid with ${solAmount.toFixed(6)} SOL. Tx: ${solSignature.substring(0, 10)}...`
+    });
+
+    return NextResponse.json({ 
+        message: "Payment and token transfer successful.",
+        solSignature, 
+        lclSignature 
+    });
 
   } catch (error: any) {
     console.error('Error in pay-with-sol API:', error);
