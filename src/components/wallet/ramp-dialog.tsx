@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,8 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { Separator } from "../ui/separator"
 import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Skeleton } from "../ui/skeleton"
 
 interface RampDialogProps {
   type: 'buy';
@@ -34,6 +36,11 @@ interface RampDialogProps {
 type PaymentStep = 'amount' | 'method' | 'details';
 type Currency = 'EUR' | 'USD';
 type PaymentMethod = 'stripe' | 'bank' | 'crypto';
+type TokenInfo = {
+    mint: string;
+    balance: number;
+}
+
 
 const generateUniqueCode = (userId: string) => {
     const userPart = userId.substring(0, 4).toUpperCase();
@@ -64,6 +71,8 @@ export function RampDialog({ type, children }: RampDialogProps) {
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
     const [hasCopiedCode, setHasCopiedCode] = useState(false);
     const [hasCopiedIban, setHasCopiedIban] = useState(false);
+    const [isScanningWallet, setIsScanningWallet] = useState(false);
+    const [walletTokens, setWalletTokens] = useState<TokenInfo[]>([]);
 
 
     const uniqueTransferCode = useMemo(() => {
@@ -77,6 +86,8 @@ export function RampDialog({ type, children }: RampDialogProps) {
         setCurrency('EUR');
         setPaymentMethod(null);
         setIsLoading(false);
+        setWalletTokens([]);
+        setIsScanningWallet(false);
     }
     
     const handleOpenChange = (isOpen: boolean) => {
@@ -96,6 +107,44 @@ export function RampDialog({ type, children }: RampDialogProps) {
             setTimeout(() => setHasCopiedIban(false), 2000);
         }
     };
+    
+    const handleScanWallet = async () => {
+        if (!user || !user.walletAddress) {
+            toast({ title: "Wallet not found", description: "Your wallet address is not available.", variant: "destructive" });
+            return;
+        }
+        setIsScanningWallet(true);
+        setWalletTokens([]);
+        try {
+            const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+            const walletPublicKey = new PublicKey(user.walletAddress);
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
+                programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+            });
+            
+            const tokens = tokenAccounts.value
+                .map(account => {
+                    const parsedInfo = account.account.data.parsed.info;
+                    return {
+                        mint: parsedInfo.mint,
+                        balance: parsedInfo.tokenAmount.uiAmount,
+                    };
+                })
+                .filter(token => token.balance > 0); // Only show tokens with a balance
+            
+            setWalletTokens(tokens);
+
+            if (tokens.length === 0) {
+                 toast({ title: "No Tokens Found", description: "No additional tokens were found in your wallet."});
+            }
+
+        } catch (error) {
+            console.error("Failed to scan wallet:", error);
+            toast({ title: "Error", description: "Could not scan your wallet for tokens.", variant: "destructive" });
+        } finally {
+            setIsScanningWallet(false);
+        }
+    }
 
 
     const handleSubmit = async () => {
@@ -398,47 +447,40 @@ export function RampDialog({ type, children }: RampDialogProps) {
                             </DialogHeader>
 
                             <div className="space-y-4 py-4">
-                                <Button className="w-full" variant="outline">
-                                    <Wallet className="mr-2 h-4 w-4" /> Scan my wallet for tokens
+                                <Button className="w-full" variant="outline" onClick={handleScanWallet} disabled={isScanningWallet}>
+                                    {isScanningWallet ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wallet className="mr-2 h-4 w-4" />}
+                                    Scan my wallet for tokens
                                 </Button>
 
-                                {/* 
-                                  // ================== DEVELOPER TODO ==================
-                                  // This section is a placeholder for the crypto payment UI.
-                                  // You would need to implement the following logic here:
-                                  //
-                                  // 1. **Scan Wallet**: On button click, use Connection.getParsedTokenAccountsByOwner(user.walletAddress)
-                                  //    to find all tokens the user holds.
-                                  //
-                                  // 2. **Get Prices**: For each token found, use a price oracle API (e.g., Jupiter aggregator)
-                                  //    to get its current price in USD.
-                                  //
-                                  // 3. **Display Tokens**: Populate a list or a <Select> component with the tokens the user can afford to swap.
-                                  //    For each token, show the user's balance and its USD value.
-                                  //
-                                  // 4. **Calculate Swap**: When a user selects a token, calculate how much of that token is
-                                  //    needed to equal the value of the LCL tokens they want to buy (e.g., $50 of LCL = $50 of USDC).
-                                  //
-                                  // 5. **Execute Swap**: On confirmation, use a library like @solana/web3.js to construct and
-                                  //    send a transaction that transfers the selected token from the user's wallet to the admin's wallet.
-                                  // ======================================================
-                                */}
-                                <div className="p-4 border rounded-md space-y-3 text-sm text-muted-foreground">
-                                    <p className="font-semibold text-foreground">1. Your Tokens</p>
-                                    <p>After scanning, your available tokens will appear here.</p>
-                                    
-                                    <p className="font-semibold text-foreground pt-3 border-t">2. Select Token to Pay With</p>
-                                    <p>Select a token from the list above.</p>
-
-                                    <p className="font-semibold text-foreground pt-3 border-t">3. Confirm Swap</p>
-                                    <p>You will be asked to approve the transaction to swap your token for {amount} {siteConfig.token.symbol}.</p>
+                                <div className="p-4 border rounded-md space-y-3 text-sm text-muted-foreground min-h-[150px]">
+                                     <p className="font-semibold text-foreground">Your Tokens</p>
+                                    {isScanningWallet ? (
+                                        <div className="space-y-2">
+                                            <Skeleton className="h-4 w-full" />
+                                            <Skeleton className="h-4 w-5/6" />
+                                        </div>
+                                    ) : walletTokens.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {walletTokens.map(token => (
+                                                <div key={token.mint} className="flex justify-between items-center text-foreground">
+                                                    <span className="font-mono text-xs break-all pr-2">{token.mint}</span>
+                                                    <span className="font-semibold">{token.balance.toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p>Your tokens will appear here after scanning.</p>
+                                    )}
+                                    <Separator />
+                                    <p className="font-semibold text-foreground pt-2">Next Steps</p>
+                                    <p>Select a token from the list above to proceed with the swap.</p>
                                 </div>
                             </div>
                             <DialogFooter>
                                 <Button 
                                     type="submit" 
                                     onClick={handleSubmit} 
-                                    disabled={true} // Disabled until wallet integration is complete
+                                    disabled={true} // Disabled until full swap logic is implemented
                                 >
                                     Pay with Crypto (Coming Soon)
                                 </Button>
