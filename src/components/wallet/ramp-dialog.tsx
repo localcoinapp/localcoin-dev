@@ -25,10 +25,13 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { Separator } from "../ui/separator"
 import { loadStripe, Stripe } from '@stripe/stripe-js';
-import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL, VersionedTransaction, Keypair } from "@solana/web3.js";
+import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { createTransferInstruction, getOrCreateAssociatedTokenAccount, getMint } from "@solana/spl-token";
 import { Skeleton } from "../ui/skeleton"
 import { cn } from "@/lib/utils"
-import * as bip39 from 'bip39';
+import * as bip39 from "bip39";
+import { Keypair } from "@solana/web3.js";
+
 
 interface RampDialogProps {
   type: 'buy';
@@ -41,11 +44,11 @@ type PaymentMethod = 'stripe' | 'bank' | 'crypto';
 type TokenInfo = {
     mint: string;
     balance: number;
-    name?: string; // Optional name for display (e.g., "SOL")
-    symbol?: string; // e.g., 'SOL'
-    logo?: string; // e.g., url to logo
+    name?: string; 
+    symbol?: string; 
+    logo?: string;
+    decimals: number;
 }
-
 
 const generateUniqueCode = (userId: string) => {
     const userPart = userId.substring(0, 4).toUpperCase();
@@ -53,7 +56,6 @@ const generateUniqueCode = (userId: string) => {
     return `${userPart}-${datePart}`;
 };
 
-// Function to get the correct Stripe promise based on currency
 const getStripePromise = (currency: Currency) => {
     const publishableKey = currency === 'EUR' 
         ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR 
@@ -64,6 +66,13 @@ const getStripePromise = (currency: Currency) => {
     }
     return loadStripe(publishableKey);
 };
+
+// Helper to get keypair from mnemonic
+function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
+  const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
+  return Keypair.fromSeed(seed.slice(0, 32));
+}
+
 
 export function RampDialog({ type, children }: RampDialogProps) {
     const { user } = useAuth();
@@ -137,20 +146,20 @@ export function RampDialog({ type, children }: RampDialogProps) {
             const walletPublicKey = new PublicKey(user.walletAddress);
 
             const allTokens: TokenInfo[] = [];
-            // --- 1. Fetch native SOL balance ---
+            
             const solBalanceLamports = await connection.getBalance(walletPublicKey);
             const solBalance = solBalanceLamports / LAMPORTS_PER_SOL;
             if (solBalance > 0) {
                 allTokens.push({
                     name: 'Solana',
                     symbol: 'SOL',
-                    mint: 'So11111111111111111111111111111111111111112', // Native SOL mint address
+                    mint: 'So11111111111111111111111111111111111111112',
                     balance: solBalance,
                     logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
+                    decimals: 9,
                 });
             }
 
-            // --- 2. Fetch SPL Token balances ---
             const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
                 programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
             });
@@ -161,12 +170,12 @@ export function RampDialog({ type, children }: RampDialogProps) {
                     return {
                         mint: parsedInfo.mint,
                         balance: parsedInfo.tokenAmount.uiAmount,
-                        symbol: parsedInfo.tokenAmount.symbol, // May not exist
+                        symbol: parsedInfo.tokenAmount.symbol,
+                        decimals: parsedInfo.tokenAmount.decimals,
                     };
                 })
-                .filter(token => token.balance > 0); // Only show tokens with a balance
+                .filter(token => token.balance > 0);
             
-            // --- 3. Combine and set state ---
             const finalTokenList = [...allTokens, ...splTokens];
             setWalletTokens(finalTokenList);
 
@@ -223,7 +232,6 @@ export function RampDialog({ type, children }: RampDialogProps) {
           setIsFetchingPrice(false);
         }
     };
-  
 
     const handleTokenSelect = (token: TokenInfo) => {
         setSelectedToken(token);
@@ -231,75 +239,82 @@ export function RampDialog({ type, children }: RampDialogProps) {
     };
     
     const handleCryptoPayment = async () => {
-        if (!user || !user.walletAddress || !user.seedPhrase || !selectedToken || requiredTokenAmount === null) {
-            toast({ title: "Error", description: "Missing required information for the swap.", variant: "destructive" });
+        if (!user || !user.seedPhrase || !selectedToken || requiredTokenAmount === null) {
+            toast({ title: "Error", description: "Missing required information for the transfer.", variant: "destructive" });
             return;
         }
+
+        const platformMnemonic = process.env.NEXT_PUBLIC_LOCALCOIN_MNEMONIC;
+        if (!platformMnemonic) {
+            toast({ title: "Configuration Error", description: "Platform wallet is not configured.", variant: "destructive" });
+            return;
+        }
+
         setIsSwapping(true);
 
         try {
-            // 1. Get the swap transaction from our backend
-            const response = await fetch('/api/wallet/swap-tokens', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userWallet: user.walletAddress,
-                    inputMint: selectedToken.mint,
-                    outputMint: siteConfig.token.mintAddress,
-                    // Note: Jupiter expects amount in the smallest unit (lamports)
-                    amount: requiredTokenAmount * (10 ** selectedToken.balance), 
-                }),
-            });
-            const { swapTransaction, error } = await response.json();
-            if (error) throw new Error(error);
-
-            // 2. Deserialize the transaction
-            const transactionBuffer = Buffer.from(swapTransaction, 'base64');
-            const transaction = VersionedTransaction.deserialize(transactionBuffer);
-            
-            // 3. Get user's Keypair from seed phrase to sign
-            const seed = bip39.mnemonicToSeedSync(user.seedPhrase);
-            const userKeypair = Keypair.fromSeed(seed.slice(0, 32));
-
-            // 4. Sign the transaction
-            transaction.sign([userKeypair]);
-            
-            // 5. Execute the transaction
             const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-            const rawTransaction = transaction.serialize();
-            const txid = await connection.sendRawTransaction(rawTransaction, {
-                skipPreflight: false, // Set to false for better error checking
-                maxRetries: 2
-            });
-
-            await connection.confirmTransaction(txid);
-
-            toast({ title: "Swap Successful!", description: `Transaction ID: ${txid}` });
             
-            // 6. Finalize by creating a token purchase request for records
+            const fromKeypair = keypairFromMnemonic(user.seedPhrase);
+            const toKeypair = keypairFromMnemonic(platformMnemonic);
+            const toPublicKey = toKeypair.publicKey;
+
+            const amountInSmallestUnit = requiredTokenAmount * (10 ** selectedToken.decimals);
+
+            // Get the sender's and receiver's associated token accounts
+            const fromAta = await getOrCreateAssociatedTokenAccount(
+                connection,
+                fromKeypair, // Payer
+                new PublicKey(selectedToken.mint),
+                fromKeypair.publicKey
+            );
+
+            const toAta = await getOrCreateAssociatedTokenAccount(
+                connection,
+                fromKeypair, // Payer
+                new PublicKey(selectedToken.mint),
+                toPublicKey
+            );
+            
+            // Create and send the transaction
+            const transaction = new Transaction().add(
+                createTransferInstruction(
+                    fromAta.address,
+                    toAta.address,
+                    fromKeypair.publicKey,
+                    amountInSmallestUnit
+                )
+            );
+
+            const signature = await sendAndConfirmTransaction(connection, transaction, [fromKeypair]);
+            
+            toast({ title: "Transfer Successful!", description: `Transaction ID: ${signature.substring(0,20)}...` });
+            
+            // Finalize by creating a token purchase request for records
             const requestsCollection = collection(db, 'tokenPurchaseRequests');
             await addDoc(requestsCollection, {
                 userId: user.id,
                 userName: user.name || user.email,
                 userWalletAddress: user.walletAddress,
                 amount: parseFloat(amount),
-                status: 'approved',
+                status: 'approved', // Auto-approve crypto payments
                 createdAt: serverTimestamp(),
                 processedAt: serverTimestamp(),
                 currency: currency,
                 paymentMethod: 'crypto',
-                transactionSignature: txid
+                transactionSignature: signature
             });
             
             handleOpenChange(false);
 
         } catch (err) {
             console.error("Crypto payment failed:", err);
-            toast({ title: "Swap Failed", description: (err as Error).message, variant: 'destructive' });
+            toast({ title: "Transfer Failed", description: (err as Error).message, variant: 'destructive' });
         } finally {
             setIsSwapping(false);
         }
     }
+
 
     const handleSubmit = async () => {
         if (!user || !user.walletAddress || !amount || !paymentMethod) {
@@ -675,5 +690,3 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
-
-    
