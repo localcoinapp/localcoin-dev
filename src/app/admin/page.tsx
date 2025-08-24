@@ -445,7 +445,7 @@ export default function AdminPage() {
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-bold font-headline mb-4">Admin Dashboard</h1>
         <Tabs defaultValue="applications">
-          <TabsList className="grid grid-cols-1 sm:grid-cols-7 w-full">
+          <TabsList className="grid w-full grid-cols-1 md:grid-cols-4 lg:grid-cols-7">
             <TabsTrigger value="applications">Merchant Applications ({pendingApplications.length})</TabsTrigger>
             <TabsTrigger value="token_requests">Token Requests ({tokenRequests.length})</TabsTrigger>
             <TabsTrigger value="cashout_requests">Cashout Requests ({pendingCashoutRequests.length})</TabsTrigger>
