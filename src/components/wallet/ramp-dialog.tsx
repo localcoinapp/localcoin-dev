@@ -182,50 +182,50 @@ export function RampDialog({ type, children }: RampDialogProps) {
         }
     }
 
-    type PriceV3Response = Record<string, {
-      id: string;
-      mintSymbol: string;
-      vsToken: string;
-      vsTokenSymbol: string;
-      price: number;
+    type PriceV3Map = Record<string, {
+      data: any;
+      usdPrice: number;
+      blockId: number;
+      decimals: number;
+      priceChange24h: number;
     }>;
   
-  const fetchPriceAndCalculateAmount = async (token: TokenInfo) => {
-    if (!amount) return;
-    setIsFetchingPrice(true);
-    setRequiredTokenAmount(null);
-  
-    try {
-      const response = await fetch(`/api/jupiter/price?ids=${token.mint}`);
-      if (!response.ok) throw new Error("Failed to fetch price from the server.");
-  
-      const prices: PriceV3Response = await response.json();
+    const fetchPriceAndCalculateAmount = async (token: TokenInfo) => {
+        if (!amount) return;
+        setIsFetchingPrice(true);
+        setRequiredTokenAmount(null);
       
-      const priceData = prices.data[token.mint];
-
-      if (!priceData) {
-        throw new Error(`No price available for ${token.symbol ?? token.mint}`);
-      }
+        try {
+          const response = await fetch(`/api/jupiter/price?ids=${encodeURIComponent(token.mint)}`);
+          if (!response.ok) throw new Error("Failed to fetch price from the server.");
       
-      let purchaseAmountUsd = parseFloat(amount);
-      if (currency === 'EUR') {
-        const eurUsd = Number(process.env.NEXT_PUBLIC_EURUSD_RATE ?? '1.08');
-        purchaseAmountUsd = purchaseAmountUsd * eurUsd;
-      }
-  
-      const requiredAmount = purchaseAmountUsd / priceData.price;
-      setRequiredTokenAmount(requiredAmount);
-    } catch (error) {
-      console.error("Price fetch error:", error);
-      toast({
-        title: "Error Fetching Price",
-        description: (error as Error).message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsFetchingPrice(false);
-    }
-  };
+          const prices: PriceV3Map = await response.json();
+          
+          const priceData = prices.data[token.mint];
+      
+          if (!priceData) {
+            throw new Error(`No price available for ${token.symbol ?? token.mint}`);
+          }
+          
+          let purchaseAmountUsd = parseFloat(amount);
+          if (currency === 'EUR') {
+            const eurUsd = Number(process.env.NEXT_PUBLIC_EURUSD_RATE ?? '1.08');
+            purchaseAmountUsd = purchaseAmountUsd * eurUsd;
+          }
+      
+          const requiredAmount = purchaseAmountUsd / priceData.price;
+          setRequiredTokenAmount(requiredAmount);
+        } catch (error) {
+          console.error("Price fetch error:", error);
+          toast({
+            title: "Error Fetching Price",
+            description: (error as Error).message,
+            variant: "destructive",
+          });
+        } finally {
+          setIsFetchingPrice(false);
+        }
+    };
   
 
     const handleTokenSelect = (token: TokenInfo) => {
@@ -677,5 +677,3 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
-
-    
