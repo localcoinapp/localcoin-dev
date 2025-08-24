@@ -185,7 +185,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
         setRequiredTokenAmount(null);
         try {
             // USDC is a good base for USD-pegged values
-            const response = await fetch(`https://price.jup.ag/v4/price?ids=${token.mint}&vsToken=USDC`);
+            const response = await fetch(`https://quote-api.jup.ag/v4/price?ids=${token.mint}&vsToken=USDC`);
             if (!response.ok) throw new Error("Failed to fetch price from Jupiter API.");
             
             const data = await response.json();
@@ -587,5 +587,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
+
+    
 
     
