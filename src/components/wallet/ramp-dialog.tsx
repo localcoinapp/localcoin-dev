@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { Separator } from "../ui/separator"
 import { loadStripe, Stripe } from '@stripe/stripe-js';
-import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Skeleton } from "../ui/skeleton"
 
 interface RampDialogProps {
@@ -39,6 +39,7 @@ type PaymentMethod = 'stripe' | 'bank' | 'crypto';
 type TokenInfo = {
     mint: string;
     balance: number;
+    name?: string; // Optional name for display (e.g., "SOL")
 }
 
 
@@ -118,11 +119,26 @@ export function RampDialog({ type, children }: RampDialogProps) {
         try {
             const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
             const walletPublicKey = new PublicKey(user.walletAddress);
+
+            // --- 1. Fetch native SOL balance ---
+            const solBalanceLamports = await connection.getBalance(walletPublicKey);
+            const solBalance = solBalanceLamports / LAMPORTS_PER_SOL;
+            const allTokens: TokenInfo[] = [];
+
+            if (solBalance > 0) {
+                allTokens.push({
+                    name: 'SOL',
+                    mint: 'So11111111111111111111111111111111111111112', // Native SOL mint address
+                    balance: solBalance,
+                });
+            }
+
+            // --- 2. Fetch SPL Token balances ---
             const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
                 programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
             });
             
-            const tokens = tokenAccounts.value
+            const splTokens = tokenAccounts.value
                 .map(account => {
                     const parsedInfo = account.account.data.parsed.info;
                     return {
@@ -132,10 +148,12 @@ export function RampDialog({ type, children }: RampDialogProps) {
                 })
                 .filter(token => token.balance > 0); // Only show tokens with a balance
             
-            setWalletTokens(tokens);
+            // --- 3. Combine and set state ---
+            const finalTokenList = [...allTokens, ...splTokens];
+            setWalletTokens(finalTokenList);
 
-            if (tokens.length === 0) {
-                 toast({ title: "No Tokens Found", description: "No additional tokens were found in your wallet."});
+            if (finalTokenList.length === 0) {
+                 toast({ title: "No Tokens Found", description: "No SOL or other tokens were found in your wallet."});
             }
 
         } catch (error) {
@@ -463,7 +481,10 @@ export function RampDialog({ type, children }: RampDialogProps) {
                                         <div className="space-y-2">
                                             {walletTokens.map(token => (
                                                 <div key={token.mint} className="flex justify-between items-center text-foreground">
-                                                    <span className="font-mono text-xs break-all pr-2">{token.mint}</span>
+                                                    <div>
+                                                        <span className="font-semibold">{token.name || 'Token'}</span>
+                                                        <span className="font-mono text-xs block break-all pr-2">{token.name ? '' : token.mint}</span>
+                                                    </div>
                                                     <span className="font-semibold">{token.balance.toLocaleString()}</span>
                                                 </div>
                                             ))}
@@ -504,5 +525,3 @@ export function RampDialog({ type, children }: RampDialogProps) {
     </Dialog>
   )
 }
-
-    
