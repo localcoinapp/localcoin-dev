@@ -403,11 +403,11 @@ export default function AdminPage() {
   
   const totalTokensIssued = allTokenRequests
     .filter(req => req.status === 'approved')
-    .reduce((acc, req) => acc + req.amount, 0);
+    .reduce((acc, req) => acc + (req.amount || 0), 0);
 
   const totalTokensCashedOut = allCashoutRequests
     .filter(req => req.status === 'approved')
-    .reduce((acc, req) => acc + req.amount, 0);
+    .reduce((acc, req) => acc + (req.amount || 0), 0);
 
   const platformProfit = totalTokensCashedOut * siteConfig.commissionRate;
   
@@ -478,7 +478,7 @@ export default function AdminPage() {
                                     {tokenRequests.length > 0 ? tokenRequests.map(req => (
                                         <TableRow key={req.id}>
                                             <TableCell>{req.userName || req.userId}</TableCell>
-                                            <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                            <TableCell>{(req.amount || 0).toFixed(2)} {siteConfig.token.symbol}</TableCell>
                                             <TableCell className="font-mono text-xs">{req.userWalletAddress}</TableCell>
                                             <TableCell>{formatDate(req.createdAt)}</TableCell>
                                             <TableCell className="text-right">
@@ -511,7 +511,7 @@ export default function AdminPage() {
                                 {historicalTokenRequests.length > 0 ? historicalTokenRequests.map(req => (
                                     <TableRow key={req.id}>
                                         <TableCell>{req.userName || req.userId}</TableCell>
-                                        <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                        <TableCell>{(req.amount || 0).toFixed(2)} {siteConfig.token.symbol}</TableCell>
                                         <TableCell><Badge variant={req.status === 'approved' ? 'default' : 'destructive'}>{req.status}</Badge></TableCell>
                                         <TableCell>{formatDate(req.processedAt)}</TableCell>
                                         <TableCell className="text-right">
@@ -553,7 +553,7 @@ export default function AdminPage() {
                                     {pendingCashoutRequests.length > 0 ? pendingCashoutRequests.map(req => (
                                         <TableRow key={req.id}>
                                             <TableCell>{req.merchantName}</TableCell>
-                                            <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                            <TableCell>{(req.amount || 0).toFixed(2)} {siteConfig.token.symbol}</TableCell>
                                             <TableCell className="font-mono text-xs">{req.merchantWalletAddress}</TableCell>
                                             <TableCell>{formatDate(req.createdAt)}</TableCell>
                                             <TableCell className="text-right">
@@ -586,7 +586,7 @@ export default function AdminPage() {
                                 {historicalCashoutRequests.length > 0 ? historicalCashoutRequests.map(req => (
                                     <TableRow key={req.id}>
                                         <TableCell>{req.merchantName}</TableCell>
-                                        <TableCell>{req.amount.toFixed(2)} {siteConfig.token.symbol}</TableCell>
+                                        <TableCell>{(req.amount || 0).toFixed(2)} {siteConfig.token.symbol}</TableCell>
                                         <TableCell><Badge variant={req.status === 'approved' ? 'default' : 'destructive'}>{req.status}</Badge></TableCell>
                                         <TableCell>{formatDate(req.processedAt)}</TableCell>
                                         <TableCell className="text-right">
