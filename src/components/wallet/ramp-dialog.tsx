@@ -185,7 +185,7 @@ export function RampDialog({ type, children }: RampDialogProps) {
         setRequiredTokenAmount(null);
         try {
             // Use our internal API route which proxies to Jupiter
-            const response = await fetch(`/api/jupiter/price?ids=${token.mint}&vsToken=USDC`);
+            const response = await fetch(`/api/jupiter/price?ids=${token.mint}`);
             if (!response.ok) throw new Error("Failed to fetch price from the server.");
             
             const data = await response.json();

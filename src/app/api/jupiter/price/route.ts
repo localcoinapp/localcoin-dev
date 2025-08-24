@@ -2,16 +2,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // This route acts as a proxy to the Jupiter Price API to avoid CORS issues.
+// It uses the v6 endpoint, which is more current.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const ids = searchParams.get('ids');
-  const vsToken = searchParams.get('vsToken');
-
-  if (!ids || !vsToken) {
-    return NextResponse.json({ error: 'Missing required query parameters: ids and vsToken' }, { status: 400 });
+  
+  if (!ids) {
+    return NextResponse.json({ error: 'Missing required query parameter: ids' }, { status: 400 });
   }
 
-  const JUPITER_API_URL = `https://quote-api.jup.ag/v4/price?ids=${ids}&vsToken=${vsToken}`;
+  // Corrected to use the v6 endpoint for better stability and features.
+  const JUPITER_API_URL = `https://quote-api.jup.ag/v6/price?ids=${ids}`;
 
   try {
     const response = await fetch(JUPITER_API_URL, {
