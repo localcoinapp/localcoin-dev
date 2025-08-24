@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required query parameter: ids' }, { status: 400 });
   }
 
-  // Corrected to use the v6 endpoint for better stability and features.
+  // Corrected to use the v6 endpoint and removed the unsupported 'vsToken' parameter.
   const JUPITER_API_URL = `https://quote-api.jup.ag/v6/price?ids=${ids}`;
 
   try {
