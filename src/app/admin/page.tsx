@@ -27,6 +27,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { enhanceEmailBody } from '@/ai/flows/enhance-email-body';
 
+type HistorySortOption = 'date-desc' | 'date-asc' | 'user-asc' | 'user-desc' | 'amount-asc' | 'amount-desc' | 'status-asc' | 'status-desc';
+type HistoryStatusFilter = 'all' | 'approved' | 'denied';
+
+
 const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'N/A';
     const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp;
@@ -64,6 +68,10 @@ export default function AdminPage() {
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [isSendingPushEmail, setIsSendingPushEmail] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  
+  // History table state
+  const [historySort, setHistorySort] = useState<HistorySortOption>('date-desc');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<HistoryStatusFilter>('all');
 
 
   const pushEmailForm = useForm<PushEmailFormValues>({
@@ -413,6 +421,24 @@ export default function AdminPage() {
   
   const historicalTokenRequests = allTokenRequests.filter(req => req.status !== 'pending');
 
+  const filteredAndSortedHistory = historicalTokenRequests
+    .filter(req => historyStatusFilter === 'all' || req.status === historyStatusFilter)
+    .sort((a, b) => {
+        const aName = a.userName?.toLowerCase() ?? '';
+        const bName = b.userName?.toLowerCase() ?? '';
+        
+        switch (historySort) {
+            case 'date-desc': return (b.processedAt?.toDate()?.getTime() || 0) - (a.processedAt?.toDate()?.getTime() || 0);
+            case 'date-asc': return (a.processedAt?.toDate()?.getTime() || 0) - (b.processedAt?.toDate()?.getTime() || 0);
+            case 'user-asc': return aName.localeCompare(bName);
+            case 'user-desc': return bName.localeCompare(aName);
+            case 'amount-asc': return (a.amount ?? 0) - (b.amount ?? 0);
+            case 'amount-desc': return (b.amount ?? 0) - (a.amount ?? 0);
+            case 'status-asc': return (a.status ?? '').localeCompare(b.status ?? '');
+            case 'status-desc': return (b.status ?? '').localeCompare(a.status ?? '');
+            default: return 0;
+        }
+    });
 
   return (
     <>
@@ -500,15 +526,44 @@ export default function AdminPage() {
                 </TabsContent>
                  <TabsContent value="history_tokens">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Token Request History</CardTitle>
-                            <CardDescription>A log of all processed token purchase requests.</CardDescription>
+                        <CardHeader className="flex-wrap items-center justify-between gap-4 md:flex-row">
+                             <div>
+                                <CardTitle>Token Request History</CardTitle>
+                                <CardDescription>A log of all processed token purchase requests.</CardDescription>
+                             </div>
+                             <div className="flex flex-wrap items-center gap-2">
+                                <Select value={historyStatusFilter} onValueChange={(v) => setHistoryStatusFilter(v as HistoryStatusFilter)}>
+                                    <SelectTrigger className="w-full sm:w-[160px]">
+                                        <SelectValue placeholder="Filter by status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Statuses</SelectItem>
+                                        <SelectItem value="approved">Approved</SelectItem>
+                                        <SelectItem value="denied">Denied</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={historySort} onValueChange={(v) => setHistorySort(v as HistorySortOption)}>
+                                    <SelectTrigger className="w-full sm:w-[160px]">
+                                        <SelectValue placeholder="Sort by" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="date-desc">Newest First</SelectItem>
+                                        <SelectItem value="date-asc">Oldest First</SelectItem>
+                                        <SelectItem value="user-asc">User (A-Z)</SelectItem>
+                                        <SelectItem value="user-desc">User (Z-A)</SelectItem>
+                                        <SelectItem value="amount-desc">Amount (High-Low)</SelectItem>
+                                        <SelectItem value="amount-asc">Amount (Low-High)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A-Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z-A)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                             </div>
                         </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Processed</TableHead><TableHead className="text-right">Transaction</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                {historicalTokenRequests.length > 0 ? historicalTokenRequests.map(req => (
+                                {filteredAndSortedHistory.length > 0 ? filteredAndSortedHistory.map(req => (
                                     <TableRow key={req.id}>
                                         <TableCell>{req.userName || req.userId}</TableCell>
                                         <TableCell>{(req.amount || 0).toFixed(2)} {siteConfig.token.symbol}</TableCell>
