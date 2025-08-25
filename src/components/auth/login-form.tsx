@@ -23,8 +23,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "../logo"
 import { useToast } from "@/hooks/use-toast"
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
-import { Terminal } from "lucide-react"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -52,12 +50,10 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Check if user is in the 'blocked_users' collection
       const blockedUserDocRef = doc(db, "blocked_users", user.uid);
       const blockedDocSnap = await getDoc(blockedUserDocRef);
 
       if (blockedDocSnap.exists()) {
-        // If user is blocked, sign them out and show a specific error
         await auth.signOut();
         toast({
           variant: "destructive",
@@ -65,14 +61,13 @@ export function LoginForm() {
           description: "Your account has been blocked. Please contact support for assistance.",
           duration: 9000,
         });
-        return; 
+        return;
       }
 
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
       console.error("Login Error:", error);
-      // Display the raw error in the toast to help debug
       toast({
         variant: "destructive",
         title: "Login Failed",
@@ -81,13 +76,12 @@ export function LoginForm() {
       });
     }
   }
-  
+
   const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // Also check if social login user is blocked
       const blockedUserDocRef = doc(db, "blocked_users", user.uid);
       const blockedDocSnap = await getDoc(blockedUserDocRef);
       if (blockedDocSnap.exists()) {
@@ -101,17 +95,15 @@ export function LoginForm() {
         return;
       }
 
-      // Check if user exists in Firestore's 'users' collection
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        // Create user document if it doesn't exist (first time social login)
         await setDoc(userDocRef, {
           email: user.email,
           name: user.displayName,
           avatar: user.photoURL,
-          role: 'user', // Default role
+          role: 'user',
           walletBalance: 0
         });
       }
