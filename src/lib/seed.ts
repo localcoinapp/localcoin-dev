@@ -17,7 +17,8 @@ export async function seedDatabase() {
   try {
     console.log('Starting database seed...');
 
-    // --- USER DATA (UNCHANGED AS PER YOUR INSTRUCTION) ---
+    // --- USER DATA ---
+    // This section defines the users and updates their roles and merchant IDs as needed.
     const users = [
       {
         uid: 'some-unique-id-1',
@@ -27,31 +28,30 @@ export async function seedDatabase() {
       {
         uid: 'some-unique-id-2',
         email: 'djwilros666@gmail.com',
-        role: 'user',
+        role: 'merchant',
+        merchantId: 'merchant-berlin-wall-tours-002', // Link to the merchant
       },
       {
         uid: 'some-unique-id-3',
         email: 'katarifarms22@gmail.com',
         role: 'merchant',
+        merchantId: 'merchant-katari-farms-001', // Link to the merchant
       },
       {
         uid: 'some-unique-id-4',
         email: 'jrooliefer@gmail.com',
-        role: 'user',
+        role: 'merchant',
+        merchantId: 'merchant-some-club-003', // Link to the merchant
       }
     ];
 
     for (const user of users) {
-        // We only update the role for the new merchants, we don't add/remove users
-        if (user.email === 'djwilros666@gmail.com' || user.email === 'jrooliefer@gmail.com') {
-            await setDocument('users', user.uid, { role: 'merchant' });
-        } else {
-            await setDocument('users', user.uid, user);
-        }
+        await setDocument('users', user.uid, user);
     }
 
 
-    // --- MERCHANT DATA (RESTORED AS PER YOUR INSTRUCTION) ---
+    // --- MERCHANT DATA ---
+    // This section recreates the three merchants with correct ownership and data structure.
     const merchantsToSeed = [
         {
             id: 'merchant-katari-farms-001',
@@ -98,8 +98,8 @@ export async function seedDatabase() {
             ...merchant,
             walletAddress: userData?.walletAddress || '', // Use existing wallet info if available
             geohash: geohashForLocation([merchant.position.lat, merchant.position.lng]),
-            logo: `/merchants/${merchant.id}/logo.png`, // Placeholder path
-            banner: `/merchants/${merchant.id}/banner.jpg`, // Placeholder path
+            logo: `/merchants/${merchant.id}/logo.png`, // Placeholder path using merchant ID
+            banner: `/merchants/${merchant.id}/banner.jpg`, // Placeholder path using merchant ID
             listings: [],
             pendingOrders: [],
             recentTransactions: [],
