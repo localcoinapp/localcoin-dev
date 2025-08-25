@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "../logo"
 import { useToast } from "@/hooks/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
+import { Terminal } from "lucide-react"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -43,9 +45,9 @@ export function LoginForm() {
       email: "",
       password: "",
     },
-  })
+  });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
