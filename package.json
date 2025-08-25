@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "reinstall": "rm -rf .next node_modules && npm install"
   },
   "dependencies": {
     "@genkit-ai/googleai": "latest",
