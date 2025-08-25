@@ -1,19 +1,18 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
-// This should be securely retrieved from environment variables or a secure system
-// **IMPORTANT**: Never hardcode or expose private keys directly in code.
-const adminSecretKey = process.env.ADMIN_WALLET_SECRET_KEY;
-
-if (!adminSecretKey) {
-  throw new Error('ADMIN_WALLET_SECRET_KEY is not set');
-}
-
-const adminKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(adminSecretKey)));
-const connection = new Connection('https://api.devnet.solana.com', 'confirmed'); // Use appropriate network
-
 export async function POST(req: NextRequest) {
   try {
+    const adminSecretKey = process.env.ADMIN_WALLET_SECRET_KEY;
+    if (!adminSecretKey) {
+      // Throw an error that will be caught by the try-catch block
+      throw new Error('ADMIN_WALLET_SECRET_KEY is not set in the environment.');
+    }
+    
+    const adminKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(adminSecretKey)));
+    const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+
     const { userWalletAddress } = await req.json();
 
     if (!userWalletAddress) {
