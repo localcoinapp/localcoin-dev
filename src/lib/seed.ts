@@ -26,7 +26,6 @@ export async function seedDatabase() {
         role: 'admin',
         name: 'Admin User',
         profileComplete: true,
-        walletBalance: 0,
       },
       {
         uid: 'user-katarifarms-003',
@@ -55,19 +54,24 @@ export async function seedDatabase() {
     ];
 
     for (const user of users) {
-        const mnemonic = bip39.generateMnemonic();
-        const seed = bip39.mnemonicToSeedSync(mnemonic);
-        const keypair = Keypair.fromSeed(seed.slice(0, 32));
-        const walletAddress = keypair.publicKey.toBase58();
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
 
-        await setDocument('users', user.uid, {
-            ...user,
-            ...(user.role === 'merchant' && {
-              walletAddress: walletAddress,
-              seedPhrase: mnemonic, // NOTE: In a real app, this should be encrypted.
-            }),
-            walletBalance: 0,
-        });
+        if (!userSnap.exists() || !userSnap.data().walletAddress) {
+            const mnemonic = bip39.generateMnemonic();
+            const seed = bip39.mnemonicToSeedSync(mnemonic);
+            const keypair = Keypair.fromSeed(seed.slice(0, 32));
+            const walletAddress = keypair.publicKey.toBase58();
+
+            await setDocument('users', user.uid, {
+                ...user,
+                walletAddress: walletAddress,
+                seedPhrase: mnemonic,
+                walletBalance: 0,
+            });
+        } else {
+             await setDocument('users', user.uid, { ...user });
+        }
     }
 
 
