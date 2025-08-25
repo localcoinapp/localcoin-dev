@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "reinstall": "rm -rf .next node_modules && npm install"
+    "reinstall": "rm -rf .next node_modules && npm install",
+    "seed": "node scripts/seed-db.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "latest",
