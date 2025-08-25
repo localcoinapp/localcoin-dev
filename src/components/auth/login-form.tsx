@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "../logo"
 import { useToast } from "@/hooks/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Terminal } from "lucide-react"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -32,6 +34,33 @@ const formSchema = z.object({
     message: "Password must be at least 8 characters.",
   }),
 })
+
+const AuthFixAlert = () => {
+    const domainToAdd = "studio--localcoin-marketplace.us-central1.hosted.app";
+    const consoleUrl = `https://console.firebase.google.com/project/localcoin-marketplace/authentication/settings`;
+
+    return (
+        <Alert variant="destructive" className="mb-6">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle className="font-bold">Action Required to Fix Login</AlertTitle>
+            <AlertDescription>
+                <p className="mb-2">The login error is because the application's domain is not authorized in your Firebase settings. You must add it manually.</p>
+                <ol className="list-decimal list-inside space-y-2">
+                    <li>
+                        Click this link to go to the Firebase Console: <br/>
+                        <a href={consoleUrl} target="_blank" rel="noopener noreferrer" className="font-mono underline break-all">{consoleUrl}</a>
+                    </li>
+                    <li>Click the **"Add domain"** button.</li>
+                    <li>
+                        Copy and paste this exact domain into the text box: <br/>
+                        <strong className="font-mono bg-background text-destructive-foreground p-1 rounded break-all">{domainToAdd}</strong>
+                    </li>
+                    <li>Click **"Add"** to save it. Then, try logging in again.</li>
+                </ol>
+            </AlertDescription>
+        </Alert>
+    );
+};
 
 export function LoginForm() {
   const router = useRouter();
@@ -70,15 +99,13 @@ export function LoginForm() {
       router.push('/');
     } catch (error: any) {
       console.error("Login Error:", error);
-      if (error.code !== 'auth/user-not-found' && error.code !== 'auth/wrong-password' && error.code !== 'auth/invalid-credential') {
-        // Avoid showing a generic error if we already showed the blocked message.
-        // This part runs for Firebase-specific errors like wrong password.
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: `Error: ${error.code} - ${error.message}`,
-        });
-      }
+      // Display the raw error in the toast to help debug
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: `Error: ${error.message}`,
+        duration: 9000,
+      });
     }
   }
   
@@ -122,7 +149,8 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Sign-In Failed",
-        description: `Error: ${error.code} - ${error.message}`,
+        description: `Error: ${error.message}`,
+        duration: 9000,
       });
     }
   }
@@ -138,7 +166,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto shadow-xl">
+    <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
           <Logo />
@@ -147,6 +175,7 @@ export function LoginForm() {
         <CardDescription>Sign in to access your wallet and the marketplace.</CardDescription>
       </CardHeader>
       <CardContent>
+        <AuthFixAlert />
         <div className="space-y-2">
           <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 62.3l-68.6 68.6c-20.5-19.4-48-31.5-79.3-31.5-62.3 0-113.5 51.6-113.5 114.9s51.2 114.9 113.5 114.9c72.3 0 96.9-46.3 102.5-69.1H248v-85.3h236.1c2.3 12.7 3.9 26.9 3.9 41.4z"></path></svg>
@@ -208,3 +237,5 @@ export function LoginForm() {
     </Card>
   )
 }
+
+    
