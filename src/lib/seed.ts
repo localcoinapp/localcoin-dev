@@ -25,6 +25,13 @@ export async function seedDatabase() {
         walletBalance: 0,
         name: 'Katari Farms Owner',
       },
+      {
+        uid: 'user-standard-004',
+        email: 'jrooliefer@gmail.com',
+        role: 'user',
+        walletBalance: 0,
+        name: 'jrooliefer',
+      },
     ];
 
     for (const user of users) {
