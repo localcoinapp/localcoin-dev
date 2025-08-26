@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Logo } from "@/components/logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
-import { Checkbox } from "../ui/checkbox"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
   email: z.string().email({
