@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from '@/lib/firebase';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -15,21 +15,26 @@ export async function POST(req: NextRequest) {
     try {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         
-        // Create a storage reference
-        const storageRef = ref(storage, `merchants/${merchantId}/${file.name}`);
+        // Use a generic name like 'logo' or 'banner' and preserve the extension
+        const extension = file.name.split('.').pop();
+        const filename = file.name; // Keep original filename for uniqueness
+        
+        // Save to a non-public 'uploads' directory at the project root
+        const dir = join(process.cwd(), 'uploads', 'merchants', merchantId);
+        
+        // Create the directory if it doesn't exist
+        await mkdir(dir, { recursive: true });
 
-        // Upload the file
-        const uploadTask = await uploadBytesResumable(storageRef, fileBuffer, {
-            contentType: file.type,
-        });
+        const path = join(dir, filename);
+        await writeFile(path, fileBuffer);
 
-        // Get the public download URL
-        const downloadURL = await getDownloadURL(uploadTask.ref);
-
-        return NextResponse.json({ url: downloadURL });
+        // The URL will point to our new serving API route
+        const url = `/api/uploads/merchants/${merchantId}/${filename}`;
+        
+        return NextResponse.json({ url });
 
     } catch (error) {
-        console.error('Error uploading file to Firebase Storage:', error);
-        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+        console.error('Error saving file:', error);
+        return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
     }
 }
