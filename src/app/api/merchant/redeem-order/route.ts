@@ -58,7 +58,11 @@ export async function POST(req: NextRequest) {
     console.log('Received request body:', body);
     order = body.order;
 
-    if (!order || !order.userId || !order.merchantId) {
+    if (!order) {
+      return NextResponse.json({ error: 'Order data is missing in the request body' }, { status: 400 });
+    }
+
+    if (!order.userId || !order.merchantId) {
       return NextResponse.json({ error: 'Missing critical order data (userId or merchantId)' }, { status: 400 });
     }
 
