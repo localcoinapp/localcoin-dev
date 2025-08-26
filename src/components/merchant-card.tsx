@@ -31,7 +31,7 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
             objectFit="contain"
             className="p-2"
             data-ai-hint={merchant.aiHint}
-            unoptimized // Add this to bypass Next.js optimizer for local API routes if needed
+            unoptimized
           />
         </div>
       </CardHeader>
