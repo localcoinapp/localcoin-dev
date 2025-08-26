@@ -95,9 +95,7 @@ export async function POST(req: NextRequest) {
     }
 
     const MNEMONIC = process.env.LOCALCOIN_MNEMONIC;
-    if (!MNEMONIC) {
-      throw new Error('Platform wallet not configured (set LOCALCOIN_MNEMONIC)');
-    }
+    
     const issuerKeypair = keypairFromMnemonic(MNEMONIC, process.env.LOCALCOIN_PASSPHRASE || '');
     
     const rpc = getRpcUrl();

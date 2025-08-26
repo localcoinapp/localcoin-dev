@@ -3,6 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/config/site';
 
 export async function POST(req: NextRequest) {
+  // --- Environment Variable Check ---
+  const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
+  const missingVars = requiredVars.filter(v => !process.env[v]);
+  if (missingVars.length > 0) {
+    const errorMsg = `Server is not configured for sending emails. Missing: ${missingVars.join(', ')}`;
+    console.error(`CRITICAL: ${errorMsg}`);
+    return NextResponse.json({ error: 'Failed to send email.', details: errorMsg }, { status: 500 });
+  }
+  // ---------------------------------
+
   try {
     const { to } = await req.json();
 
