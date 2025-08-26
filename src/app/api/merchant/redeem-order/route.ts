@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
 
         const completedOrder: CartItem = { 
             ...order,
-            orderId: order.orderId!, // Explicitly keep the orderId
+            orderId: order.orderId,
             status: 'completed', 
             redeemedAt: new Date(),
             transactionSignature: signature 
