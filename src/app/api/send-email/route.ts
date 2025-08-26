@@ -8,32 +8,37 @@ interface SendEmailOptions {
   html: string;
 }
 
-const transporter = nodemailer.createTransport({
-  pool: true,
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: Number(process.env.SMTP_PORT) === 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-
-transporter.verify((error) => {
-  if (error) {
-    console.error("SMTP Connection Error:", error);
-  } else {
-    console.log("SMTP server is ready to take our messages");
-  }
-});
-
 async function sendEmail({ to, subject, html }: SendEmailOptions) {
-  if (!process.env.SMTP_FROM) {
-    throw new Error("CRITICAL: Missing SMTP_FROM environment variable.");
+  // --- Environment Variable Check ---
+  const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
+  const missingVars = requiredVars.filter(v => !process.env[v]);
+  if (missingVars.length > 0) {
+    console.error(`CRITICAL: Missing SMTP environment variables: ${missingVars.join(', ')}`);
+    throw new Error(`Server is not configured for sending emails. Missing: ${missingVars.join(', ')}`);
   }
+  // ---------------------------------
+
+  const transporter = nodemailer.createTransport({
+    pool: true,
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+
+  transporter.verify((error) => {
+    if (error) {
+      console.error("SMTP Connection Error:", error);
+    } else {
+      console.log("SMTP server is ready to take our messages");
+    }
+  });
   
   const mailOptions = {
     from: process.env.SMTP_FROM,

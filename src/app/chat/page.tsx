@@ -16,11 +16,14 @@ import { collection, query, where, onSnapshot, orderBy } from "firebase/firestor
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Chat } from "@/types";
 import { formatDistanceToNow } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Terminal } from "lucide-react";
 
 export default function ChatListPage() {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [indexError, setIndexError] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -29,12 +32,11 @@ export default function ChatListPage() {
     }
 
     const chatsRef = collection(db, "chats");
-    // The orderBy clause is removed to prevent an error on a missing index.
-    // The user should create the composite index in the Firebase console.
-    // The original query was: query(chatsRef, where("participantIds", "array-contains", user.id), orderBy("updatedAt", "desc"));
+    // This query requires a composite index on (participantIds, updatedAt DESC)
     const q = query(
         chatsRef, 
-        where("participantIds", "array-contains", user.id)
+        where("participantIds", "array-contains", user.id),
+        orderBy("updatedAt", "desc")
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -43,17 +45,16 @@ export default function ChatListPage() {
         ...doc.data(),
       })) as Chat[];
       
-      // Manual sort on the client-side as a temporary fallback
-      userChats.sort((a, b) => {
-          const timeA = a.updatedAt?.toDate() || 0;
-          const timeB = b.updatedAt?.toDate() || 0;
-          return timeB - timeA;
-      });
-
+      setIndexError(false); // Reset error on successful snapshot
       setChats(userChats);
       setLoading(false);
     }, (error) => {
-        console.error("Error fetching chats: ", error);
+        if (error.code === 'failed-precondition') {
+            console.error("Firestore Index Error:", error.message);
+            setIndexError(true);
+        } else {
+            console.error("Error fetching chats: ", error);
+        }
         setLoading(false);
     });
 
@@ -84,6 +85,15 @@ export default function ChatListPage() {
           <CardTitle className="text-2xl font-headline">Your Conversations</CardTitle>
         </CardHeader>
         <CardContent>
+          {indexError && (
+              <Alert variant="destructive" className="mb-4">
+                  <Terminal className="h-4 w-4" />
+                  <AlertTitle>Database Configuration Required</AlertTitle>
+                  <AlertDescription>
+                    A Firestore index is needed for this query. Check your browser's developer console for a link to create it automatically in the Firebase Console.
+                  </AlertDescription>
+              </Alert>
+          )}
           <ScrollArea className="h-[60vh]">
             <div className="space-y-4">
               {chats.length > 0 ? chats.map((chat) => {

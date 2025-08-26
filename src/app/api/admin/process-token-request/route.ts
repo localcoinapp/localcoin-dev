@@ -40,6 +40,13 @@ function getRpcUrl() {
 /** -------------------------------- */
 
 export async function POST(req: NextRequest) {
+  // --- Environment Variable Check ---
+  if (!process.env.LOCALCOIN_MNEMONIC) {
+    console.error('CRITICAL: Missing LOCALCOIN_MNEMONIC environment variable.');
+    return NextResponse.json({ error: 'Server configuration error.', details: 'The platform wallet is not configured.' }, { status: 500 });
+  }
+  // ---------------------------------
+
   console.log('--- Received POST /api/admin/process-token-request ---');
 
   let requestId: string | null = null;

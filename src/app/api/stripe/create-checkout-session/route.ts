@@ -11,7 +11,8 @@ const getStripeInstance = (currency: 'EUR' | 'USD') => {
         : process.env.STRIPE_SECRET_KEY_USD;
 
     if (!secretKey) {
-        throw new Error(`Stripe secret key for ${currency} is not set in environment variables.`);
+        console.error(`CRITICAL: Stripe secret key for ${currency} is not set in environment variables.`);
+        throw new Error(`Stripe payments for ${currency} are not configured on the server.`);
     }
 
     return new Stripe(secretKey, { apiVersion: '2024-04-10' });
@@ -77,5 +78,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create checkout session.', details: errorMessage }, { status: 500 });
     }
 }
-
-    
