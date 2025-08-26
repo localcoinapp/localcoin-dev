@@ -65,9 +65,7 @@ export async function POST(req: NextRequest) {
 
     // --- Get Platform's Wallet Address ---
     const platformMnemonic = process.env.LOCALCOIN_MNEMONIC;
-    if (!platformMnemonic) {
-      throw new Error('Platform wallet not configured (set LOCALCOIN_MNEMONIC)');
-    }
+    
     const platformKeypair = keypairFromMnemonic(platformMnemonic, process.env.LOCALCOIN_PASSPHRASE || '');
     const recipientPublicKey = platformKeypair.publicKey;
 
