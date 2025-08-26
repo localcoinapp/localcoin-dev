@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     
   } catch (error) {
     console.error('Error in /api/contact:', error);
-    return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ error: 'Failed to send email', details: errorMessage }, { status: 500 });
   }
 }

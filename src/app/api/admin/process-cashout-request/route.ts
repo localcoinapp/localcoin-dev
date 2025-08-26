@@ -29,15 +29,6 @@ function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
 }
 
-// Helper function to send the confirmation email
-async function sendConfirmationEmail(origin: string, merchantEmail: string, subject: string, html: string) {
-    await fetch(`${origin}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: merchantEmail, subject, html }),
-    });
-}
-
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check ---
   if (!process.env.LOCALCOIN_MNEMONIC) {
@@ -51,6 +42,16 @@ export async function POST(req: NextRequest) {
   let requestId: string | null = null;
   try {
     const origin = req.nextUrl.origin;
+
+    // Helper function to send the confirmation email
+    async function sendConfirmationEmail(merchantEmail: string, subject: string, html: string) {
+        await fetch(`${origin}/api/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: merchantEmail, subject, html }),
+        });
+    }
+
     const body = await req.json();
     requestId = body.requestId;
 
@@ -176,7 +177,7 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await sendConfirmationEmail(origin, merchantEmail, subject, emailHtml);
+    await sendConfirmationEmail(merchantEmail, subject, emailHtml);
 
     return NextResponse.json({ signature });
 
