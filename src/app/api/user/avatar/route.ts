@@ -17,10 +17,13 @@ export async function POST(req: NextRequest) {
 
     try {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
+        
         // Use a generic name like 'avatar' and preserve the extension
         const extension = file.name.split('.').pop();
         const filename = `avatar.${extension}`;
-        const dir = join(process.cwd(), 'public', 'users', userId);
+        
+        // Save to the non-public 'uploads' directory
+        const dir = join(process.cwd(), 'uploads', 'users', userId);
         
         // Create the directory if it doesn't exist
         await mkdir(dir, { recursive: true });
@@ -28,10 +31,10 @@ export async function POST(req: NextRequest) {
         const path = join(dir, filename);
         await writeFile(path, fileBuffer);
 
-        const url = `/users/${userId}/${filename}`;
+        // The URL will point to our new serving API route
+        const url = `/api/uploads/users/${userId}/${filename}`;
 
         // Also update the user's profile in Firestore
-        // This part now correctly targets the Firestore document
         const userDocRef = doc(db, "users", userId);
         await setDoc(userDocRef, { avatar: url }, { merge: true });
 

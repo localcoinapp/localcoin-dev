@@ -98,8 +98,8 @@ export async function seedDatabase() {
             ...merchant,
             walletAddress: userData?.walletAddress || '', // Use existing wallet info if available
             geohash: geohashForLocation([merchant.position.lat, merchant.position.lng]),
-            logo: `/merchants/${merchant.id}/logo.png`, // Placeholder path using merchant ID
-            banner: `/merchants/${merchant.id}/banner.jpg`, // Placeholder path using merchant ID
+            logo: `/api/uploads/merchants/${merchant.id}/logo.png`, // Correct path to serving API
+            banner: `/api/uploads/merchants/${merchant.id}/banner.jpg`, // Correct path to serving API
             listings: [],
             pendingOrders: [],
             recentTransactions: [],
