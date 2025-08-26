@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -585,7 +586,7 @@ export default function StoreSettingsPage() {
                 <FormLabel>Banner Image</FormLabel>
                 <div className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 relative">
                   {isUploadingBanner && <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg z-10"><Loader2 className="h-8 w-8 animate-spin text-white"/></div>}
-                  {merchantData?.banner && <Image src={merchantData.banner} alt="Banner" className="w-full h-full object-cover rounded-lg" unoptimized />}
+                  {merchantData?.banner && <Image src={merchantData.banner} alt="Banner" layout="fill" objectFit="cover" className="rounded-lg" unoptimized />}
                    <input
                     type="file"
                     ref={bannerFileInputRef}
