@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
 
         const completedOrder: CartItem = { 
             ...order,
+            orderId: order.orderId, // Explicitly keep the orderId
             status: 'completed', 
             redeemedAt: new Date(),
             transactionSignature: signature 
@@ -203,8 +204,8 @@ export async function POST(req: NextRequest) {
                 const merchantData = merchantSnap.data() as Merchant;
                 const userData = userSnap.data() as User;
 
-                const failedOrderInCart: CartItem = { ...order, status: 'failed' as const, error: error.message };
-                const failedOrderForMerchant: CartItem = { ...order, status: 'failed' as const, error: error.message, redeemedAt: new Date() };
+                const failedOrderInCart: CartItem = { ...order, orderId: order.orderId, status: 'failed' as const, error: error.message };
+                const failedOrderForMerchant: CartItem = { ...order, orderId: order.orderId, status: 'failed' as const, error: error.message, redeemedAt: new Date() };
                 
                 // Remove from pending, add to recent transactions with 'failed' status
                 const updatedPendingOrders = (merchantData.pendingOrders || []).filter(o => o.orderId !== order!.orderId);
