@@ -20,23 +20,16 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // This function is no longer needed as the whole card is a link now.
-  // The login check will happen on the destination page or via the view button.
-  // const handleCardClick = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-  //   if (!user) {
-  //     e.preventDefault();
-  //     setIsModalOpen(true);
-  //   }
-  // };
-
   const cardContent = (
     <>
       <CardHeader className="p-0">
         <div className="relative h-40 w-full bg-muted">
-          <img
+          <Image
             src={merchant.logo || '/placeholder.svg'}
             alt={merchant.companyName}
-            className="h-full w-full object-contain"
+            layout="fill"
+            objectFit="contain"
+            className="p-2"
             data-ai-hint={merchant.aiHint}
           />
         </div>
@@ -44,7 +37,7 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
       <CardContent className="p-4 flex-grow">
         <Badge variant="secondary" className="mb-2">{merchant.category}</Badge>
         <CardTitle className="text-xl font-bold font-headline">{merchant.companyName}</CardTitle>
-        <CardDescription className="mt-2 text-sm text-muted-foreground">{merchant.description}</CardDescription>
+        <CardDescription className="mt-2 text-sm text-muted-foreground line-clamp-3">{merchant.description}</CardDescription>
       </CardContent>
     </>
   );

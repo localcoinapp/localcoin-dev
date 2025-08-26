@@ -8,7 +8,7 @@ import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/
 const firebaseConfig = {
     "projectId": "localcoin-marketplace",
     "appId": "1:929108967513:web:ddc99e36b6338aefc4b148",
-    "storageBucket": "localcoin-marketplace.firebasestorage.app",
+    "storageBucket": "localcoin-marketplace.appspot.com",
     "apiKey": "AIzaSyDuU4uvBrYnyI6f6wk4n4hSCltJuJIYitg",
     "authDomain": "localcoin-marketplace.firebaseapp.com",
     "messagingSenderId": "929108967513"

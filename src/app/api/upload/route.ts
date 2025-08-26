@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from '@/lib/firebase';
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -14,19 +14,22 @@ export async function POST(req: NextRequest) {
 
     try {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
-        const dir = join(process.cwd(), 'public', 'merchants', merchantId);
         
-        // Create the directory if it doesn't exist
-        await mkdir(dir, { recursive: true });
+        // Create a storage reference
+        const storageRef = ref(storage, `merchants/${merchantId}/${file.name}`);
 
-        const path = join(dir, file.name);
-        await writeFile(path, fileBuffer);
+        // Upload the file
+        const uploadTask = await uploadBytesResumable(storageRef, fileBuffer, {
+            contentType: file.type,
+        });
 
-        const url = `/merchants/${merchantId}/${file.name}`;
+        // Get the public download URL
+        const downloadURL = await getDownloadURL(uploadTask.ref);
 
-        return NextResponse.json({ url });
+        return NextResponse.json({ url: downloadURL });
+
     } catch (error) {
-        console.error('Error saving file:', error);
-        return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
+        console.error('Error uploading file to Firebase Storage:', error);
+        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
     }
 }

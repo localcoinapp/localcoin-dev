@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { AuthModal } from '@/components/auth-modal';
+import Image from 'next/image';
 
 
 interface Listing extends MerchantItem {
@@ -260,11 +261,9 @@ export default function MerchantPage() {
     <>
     <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="w-full h-48 sm:h-64 md:h-80 bg-muted rounded-lg overflow-hidden mb-8 shadow-lg">
-        {merchant.banner ? (
-          <img src={merchant.banner} alt={`${merchant.companyName} banner`} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full bg-gray-200"></div>
+      <div className="relative w-full h-48 sm:h-64 md:h-80 bg-muted rounded-lg overflow-hidden mb-8 shadow-lg">
+        {merchant.banner && (
+          <Image src={merchant.banner} alt={`${merchant.companyName} banner`} layout="fill" objectFit="cover" />
         )}
       </div>
 
