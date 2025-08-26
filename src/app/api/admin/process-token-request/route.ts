@@ -1,5 +1,4 @@
 
-
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -23,21 +22,24 @@ import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
 import nacl from 'tweetnacl';
 
-/**
- * --- UPDATED KEY DERIVATION ---
- * This function now uses the simpler derivation method found elsewhere in the codebase,
- * which is more likely to match the wallet's generated address.
- */
+
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
   const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
-  // This uses the first 32 bytes of the seed, which is a common derivation method.
   return Keypair.fromSeed(seed.slice(0, 32));
 }
 
 function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
 }
-/** -------------------------------- */
+
+// Helper function to send the confirmation email
+async function sendConfirmationEmail(origin: string, userEmail: string, subject: string, html: string) {
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: userEmail, subject, html }),
+    });
+}
 
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check ---
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
 
   let requestId: string | null = null;
   try {
+    const origin = req.nextUrl.origin;
     const body = await req.json();
     requestId = body.requestId;
 
@@ -72,7 +75,6 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // --- Fetch user email for notification ---
     const userDocRef = doc(db, 'users', requestData.userId);
     const userSnap = await getDoc(userDocRef);
     if (!userSnap.exists()) {
@@ -83,7 +85,6 @@ export async function POST(req: NextRequest) {
     if (!userEmail) {
         throw new Error('User email not found, cannot send email notification.');
     }
-    // -----------------------------------------
 
     const recipient = requestData.userWalletAddress;
     const amountWhole = Number(requestData.amount);
@@ -101,7 +102,6 @@ export async function POST(req: NextRequest) {
     const rpc = getRpcUrl();
     const connection = new Connection(rpc, 'confirmed');
 
-    // --- DIAGNOSTIC LOGGING ---
     console.log(`[DIAGNOSTIC] Issuer PubKey: ${issuerKeypair.publicKey.toBase58()}`);
     const solBalance = await connection.getBalance(issuerKeypair.publicKey);
     console.log(`[DIAGNOSTIC] Issuer SOL Balance: ${solBalance / LAMPORTS_PER_SOL} SOL`);
@@ -122,7 +122,6 @@ export async function POST(req: NextRequest) {
     const fromAtaInfo = await getAccount(connection, fromAta.address);
     const tokenBalance = fromAtaInfo.amount;
     console.log(`[DIAGNOSTIC] Issuer Token Balance: ${Number(tokenBalance) / (10**decimals)} LocalCoin`);
-    // --- END DIAGNOSTIC LOGGING ---
 
     if (tokenBalance < BigInt(amountWhole * (10**decimals))) {
         throw new Error(`[VERIFICATION FAILED] Insufficient token balance. On-chain balance is ${Number(tokenBalance) / (10**decimals)}, requested amount is ${amountWhole}.`);
@@ -157,7 +156,6 @@ export async function POST(req: NextRequest) {
       toAta: toAta.address.toBase58(),
     });
 
-    // --- Send confirmation email ---
     const subject = `Your ${siteConfig.name} Purchase is Complete!`;
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
@@ -192,14 +190,8 @@ export async function POST(req: NextRequest) {
         <p>The ${siteConfig.name} Team</p>
       </div>
     `;
-
-    const origin = req.nextUrl.origin;
-    await fetch(`${origin}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: userEmail, subject, html: emailHtml }),
-    });
-    // ----------------------------
+    
+    await sendConfirmationEmail(origin, userEmail, subject, emailHtml);
 
     return NextResponse.json({ signature });
   } catch (error: any) {

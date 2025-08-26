@@ -4,6 +4,15 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User, Merchant } from '@/types';
 
+// Helper function to send email to a single recipient
+async function sendEmailToRecipient(origin: string, to: string, subject: string, html: string) {
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, html }),
+    });
+}
+
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check for email sending capabilities ---
   const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
@@ -16,6 +25,7 @@ export async function POST(req: NextRequest) {
   // ---------------------------------
 
   try {
+    const origin = req.nextUrl.origin;
     const { recipientGroup, subject, body } = await req.json();
 
     if (!recipientGroup || !subject || !body) {
@@ -44,15 +54,10 @@ export async function POST(req: NextRequest) {
     console.log(`Preparing to send email to ${finalRecipients.length} unique recipient(s).`);
     
     if (finalRecipients.length > 0) {
-        const origin = req.nextUrl.origin;
+        const html = body.replace(/\n/g, '<br>');
         for (const email of finalRecipients) {
             try {
-                const html = body.replace(/\n/g, '<br>');
-                await fetch(`${origin}/api/send-email`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ to: email, subject, html }),
-                });
+                await sendEmailToRecipient(origin, email, subject, html);
                 console.log(`Successfully queued email to ${email}`);
             } catch (emailError) {
                 console.error(`Failed to queue email to ${email}:`, emailError);

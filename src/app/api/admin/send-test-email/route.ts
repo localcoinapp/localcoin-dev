@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
   // ---------------------------------
 
   try {
+    const origin = req.nextUrl.origin;
     const { to } = await req.json();
 
     if (!to) {
@@ -29,7 +30,6 @@ export async function POST(req: NextRequest) {
       <p>Sent at: ${new Date().toUTCString()}</p>
     `;
     
-    const origin = req.nextUrl.origin;
     const response = await fetch(`${origin}/api/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

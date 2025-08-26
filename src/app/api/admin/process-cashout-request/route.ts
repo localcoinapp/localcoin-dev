@@ -29,6 +29,15 @@ function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
 }
 
+// Helper function to send the confirmation email
+async function sendConfirmationEmail(origin: string, merchantEmail: string, subject: string, html: string) {
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: merchantEmail, subject, html }),
+    });
+}
+
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check ---
   if (!process.env.LOCALCOIN_MNEMONIC) {
@@ -41,6 +50,7 @@ export async function POST(req: NextRequest) {
 
   let requestId: string | null = null;
   try {
+    const origin = req.nextUrl.origin;
     const body = await req.json();
     requestId = body.requestId;
 
@@ -79,14 +89,11 @@ export async function POST(req: NextRequest) {
         throw new Error("Merchant contact email not found, cannot send notification.");
     }
 
-    // --- FIX START: Correctly define platform wallet as recipient ---
     const platformMnemonic = process.env.LOCALCOIN_MNEMONIC;
     
     const platformKeypair = keypairFromMnemonic(platformMnemonic, process.env.LOCALCOIN_PASSPHRASE || '');
-    const recipientPublicKey = platformKeypair.publicKey; // Platform wallet is the recipient
-    // --- FIX END ---
+    const recipientPublicKey = platformKeypair.publicKey;
 
-    // Merchant's wallet is the sender
     const merchantKeypair = keypairFromMnemonic(merchantMnemonic);
 
     const connection = new Connection(getRpcUrl(), 'confirmed');
@@ -95,44 +102,39 @@ export async function POST(req: NextRequest) {
     const decimals = mintInfo.decimals;
     const rawAmount = BigInt(amountWhole * (10 ** decimals));
 
-    // Get ATAs
     const fromAta = await getOrCreateAssociatedTokenAccount(
       connection,
-      merchantKeypair, // Payer for ATA creation if needed for the sender
+      merchantKeypair,
       tokenMintPublicKey,
       merchantKeypair.publicKey
     );
 
     const toAta = await getOrCreateAssociatedTokenAccount(
       connection,
-      platformKeypair, // Platform wallet pays for its own ATA if it doesn't exist
+      platformKeypair,
       tokenMintPublicKey,
       recipientPublicKey
     );
 
-    // Create and send transaction
     const ix = createTransferCheckedInstruction(
       fromAta.address,
       tokenMintPublicKey,
       toAta.address,
-      merchantKeypair.publicKey, // Merchant is the owner and signer
+      merchantKeypair.publicKey,
       rawAmount,
       decimals
     );
 
     const tx = new Transaction().add(ix);
-    // Sign with the MERCHANT's keypair
     const signature = await sendAndConfirmTransaction(connection, tx, [merchantKeypair]);
     console.log('Cashout transfer signature:', signature);
 
-    // Update the request document in Firestore
     await updateDoc(requestRef, {
       status: 'approved',
       processedAt: serverTimestamp(),
       transactionSignature: signature,
     });
     
-    // --- Send confirmation email ---
     const commission = amountWhole * siteConfig.commissionRate;
     const netPayout = amountWhole * (1 - siteConfig.commissionRate);
     const subject = `Your ${siteConfig.name} Payout is Complete!`;
@@ -174,14 +176,7 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    const origin = req.nextUrl.origin;
-    await fetch(`${origin}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: merchantEmail, subject, html: emailHtml }),
-    });
-    // ----------------------------
-
+    await sendConfirmationEmail(origin, merchantEmail, subject, emailHtml);
 
     return NextResponse.json({ signature });
 
