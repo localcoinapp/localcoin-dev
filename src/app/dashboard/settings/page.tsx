@@ -302,7 +302,7 @@ export default function StoreSettingsPage() {
         if (fileType === 'logo') {
           setIsUploading(false);
         } else {
-          setIsUploadingBanner(false);
+          setIsUploadingBanner(true);
         }
       }
     }
