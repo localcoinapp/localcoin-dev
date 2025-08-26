@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
     );
 
     console.log('Attempting token transfer...');
-    const rawAmount = BigInt(amountWhole) * (10n ** BigInt(decimals));
+    const rawAmount = BigInt(amountWhole) * (BigInt(10) ** BigInt(decimals));
     const ix = createTransferCheckedInstruction(
       fromAta.address,
       tokenMintPublicKey,
