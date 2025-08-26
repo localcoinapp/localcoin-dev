@@ -155,20 +155,23 @@ export async function POST(req: NextRequest) {
         const freshUserData = freshUserSnap.data() as User;
         const freshMerchantData = freshMerchantSnap.data() as Merchant;
 
+        if (!order) {
+            throw new Error("Order became null during transaction.");
+        }
+
         const completedOrder: CartItem = { 
-            ...order,
-            orderId: order.orderId ?? '',
-            title: order.title ?? '',
-            itemId: order.itemId ?? '',
-            listingId: order.listingId ?? '',
-            price: order.price ?? 0,
-            quantity: order.quantity ?? 1,
-            merchantId: order.merchantId ?? '',
-            merchantName: order.merchantName ?? '',
-            redeemCode: order.redeemCode ?? null,
-            userId: order.userId ?? '',
-            userName: order.userName ?? '',
-            category: order.category ?? '',
+            orderId: order.orderId,
+            title: order.title,
+            itemId: order.itemId,
+            listingId: order.listingId,
+            price: order.price,
+            quantity: order.quantity,
+            merchantId: order.merchantId,
+            merchantName: order.merchantName,
+            redeemCode: order.redeemCode,
+            userId: order.userId,
+            userName: order.userName,
+            category: order.category,
             status: 'completed', 
             redeemedAt: new Date(),
             transactionSignature: signature 
