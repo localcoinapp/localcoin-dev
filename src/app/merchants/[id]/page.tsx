@@ -263,7 +263,7 @@ export default function MerchantPage() {
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="relative w-full h-48 sm:h-64 md:h-80 bg-muted rounded-lg overflow-hidden mb-8 shadow-lg">
         {merchant.banner && (
-          <Image src={merchant.banner} alt={`${merchant.companyName} banner`} layout="fill" objectFit="cover" />
+          <Image src={merchant.banner} alt={`${merchant.companyName} banner`} layout="fill" objectFit="cover" unoptimized />
         )}
       </div>
 
