@@ -18,9 +18,10 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
+// We are not using Firebase storage for this implementation
+// const storage = getStorage(app);
 
 // Set persistence to local. This is the crucial part for this environment.
 setPersistence(auth, browserLocalPersistence);
 
-export { app, auth, db, storage, ref, uploadBytesResumable, getDownloadURL, getDoc, updateProfile };
+export { app, auth, db, getDoc, updateProfile };
