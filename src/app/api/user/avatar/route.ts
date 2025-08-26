@@ -2,8 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { auth, db } from '@/lib/firebase';
-import { updateProfile } from 'firebase/auth';
+import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 export async function POST(req: NextRequest) {
@@ -38,16 +37,9 @@ export async function POST(req: NextRequest) {
         const userDocRef = doc(db, "users", userId);
         await setDoc(userDocRef, { avatar: url }, { merge: true });
 
-        // We can still attempt to update the auth profile, but Firestore is the source of truth for the app UI
-        const currentUser = auth.currentUser;
-        if (currentUser && currentUser.uid === userId) {
-            await updateProfile(currentUser, { photoURL: url });
-        }
-
-
         return NextResponse.json({ url });
     } catch (error) {
-        console.error('Error saving file:', error);
-        return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
+        console.error('Error saving user avatar:', error);
+        return NextResponse.json({ error: 'Failed to save avatar file' }, { status: 500 });
     }
 }

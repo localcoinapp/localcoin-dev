@@ -7,9 +7,10 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const merchantId = formData.get('merchantId') as string;
+    const fileType = formData.get('fileType') as 'logo' | 'banner'; // e.g., 'logo' or 'banner'
 
-    if (!file || !merchantId) {
-        return NextResponse.json({ error: 'Missing file or merchantId' }, { status: 400 });
+    if (!file || !merchantId || !fileType) {
+        return NextResponse.json({ error: 'Missing file, merchantId, or fileType' }, { status: 400 });
     }
 
     try {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
         
         // Use a generic name like 'logo' or 'banner' and preserve the extension
         const extension = file.name.split('.').pop();
-        const filename = file.name; // Keep original filename for uniqueness
+        const filename = `${fileType}.${extension}`;
         
         // Save to a non-public 'uploads' directory at the project root
         const dir = join(process.cwd(), 'uploads', 'merchants', merchantId);
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ url });
 
     } catch (error) {
-        console.error('Error saving file:', error);
+        console.error('Error saving merchant file:', error);
         return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
     }
 }

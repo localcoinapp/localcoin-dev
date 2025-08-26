@@ -29,7 +29,7 @@ import { countries } from "@/data/countries";
 import { states } from "@/data/states";
 import { provinces } from "@/data/provinces";
 import { useAuth } from "@/hooks/use-auth";
-import { db, storage, ref, uploadBytesResumable, getDownloadURL } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -276,6 +276,7 @@ export default function StoreSettingsPage() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('merchantId', user.merchantId);
+      formData.append('fileType', fileType);
 
       try {
           const response = await fetch('/api/upload', {
