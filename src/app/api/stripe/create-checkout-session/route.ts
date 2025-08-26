@@ -25,6 +25,13 @@ export async function POST(req: NextRequest) {
         if (!amount || !currency || !userId || !userWalletAddress) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
+        
+        if (currency === 'EUR' && !process.env.STRIPE_SECRET_KEY_EUR) {
+             return NextResponse.json({ error: 'Server configuration error.', details: 'Stripe EUR key is not configured.' }, { status: 500 });
+        }
+        if (currency === 'USD' && !process.env.STRIPE_SECRET_KEY_USD) {
+             return NextResponse.json({ error: 'Server configuration error.', details: 'Stripe USD key is not configured.' }, { status: 500 });
+        }
 
         const stripe = getStripeInstance(currency);
 
