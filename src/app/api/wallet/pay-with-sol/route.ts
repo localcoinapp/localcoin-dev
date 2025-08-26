@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,6 +22,8 @@ import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/fires
 import type { User } from '@/types';
 import * as bip39 from 'bip39';
 import { siteConfig } from '@/config/site';
+
+export const runtime = 'nodejs';
 
 // Helper to get a Keypair from a mnemonic
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {

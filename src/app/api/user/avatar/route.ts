@@ -5,6 +5,8 @@ import { join } from 'path';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File;

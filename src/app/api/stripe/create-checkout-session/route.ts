@@ -4,6 +4,8 @@ import Stripe from 'stripe';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
+export const runtime = 'nodejs';
+
 // Initialize Stripe with conditional keys
 const getStripeInstance = (currency: 'EUR' | 'USD') => {
     const secretKey = currency === 'EUR' 
@@ -19,6 +21,13 @@ const getStripeInstance = (currency: 'EUR' | 'USD') => {
 };
 
 export async function POST(req: NextRequest) {
+    // --- Environment Variable Checks ---
+    if (!process.env.STRIPE_SECRET_KEY_EUR || !process.env.STRIPE_SECRET_KEY_USD) {
+        console.error('CRITICAL: One or more Stripe secret keys are not set in environment variables.');
+        return NextResponse.json({ error: 'Server configuration error.', details: 'Stripe payments are not configured.' }, { status: 500 });
+    }
+    // ------------------------------------
+    
     try {
         const { amount, currency, userId, userName, userWalletAddress } = await req.json();
 
@@ -26,13 +35,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
         }
         
-        if (currency === 'EUR' && !process.env.STRIPE_SECRET_KEY_EUR) {
-             return NextResponse.json({ error: 'Server configuration error.', details: 'Stripe EUR key is not configured.' }, { status: 500 });
-        }
-        if (currency === 'USD' && !process.env.STRIPE_SECRET_KEY_USD) {
-             return NextResponse.json({ error: 'Server configuration error.', details: 'Stripe USD key is not configured.' }, { status: 500 });
-        }
-
         const stripe = getStripeInstance(currency);
 
         // --- Create a pending purchase request in Firestore ---
@@ -49,7 +51,6 @@ export async function POST(req: NextRequest) {
             paymentMethod: 'stripe',
         });
         // ----------------------------------------------------
-
 
         // Get the base URL from the request headers
         const origin = req.headers.get('origin') || 'http://localhost:3000';

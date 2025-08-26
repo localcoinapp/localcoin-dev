@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/config/site';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check ---
   const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];

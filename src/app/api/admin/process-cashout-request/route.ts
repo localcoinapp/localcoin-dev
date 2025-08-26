@@ -19,6 +19,8 @@ import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { MerchantCashoutRequest, Merchant } from '@/types';
 import * as bip39 from 'bip39';
 
+export const runtime = 'nodejs';
+
 // Derive keypair from mnemonic
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
   const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
@@ -27,6 +29,14 @@ function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
 
 function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
+}
+
+async function sendConfirmationEmail(origin: string, merchantEmail: string, subject: string, html: string) {
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: merchantEmail, subject, html }),
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -42,15 +52,6 @@ export async function POST(req: NextRequest) {
   let requestId: string | null = null;
   try {
     const origin = req.nextUrl.origin;
-
-    // Helper function to send the confirmation email
-    async function sendConfirmationEmail(merchantEmail: string, subject: string, html: string) {
-        await fetch(`${origin}/api/send-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: merchantEmail, subject, html }),
-        });
-    }
 
     const body = await req.json();
     requestId = body.requestId;
@@ -177,7 +178,7 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await sendConfirmationEmail(merchantEmail, subject, emailHtml);
+    await sendConfirmationEmail(origin, merchantEmail, subject, emailHtml);
 
     return NextResponse.json({ signature });
 

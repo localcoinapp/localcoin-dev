@@ -1,6 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check for email sending capabilities ---
   const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM', 'NEXT_PUBLIC_CONTACT_EMAIL'];

@@ -22,6 +22,7 @@ import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
 import nacl from 'tweetnacl';
 
+export const runtime = 'nodejs';
 
 function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
   const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
@@ -30,6 +31,14 @@ function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
 
 function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
+}
+
+async function sendConfirmationEmail(origin: string, userEmail: string, subject: string, html: string) {
+    await fetch(`${origin}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: userEmail, subject, html }),
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -46,15 +55,6 @@ export async function POST(req: NextRequest) {
   try {
     const origin = req.nextUrl.origin;
     
-    // Helper function to send the confirmation email
-    async function sendConfirmationEmail(userEmail: string, subject: string, html: string) {
-        await fetch(`${origin}/api/send-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: userEmail, subject, html }),
-        });
-    }
-
     const body = await req.json();
     requestId = body.requestId;
 
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
       </div>
     `;
     
-    await sendConfirmationEmail(userEmail, subject, emailHtml);
+    await sendConfirmationEmail(origin, userEmail, subject, emailHtml);
 
     return NextResponse.json({ signature });
   } catch (error: any) {

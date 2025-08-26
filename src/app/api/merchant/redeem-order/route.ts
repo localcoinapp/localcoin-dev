@@ -23,6 +23,8 @@ import { doc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/fir
 import type { User, Merchant, CartItem, MerchantItem } from '@/types';
 import * as bip39 from 'bip39';
 
+export const runtime = 'nodejs';
+
 // Helper function to find and update inventory
 const updateInventory = (listings: MerchantItem[], itemId: string, quantityChange: number): MerchantItem[] => {
     const listingIndex = listings.findIndex(item => item.id === itemId);

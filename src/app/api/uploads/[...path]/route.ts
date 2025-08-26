@@ -4,6 +4,8 @@ import { join } from 'path';
 import { stat, readFile } from 'fs/promises';
 import mime from 'mime-types';
 
+export const runtime = 'nodejs';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { path: string[] } }
