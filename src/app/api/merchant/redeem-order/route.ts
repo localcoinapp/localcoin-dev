@@ -155,6 +155,7 @@ export async function POST(req: NextRequest) {
         const freshUserData = freshUserSnap.data() as User;
         const freshMerchantData = freshMerchantSnap.data() as Merchant;
 
+        // This check ensures 'order' is not null for the TypeScript compiler
         if (!order) {
             throw new Error("Order became null during transaction.");
         }
