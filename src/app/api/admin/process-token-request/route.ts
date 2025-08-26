@@ -20,7 +20,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
-import nacl from 'tweetnacl';
+import * as nacl from 'tweetnacl';
 
 export const runtime = 'nodejs';
 
@@ -34,11 +34,15 @@ function getRpcUrl() {
 }
 
 async function sendConfirmationEmail(origin: string, userEmail: string, subject: string, html: string) {
-    await fetch(`${origin}/api/send-email`, {
+    const response = await fetch(`${origin}/api/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: userEmail, subject, html }),
     });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || `Failed to send email to ${userEmail}`);
+    }
 }
 
 export async function POST(req: NextRequest) {
@@ -48,8 +52,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Server configuration error.', details: 'The platform wallet is not configured.' }, { status: 500 });
   }
   // ---------------------------------
-
-  console.log('--- Received POST /api/admin/process-token-request ---');
 
   let requestId: string | null = null;
   try {
