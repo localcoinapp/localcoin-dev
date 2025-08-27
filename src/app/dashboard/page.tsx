@@ -229,7 +229,7 @@ export default function DashboardPage() {
   };
   
    if (isLoading || authLoading) {
-    return <div className="container text-center"><p>Loading dashboard...</p></div>;
+    return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
   }
   
   if (!merchantData) {
@@ -353,5 +353,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
-    
