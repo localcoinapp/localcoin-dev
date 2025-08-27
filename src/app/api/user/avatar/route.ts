@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -9,7 +8,7 @@ import { doc, setDoc } from 'firebase/firestore';
 export const runtime = 'nodejs';
 
 // Define the base directory for uploads.
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();

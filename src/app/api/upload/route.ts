@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -8,8 +7,7 @@ export const runtime = 'nodejs';
 
 // Define the base directory for uploads. On a production VM, you would set this
 // via an environment variable to a persistent path like /var/www/uploads.
-// The default saves to the public folder, which works for local dev but is ephemeral in most cloud environments.
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
