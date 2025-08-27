@@ -393,14 +393,22 @@ export default function DashboardPage() {
   };
 
   const handleRedeemOrder = async (order: CartItem) => {
-    setIsRedeemModalOpen(false); // Close the modal immediately
+    setIsRedeemModalOpen(false);
     toast({ title: "Processing Redemption...", description: "Please wait while we transfer the tokens." });
+
+    // Create a deep copy and convert Timestamps to JS Dates for serialization
+    const serializableOrder = JSON.parse(JSON.stringify(order, (key, value) => {
+        if (value && typeof value === 'object' && value.hasOwnProperty('seconds') && value.hasOwnProperty('nanoseconds')) {
+            return new Timestamp(value.seconds, value.nanoseconds).toDate();
+        }
+        return value;
+    }));
   
     try {
       const response = await fetch('/api/merchant/redeem-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order }),
+        body: JSON.stringify({ order: serializableOrder }),
       });
   
       const result = await response.json();
