@@ -1,135 +1,118 @@
-// This file is reserved for cryptographic functions, such as encrypting and decrypting sensitive data.
-// It uses the Web Crypto API (SubtleCrypto), which is available in modern Node.js and browsers.
+/**
+ * AES-GCM encrypt/decrypt using Web Crypto (SubtleCrypto) with PBKDF2 key derivation.
+ * Works in modern Node and browsers.
+ */
+import { Buffer } from "buffer";
 
-// --- Helper function to get the crypto implementation ---
+// --- Helper to get a SubtleCrypto-enabled crypto impl ---
 const getCrypto = () => {
-  // For server-side (Node.js >= 19)
-  if (typeof globalThis !== 'undefined' && globalThis.crypto) {
-    return globalThis.crypto;
+  if (typeof globalThis !== "undefined" && (globalThis as any).crypto?.subtle) {
+    return (globalThis as any).crypto as Crypto;
   }
-  // For browser or older Node.js with polyfill
-  // In a pure browser environment, `window.crypto` would be the primary source.
-  if (typeof window !== 'undefined' && window.crypto) {
-    return window.crypto;
-  }
-  // Fallback for environments where crypto is not globally available
   try {
-    const crypto = require('crypto');
-    return crypto.webcrypto;
-  } catch (e) {
-    throw new Error('Crypto module not available in this environment');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const nodeCrypto = require("crypto");
+    if (nodeCrypto?.webcrypto?.subtle) return nodeCrypto.webcrypto as Crypto;
+  } catch {
+    /* ignore */
   }
+  throw new Error("Crypto module with SubtleCrypto is not available in this environment");
 };
 
 const crypto = getCrypto();
 
 // --- Configuration ---
-const ALGORITHM = 'AES-GCM';
+const ALGORITHM = "AES-GCM";
 const IV_LENGTH = 12; // bytes
 const SALT_LENGTH = 16; // bytes
 const TAG_LENGTH = 128; // bits
-const PBKDF2_ITERATIONS = 100000;
-const KEY_DERIVATION_ALGORITHM = 'PBKDF2';
+const PBKDF2_ITERATIONS = 100_000;
+const KEY_DERIVATION_ALGORITHM = "PBKDF2";
 
 /**
  * Derives a cryptographic key from a secret string using PBKDF2.
- * @param secret The master secret (from environment variable).
- * @param salt A random salt for the key derivation.
- * @returns A CryptoKey suitable for AES-GCM.
+ * Accepts salt as Uint8Array but converts to an exact ArrayBuffer for TS compatibility.
  */
-async function deriveKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(secret: string, saltBytes: Uint8Array): Promise<CryptoKey> {
   const secretKey = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     new TextEncoder().encode(secret),
     { name: KEY_DERIVATION_ALGORITHM },
     false,
-    ['deriveKey']
+    ["deriveKey"]
   );
+
+  // Ensure BufferSource is an exact ArrayBuffer (not a view with offsets)
+  const saltBuffer: ArrayBuffer = saltBytes.slice(0).buffer;
 
   return crypto.subtle.deriveKey(
     {
       name: KEY_DERIVATION_ALGORITHM,
-      salt: salt,
+      salt: saltBuffer,
       iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
+      hash: "SHA-256",
     },
     secretKey,
     { name: ALGORITHM, length: 256 },
-    true,
-    ['encrypt', 'decrypt']
+    false,
+    ["encrypt", "decrypt"]
   );
 }
 
 /**
  * Encrypts a plaintext string using AES-GCM.
- * The output format is "salt:iv:ciphertext:tag" encoded in Base64.
- * @param plaintext The string to encrypt.
- * @returns The Base64 encoded encrypted string.
+ * Output: Base64 of salt || iv || ciphertext(+tag).
  */
 export async function encrypt(plaintext: string): Promise<string> {
   const secret = process.env.ENCRYPTION_SECRET;
-  if (!secret) {
-    throw new Error('ENCRYPTION_SECRET environment variable is not set.');
-  }
+  if (!secret) throw new Error("ENCRYPTION_SECRET environment variable is not set.");
 
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const saltBytes = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-  const key = await deriveKey(secret, salt);
+  const key = await deriveKey(secret, saltBytes);
 
-  const encryptedData = await crypto.subtle.encrypt(
-    {
-      name: ALGORITHM,
-      iv: iv,
-      tagLength: TAG_LENGTH,
-    },
+  const encryptedBuffer = await crypto.subtle.encrypt(
+    { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
     key,
     new TextEncoder().encode(plaintext)
   );
 
-  const ciphertext = new Uint8Array(encryptedData);
-  const combined = new Uint8Array(salt.length + iv.length + ciphertext.length);
+  const ciphertext = new Uint8Array(encryptedBuffer);
 
-  combined.set(salt, 0);
-  combined.set(iv, salt.length);
-  combined.set(ciphertext, salt.length + iv.length);
+  const combined = new Uint8Array(saltBytes.length + iv.length + ciphertext.length);
+  combined.set(saltBytes, 0);
+  combined.set(iv, SALT_LENGTH);
+  combined.set(ciphertext, SALT_LENGTH + IV_LENGTH);
 
-  // Convert to Base64 to safely store and transmit
-  return Buffer.from(combined).toString('base64');
+  return Buffer.from(combined).toString("base64");
 }
 
 /**
- * Decrypts a Base64 encoded string that was encrypted with the `encrypt` function.
- * @param encryptedBase64 The encrypted string in "salt:iv:ciphertext:tag" format (Base64 encoded).
- * @returns The original plaintext string.
+ * Decrypts a Base64 string produced by `encrypt`.
  */
 export async function decrypt(encryptedBase64: string): Promise<string> {
   const secret = process.env.ENCRYPTION_SECRET;
-  if (!secret) {
-    throw new Error('ENCRYPTION_SECRET environment variable is not set.');
+  if (!secret) throw new Error("ENCRYPTION_SECRET environment variable is not set.");
+
+  const combined = Buffer.from(encryptedBase64, "base64");
+  if (combined.length < SALT_LENGTH + IV_LENGTH + 1) {
+    throw new Error("Invalid encrypted payload.");
   }
 
-  const combined = Buffer.from(encryptedBase64, 'base64');
-  
-  const salt = combined.slice(0, SALT_LENGTH);
-  const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-  const ciphertext = combined.slice(SALT_LENGTH + IV_LENGTH);
+  const saltBytes = new Uint8Array(combined.subarray(0, SALT_LENGTH)); // view over salt
+  const iv = new Uint8Array(combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH));
+  const ciphertext = new Uint8Array(combined.subarray(SALT_LENGTH + IV_LENGTH));
 
-  const key = await deriveKey(secret, salt);
+  const key = await deriveKey(secret, saltBytes);
 
   try {
-    const decryptedData = await crypto.subtle.decrypt(
-      {
-        name: ALGORITHM,
-        iv: iv,
-        tagLength: TAG_LENGTH,
-      },
+    const decrypted = await crypto.subtle.decrypt(
+      { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
       key,
       ciphertext
     );
-
-    return new TextDecoder().decode(decryptedData);
-  } catch (error) {
-    console.error("Decryption failed:", error);
-    throw new Error('Failed to decrypt data. The data may be corrupt or the key incorrect.');
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    throw new Error("Failed to decrypt data. The data may be corrupt or the key is incorrect.");
   }
 }
