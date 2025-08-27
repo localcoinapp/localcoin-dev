@@ -20,7 +20,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
-import * as nacl from 'tweetnacl';
+import { sendEmail } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 
@@ -31,18 +31,6 @@ function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
 
 function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
-}
-
-async function sendConfirmationEmail(origin: string, userEmail: string, subject: string, html: string) {
-    const response = await fetch(`${origin}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: userEmail, subject, html }),
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || `Failed to send email to ${userEmail}`);
-    }
 }
 
 export async function POST(req: NextRequest) {
@@ -56,8 +44,6 @@ export async function POST(req: NextRequest) {
 
   let requestId: string | null = null;
   try {
-    const origin = req.nextUrl.origin;
-    
     const body = await req.json();
     requestId = body.requestId;
 
@@ -153,6 +139,7 @@ export async function POST(req: NextRequest) {
     const signature = await sendAndConfirmTransaction(connection, tx, [issuerKeypair]);
     console.log('Transfer signature:', signature);
 
+    // Database update and email now happen *after* successful transaction.
     await updateDoc(requestRef, {
       status: 'approved',
       processedAt: serverTimestamp(),
@@ -195,7 +182,8 @@ export async function POST(req: NextRequest) {
       </div>
     `;
     
-    await sendConfirmationEmail(origin, userEmail, subject, emailHtml);
+    // Direct email call
+    await sendEmail({ to: userEmail, subject, html: emailHtml });
 
     return NextResponse.json({ signature });
   } catch (error: any) {

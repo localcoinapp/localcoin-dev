@@ -18,6 +18,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { MerchantCashoutRequest, Merchant } from '@/types';
 import * as bip39 from 'bip39';
+import { sendEmail } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 
@@ -29,14 +30,6 @@ function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
 
 function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || clusterApiUrl('devnet');
-}
-
-async function sendConfirmationEmail(origin: string, merchantEmail: string, subject: string, html: string) {
-    await fetch(`${origin}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: merchantEmail, subject, html }),
-    });
 }
 
 export async function POST(req: NextRequest) {
@@ -51,8 +44,6 @@ export async function POST(req: NextRequest) {
 
   let requestId: string | null = null;
   try {
-    const origin = req.nextUrl.origin;
-
     const body = await req.json();
     requestId = body.requestId;
 
@@ -131,6 +122,7 @@ export async function POST(req: NextRequest) {
     const signature = await sendAndConfirmTransaction(connection, tx, [merchantKeypair]);
     console.log('Cashout transfer signature:', signature);
 
+    // Database update and email now happen *after* successful transaction.
     await updateDoc(requestRef, {
       status: 'approved',
       processedAt: serverTimestamp(),
@@ -178,7 +170,8 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
-    await sendConfirmationEmail(origin, merchantEmail, subject, emailHtml);
+    // Direct email call
+    await sendEmail({ to: merchantEmail, subject, html: emailHtml });
 
     return NextResponse.json({ signature });
 

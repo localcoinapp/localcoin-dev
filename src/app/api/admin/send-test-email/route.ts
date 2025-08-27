@@ -1,22 +1,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/config/site';
+import { sendEmail } from '@/lib/mail';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
-  // --- Environment Variable Check ---
-  const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
-  const missingVars = requiredVars.filter(v => !process.env[v]);
-  if (missingVars.length > 0) {
-    const errorMsg = `Server is not configured for sending emails. Missing: ${missingVars.join(', ')}`;
-    console.error(`CRITICAL: ${errorMsg}`);
-    return NextResponse.json({ error: 'Failed to send email.', details: errorMsg }, { status: 500 });
-  }
-  // ---------------------------------
-
   try {
-    const origin = req.nextUrl.origin;
     const { to } = await req.json();
 
     if (!to) {
@@ -32,16 +22,7 @@ export async function POST(req: NextRequest) {
       <p>Sent at: ${new Date().toUTCString()}</p>
     `;
     
-    const response = await fetch(`${origin}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, html }),
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || 'Failed to send test email via API route.');
-    }
+    await sendEmail({ to, subject, html });
 
     return NextResponse.json({ message: 'Test email sent successfully' });
 
