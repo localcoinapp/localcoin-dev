@@ -165,7 +165,9 @@ const GenerateImageDialog = ({ onGenerate, fileType }: { onGenerate: (file: File
         setIsGenerating(true);
         try {
             const result = await generateImage({ prompt });
-            const file = dataUriToFiIe(result.imageDataUri, `${fileType}-${Date.now()}.png`);
+            // Use the generic name 'logo.png' or 'banner.png'
+            const filename = `${fileType}.png`;
+            const file = dataUriToFiIe(result.imageDataUri, filename);
             onGenerate(file);
             setIsOpen(false);
         } catch (error) {
@@ -303,7 +305,7 @@ export default function StoreSettingsPage() {
         if (fileType === 'logo') {
           setIsUploading(false);
         } else {
-          setIsUploadingBanner(true);
+          setIsUploadingBanner(false);
         }
       }
     }
