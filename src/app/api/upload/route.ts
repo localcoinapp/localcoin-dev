@@ -6,9 +6,10 @@ import mime from 'mime-types';
 
 export const runtime = 'nodejs';
 
-// Define the base directory for uploads. In a real VM, you'd set this
+// Define the base directory for uploads. On a production VM, you would set this
 // via an environment variable to a persistent path like /var/www/uploads.
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public/uploads');
+// The default saves to the public folder, which works for local dev but is ephemeral in most cloud environments.
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
         await fs.mkdir(dirPath, { recursive: true });
 
         // Use a generic name like 'logo' or 'banner' and preserve the extension
-        const extension = file.name.split('.').pop() || mime.extension(file.type) || 'png';
+        const extension = mime.extension(file.type) || file.name.split('.').pop() || 'png';
         const filename = `${fileType}.${extension}`;
         const fullPath = path.join(dirPath, filename);
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
         await fs.writeFile(fullPath, fileBuffer);
 
         // The URL path that will be stored in the database and used by the client.
-        // This is a relative URL, which makes it portable.
+        // This is a relative URL, making it portable across environments.
         const url = `/uploads/merchants/${merchantId}/${filename}`;
         
         return NextResponse.json({ url });

@@ -8,8 +8,8 @@ import { doc, setDoc } from 'firebase/firestore';
 
 export const runtime = 'nodejs';
 
-// Define the base directory for uploads
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public/uploads');
+// Define the base directory for uploads.
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         const dirPath = path.join(UPLOAD_DIR, 'users', userId);
         await fs.mkdir(dirPath, { recursive: true });
         
-        const extension = file.name.split('.').pop() || mime.extension(file.type) || 'png';
+        const extension = mime.extension(file.type) || file.name.split('.').pop() || 'png';
         const filename = `avatar.${extension}`;
         const fullPath = path.join(dirPath, filename);
         
