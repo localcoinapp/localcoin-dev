@@ -1,3 +1,4 @@
+
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const protectedRoutes = ['/wallet', '/dashboard', '/profile', '/settings', '/cart'];
+const adminRoutes = ['/admin'];
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -37,7 +39,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await auth.signOut();
           setUser(null);
           setLoading(false);
-          if (protectedRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
+          // Redirect if on a protected route
+          if (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
             router.push('/login');
           }
           return;
@@ -49,21 +52,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           userDocRef,
           (docSnap) => {
             if (docSnap.exists()) {
-              const docData = docSnap.data() as Partial<User>;
+              const docData = docSnap.data() as User; // Cast as User to get all fields
 
               const mergedUser: User = {
-                ...(docData as User),
+                // Start with data from Firestore, which has role, merchantId, etc.
+                ...docData, 
+                // Overwrite with guaranteed fresh data from Firebase Auth
                 id: firebaseUser.uid,
+                uid: firebaseUser.uid,
                 name: firebaseUser.displayName ?? docData.name ?? '',
                 email: firebaseUser.email ?? docData.email ?? null,
                 avatar: firebaseUser.photoURL ?? docData.avatar ?? null,
-                // ✅ default to 'user' (valid per your UserRole type)
-                role: docData.role ?? 'user',
               };
 
               setUser(mergedUser);
+              
+              // Redirect non-admins from admin routes
+              if (mergedUser.role !== 'admin' && adminRoutes.includes(pathname)) {
+                 router.push('/');
+              }
             } else {
-              setUser(null);
+              setUser(null); // User deleted from 'users' but still in auth
             }
             setLoading(false);
           },
@@ -76,11 +85,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return () => unsubscribeSnapshot();
       } else {
+        // No user logged in
         setUser(null);
-        if (protectedRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
+        setLoading(false);
+        if (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
           router.push('/login');
         }
-        setLoading(false);
       }
     });
 
