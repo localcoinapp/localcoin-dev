@@ -598,11 +598,11 @@ export default function DashboardPage() {
   const interval = getTimeframeInterval(timeframe);
 
   const filteredTransactions = interval
-    ? recentTransactions.filter(tx => tx.status === 'completed' && tx.redeemedAt && isWithinInterval(tx.redeemedAt.toDate(), interval))
+    ? recentTransactions.filter(tx => tx.status === 'completed' && tx.redeemedAt && isWithinInterval(new Date(tx.redeemedAt.seconds * 1000), interval))
     : recentTransactions.filter(tx => tx.status === 'completed');
 
   const filteredCashoutHistory = interval
-    ? cashoutHistory.filter(req => req.status === 'approved' && req.processedAt && isWithinInterval(req.processedAt.toDate(), interval))
+    ? cashoutHistory.filter(req => req.status === 'approved' && req.processedAt && isWithinInterval(new Date(req.processedAt.seconds * 1000), interval))
     : cashoutHistory.filter(req => req.status === 'approved');
   
   const totalEarnings = filteredTransactions.reduce((acc, tx) => acc + tx.price, 0);

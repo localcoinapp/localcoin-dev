@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
         
         await fs.writeFile(fullPath, fileBuffer);
 
-        const url = `/uploads/users/${userId}/${filename}`;
+        // The URL path that will be stored in the database and used by the client.
+        // This is a relative URL that will be handled by our /api/serve-uploads route.
+        const url = `/api/serve-uploads/users/${userId}/${filename}`;
 
         // Also update the user's profile in Firestore
         const userDocRef = doc(db, "users", userId);

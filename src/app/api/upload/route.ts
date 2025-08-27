@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
         await fs.writeFile(fullPath, fileBuffer);
 
         // The URL path that will be stored in the database and used by the client.
-        // This is a relative URL, making it portable across environments.
-        const url = `/uploads/merchants/${merchantId}/${filename}`;
+        // This is a relative URL that will be handled by our /api/serve-uploads route.
+        const url = `/api/serve-uploads/merchants/${merchantId}/${filename}`;
         
         return NextResponse.json({ url });
 
