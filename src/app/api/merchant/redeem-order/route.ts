@@ -1,4 +1,6 @@
 
+'use client';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -16,7 +18,7 @@ import {
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/firestore';
 import type { User, Merchant, CartItem, MerchantItem } from '@/types';
 import * as bip39 from 'bip39';
 
@@ -57,20 +59,22 @@ function normalizeCartItemBase(order: CartItem): CartItem {
     quantity: order.quantity ?? 0,
     merchantId: order.merchantId ?? '',
     merchantName: order.merchantName ?? '',
-    redeemCode: order.redeemCode ?? '',
+    redeemCode: order.redeemCode ?? null,
     userId: order.userId ?? '',
     userName: order.userName ?? '',
     category: order.category ?? '',
-    // The following fields will be set per status variant below:
-    status: order.status ?? 'pending',
-    redeemedAt: order.redeemedAt,
-    transactionSignature: order.transactionSignature,
-    error: order.error,
+    status: order.status ?? 'pending_approval',
+    // The following fields are handled separately when creating completed/failed orders
+    timestamp: order.timestamp ?? null,
+    redeemedAt: order.redeemedAt ?? null,
+    transactionSignature: order.transactionSignature ?? undefined,
+    error: order.error ?? undefined,
   };
 }
 
 export async function POST(req: NextRequest) {
   console.log('--- Received POST /api/merchant/redeem-order ---');
+  let orderForErrorHandling: CartItem | undefined;
 
   try {
     const body: { order?: CartItem } = await req.json();
@@ -79,15 +83,14 @@ export async function POST(req: NextRequest) {
     if (!body || !body.order) {
       return NextResponse.json({ error: 'Order data is missing in the request body' }, { status: 400 });
     }
+    orderForErrorHandling = body.order;
 
-    // From here on, `order` is non-null
-    const order = body.order;
-
-    if (!order.userId || !order.merchantId) {
+    if (!body.order.userId || !body.order.merchantId) {
       return NextResponse.json({ error: 'Missing critical order data (userId or merchantId)' }, { status: 400 });
     }
 
-    // Fetch user and merchant documents from Firestore
+    const order = normalizeCartItemBase(body.order);
+
     const userDocRef = doc(db, 'users', order.userId);
     const merchantDocRef = doc(db, 'merchants', order.merchantId);
 
@@ -99,37 +102,26 @@ export async function POST(req: NextRequest) {
     const userData = userSnap.data() as User;
     const merchantData = merchantSnap.data() as Merchant;
 
-    // Validate necessary data for the transaction
     if (!userData.seedPhrase) throw new Error('User seed phrase not found. Cannot authorize transfer.');
     if (!merchantData.walletAddress) throw new Error('Merchant wallet address not found. Cannot receive funds.');
     if (!order.price || order.price <= 0) throw new Error('Invalid order price. Price must be greater than zero.');
 
-    // --- Start Solana Transaction ---
     const connection = new Connection(getRpcUrl(), 'confirmed');
     const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
-
     const userKeypair = keypairFromMnemonic(userData.seedPhrase);
     const merchantPublicKey = new PublicKey(merchantData.walletAddress);
 
     const mintInfo = await getMint(connection, tokenMintPublicKey);
     const decimals = mintInfo.decimals;
-
-    // Compute raw token amount as BigInt (avoid BigInt literals for older TS targets)
     const rawAmount = BigInt(Math.round(order.price * Math.pow(10, decimals)));
 
-    // VERIFY USER SOL BALANCE FOR TRANSACTION FEES
     const userSolBalance = await connection.getBalance(userKeypair.publicKey);
     if (userSolBalance < 5000) {
-      // ~0.000005 SOL; adjust if your txs need more
-      throw new Error('Insufficient SOL balance for transaction fees. Please ensure the user wallet has at least 0.000005 SOL.');
+      throw new Error('Insufficient SOL balance for transaction fees.');
     }
 
-    // VERIFY USER TOKEN BALANCE BEFORE ATTEMPTING TRANSACTION
     const fromAta = await getOrCreateAssociatedTokenAccount(
-      connection,
-      userKeypair,
-      tokenMintPublicKey,
-      userKeypair.publicKey
+      connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey
     );
     const fromAtaInfo = await getAccount(connection, fromAta.address);
     if (fromAtaInfo.amount < rawAmount) {
@@ -138,23 +130,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get or create the merchant's token account, with the USER paying the fee if creation is needed
     const toAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, merchantPublicKey);
-
     const ix = createTransferCheckedInstruction(
-      fromAta.address,
-      tokenMintPublicKey,
-      toAta.address,
-      userKeypair.publicKey, // User is the signer
-      rawAmount,
-      decimals
+      fromAta.address, tokenMintPublicKey, toAta.address, userKeypair.publicKey, rawAmount, decimals
     );
 
     const tx = new Transaction().add(ix);
     const signature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
     console.log('Redemption Transfer Signature:', signature);
 
-    // --- Update Firestore Documents on Success ---
     await runTransaction(db, async (transaction) => {
       const freshUserSnap = await transaction.get(userDocRef);
       const freshMerchantSnap = await transaction.get(merchantDocRef);
@@ -182,10 +166,8 @@ export async function POST(req: NextRequest) {
         (o: CartItem) => o.orderId !== base.orderId
       );
 
-      // Use arrayUnion to safely add the completed order to recent transactions
-      const updatedTransactions = arrayUnion(completedOrder);
+      const completedTxForMerchant = { ...completedOrder, redeemedAt: Timestamp.now() };
 
-      // FIX: Ensure walletBalance is treated as a number, defaulting to 0.
       const currentMerchantBalance = Number(freshMerchantData.walletBalance || 0);
       const currentUserBalance = Number(freshUserData.walletBalance || 0);
       const orderPrice = Number(base.price || 0);
@@ -196,21 +178,19 @@ export async function POST(req: NextRequest) {
       transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newUserBalance });
       transaction.update(merchantDocRef, {
         pendingOrders: updatedPendingOrders,
-        recentTransactions: updatedTransactions,
+        recentTransactions: arrayUnion(completedTxForMerchant),
         walletBalance: newMerchantBalance,
       });
     });
 
     return NextResponse.json({ signature });
   } catch (error: any) {
-    // Attempt to mark the order as failed in Firestore if we have enough info
-    try {
-      const body = await req.json().catch(() => null) as { order?: CartItem } | null;
-      const order = body?.order;
-      if (order?.userId && order?.merchantId) {
+    console.error('Error in redeem-order API:', error);
+    if (orderForErrorHandling?.userId && orderForErrorHandling?.merchantId) {
+      try {
         await runTransaction(db, async (transaction) => {
-          const merchantDocRef = doc(db, 'merchants', order.merchantId);
-          const userDocRef = doc(db, 'users', order.userId);
+          const merchantDocRef = doc(db, 'merchants', orderForErrorHandling!.merchantId);
+          const userDocRef = doc(db, 'users', orderForErrorHandling!.userId);
 
           const [merchantSnap, userSnap] = await Promise.all([transaction.get(merchantDocRef), transaction.get(userDocRef)]);
           if (!merchantSnap.exists() || !userSnap.exists()) return;
@@ -218,17 +198,12 @@ export async function POST(req: NextRequest) {
           const merchantData = merchantSnap.data() as Merchant;
           const userData = userSnap.data() as User;
 
-          const base = normalizeCartItemBase(order);
-          const failedOrderInCart: CartItem = {
+          const base = normalizeCartItemBase(orderForErrorHandling!);
+          const failedOrder: CartItem = {
             ...base,
             status: 'failed',
-            error: String(error?.message ?? 'Unknown error'),
-          };
-          const failedOrderForMerchant: CartItem = {
-            ...base,
-            status: 'failed',
-            error: String(error?.message ?? 'Unknown error'),
             redeemedAt: new Date(),
+            error: String(error?.message ?? 'Unknown error'),
           };
 
           const updatedPendingOrders = (merchantData.pendingOrders ?? []).filter(
@@ -236,10 +211,9 @@ export async function POST(req: NextRequest) {
           );
 
           const updatedUserCart = (userData.cart ?? []).map((item: CartItem) =>
-            item.orderId === base.orderId ? failedOrderInCart : item
+            item.orderId === base.orderId ? failedOrder : item
           );
 
-          // Return stock to inventory
           const updatedListings = updateInventory(
             merchantData.listings ?? [],
             base.listingId,
@@ -248,20 +222,18 @@ export async function POST(req: NextRequest) {
 
           transaction.update(merchantDocRef, {
             pendingOrders: updatedPendingOrders,
-            recentTransactions: arrayUnion(failedOrderForMerchant),
+            recentTransactions: arrayUnion(failedOrder),
             listings: updatedListings,
           });
           transaction.update(userDocRef, { cart: updatedUserCart });
 
           console.log(`Firestore updated for failed order ${base.orderId}`);
         });
+      } catch (dbError) {
+        console.error('CRITICAL: Failed to update Firestore after redemption error:', dbError);
       }
-    } catch (dbError) {
-      console.error('CRITICAL: Failed to update Firestore after redemption error:', dbError);
-      console.error('Original redemption error was:', error);
     }
 
-    console.error('Error in redeem-order API:', error);
     return NextResponse.json(
       { error: 'Failed to redeem order.', details: String(error?.message || 'An unknown error occurred.') },
       { status: 500 }
