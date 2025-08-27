@@ -48,8 +48,9 @@ async function sendConfirmationEmail(origin: string, userEmail: string, subject:
 export async function POST(req: NextRequest) {
   // --- Environment Variable Check ---
   if (!process.env.LOCALCOIN_MNEMONIC) {
-    console.error('CRITICAL: Missing LOCALCOIN_MNEMONIC environment variable.');
-    return NextResponse.json({ error: 'Server configuration error.', details: 'The platform wallet is not configured.' }, { status: 500 });
+    const errorMessage = 'CRITICAL: Missing LOCALCOIN_MNEMONIC environment variable. The platform wallet is not configured.';
+    console.error(errorMessage);
+    return NextResponse.json({ error: 'Server configuration error.', details: errorMessage }, { status: 500 });
   }
   // ---------------------------------
 
