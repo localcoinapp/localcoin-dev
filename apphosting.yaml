@@ -5,3 +5,30 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  environment:
+    LOCALCOIN_MNEMONIC:
+      secret: LOCALCOIN_MNEMONIC
+    STRIPE_SECRET_KEY_EUR:
+      secret: STRIPE_SECRET_KEY_EUR
+    STRIPE_SECRET_KEY_USD:
+      secret: STRIPE_SECRET_KEY_USD
+    SMTP_HOST:
+      secret: SMTP_HOST
+    SMTP_PORT:
+      secret: SMTP_PORT
+    SMTP_USER:
+      secret: SMTP_USER
+    SMTP_PASS:
+      secret: SMTP_PASS
+    SMTP_FROM:
+      secret: SMTP_FROM
+    NEXT_PUBLIC_CONTACT_EMAIL:
+      secret: NEXT_PUBLIC_CONTACT_EMAIL
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR:
+      secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD:
+      secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD
+    ENCRYPTION_SECRET:
+      secret: ENCRYPTION_SECRET
+    NEXT_PUBLIC_EURUSD_RATE:
+      secret: NEXT_PUBLIC_EURUSD_RATE
