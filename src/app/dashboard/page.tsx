@@ -397,13 +397,18 @@ export default function DashboardPage() {
     toast({ title: "Processing Redemption...", description: "Please wait while we transfer the tokens." });
   
     try {
-      // Deep copy the order object and convert any Timestamps to serializable format
-      const serializableOrder = JSON.parse(JSON.stringify(order));
+      if (!order.userId || !order.merchantId || !order.orderId) {
+        throw new Error("Missing critical order information for redemption.");
+      }
   
       const response = await fetch('/api/merchant/redeem-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: serializableOrder }),
+        body: JSON.stringify({ 
+          userId: order.userId,
+          merchantId: order.merchantId,
+          orderId: order.orderId,
+        }),
       });
   
       const result = await response.json();
@@ -412,7 +417,6 @@ export default function DashboardPage() {
         throw new Error(result.details || 'Failed to redeem order.');
       }
   
-      // Manually trigger a balance refresh after successful redemption
       fetchBalance();
   
       toast({
