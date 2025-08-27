@@ -1,7 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
+import mime from 'mime-types';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const merchantId = formData.get('merchantId') as string;
-    const fileType = formData.get('fileType') as 'logo' | 'banner'; // e.g., 'logo' or 'banner'
+    const fileType = formData.get('fileType') as 'logo' | 'banner';
 
     if (!file || !merchantId || !fileType) {
         return NextResponse.json({ error: 'Missing file, merchantId, or fileType' }, { status: 400 });
@@ -19,25 +20,21 @@ export async function POST(req: NextRequest) {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         
         // Use a generic name like 'logo' or 'banner' and preserve the extension
-        const extension = file.name.split('.').pop();
+        const extension = file.name.split('.').pop() || mime.extension(file.type) || 'png';
         const filename = `${fileType}.${extension}`;
+        const storagePath = `merchants/${merchantId}/${filename}`;
         
-        // Save to a non-public 'uploads' directory at the project root
-        const dir = join(process.cwd(), 'uploads', 'merchants', merchantId);
-        
-        // Create the directory if it doesn't exist
-        await mkdir(dir, { recursive: true });
+        const storageRef = ref(storage, storagePath);
 
-        const path = join(dir, filename);
-        await writeFile(path, fileBuffer);
+        const metadata = { contentType: file.type };
+        await uploadBytes(storageRef, fileBuffer, metadata);
 
-        // The URL will point to our new serving API route
-        const url = `/api/uploads/merchants/${merchantId}/${filename}`;
+        const url = await getDownloadURL(storageRef);
         
         return NextResponse.json({ url });
 
     } catch (error) {
-        console.error('Error saving merchant file:', error);
+        console.error('Error uploading merchant file to Cloud Storage:', error);
         return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
     }
 }

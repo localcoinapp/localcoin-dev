@@ -1,9 +1,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { db } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import mime from 'mime-types';
+
 
 export const runtime = 'nodejs';
 
@@ -19,21 +20,16 @@ export async function POST(req: NextRequest) {
     try {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         
-        // Use a generic name like 'avatar' and preserve the extension
-        const extension = file.name.split('.').pop();
+        const extension = file.name.split('.').pop() || mime.extension(file.type) || 'png';
         const filename = `avatar.${extension}`;
+        const storagePath = `users/${userId}/${filename}`;
         
-        // Save to the non-public 'uploads' directory
-        const dir = join(process.cwd(), 'uploads', 'users', userId);
+        const storageRef = ref(storage, storagePath);
         
-        // Create the directory if it doesn't exist
-        await mkdir(dir, { recursive: true });
+        const metadata = { contentType: file.type };
+        await uploadBytes(storageRef, fileBuffer, metadata);
 
-        const path = join(dir, filename);
-        await writeFile(path, fileBuffer);
-
-        // The URL will point to our new serving API route
-        const url = `/api/uploads/users/${userId}/${filename}`;
+        const url = await getDownloadURL(storageRef);
 
         // Also update the user's profile in Firestore
         const userDocRef = doc(db, "users", userId);
@@ -41,7 +37,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ url });
     } catch (error) {
-        console.error('Error saving user avatar:', error);
+        console.error('Error uploading user avatar to Cloud Storage:', error);
         return NextResponse.json({ error: 'Failed to save avatar file' }, { status: 500 });
     }
 }
