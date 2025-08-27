@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -184,8 +185,13 @@ export async function POST(req: NextRequest) {
       // Use arrayUnion to safely add the completed order to recent transactions
       const updatedTransactions = arrayUnion(completedOrder);
 
-      const newMerchantBalance = (freshMerchantData.walletBalance ?? 0) + (base.price ?? 0);
-      const newUserBalance = (freshUserData.walletBalance ?? 0) - (base.price ?? 0);
+      // FIX: Ensure walletBalance is treated as a number, defaulting to 0.
+      const currentMerchantBalance = Number(freshMerchantData.walletBalance || 0);
+      const currentUserBalance = Number(freshUserData.walletBalance || 0);
+      const orderPrice = Number(base.price || 0);
+
+      const newMerchantBalance = currentMerchantBalance + orderPrice;
+      const newUserBalance = currentUserBalance - orderPrice;
 
       transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newUserBalance });
       transaction.update(merchantDocRef, {
