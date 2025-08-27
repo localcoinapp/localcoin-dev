@@ -5,6 +5,8 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  # This tells App Hosting to look for these secrets in Google Secret Manager
+  # and make them available as environment variables to your app.
   environment:
     LOCALCOIN_MNEMONIC:
       secret: LOCALCOIN_MNEMONIC
