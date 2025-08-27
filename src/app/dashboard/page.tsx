@@ -132,7 +132,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [merchantData, setMerchantData] = useState<Merchant | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -143,7 +142,7 @@ export default function DashboardPage() {
   const [activeOrders, setActiveOrders] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to be ready
+    if (authLoading) return; 
     if (!user) {
         router.push('/login');
         return;
@@ -160,18 +159,17 @@ export default function DashboardPage() {
           );
           setActiveOrders(active);
         } else {
+          // This can happen if the merchant doc is deleted but user still has role
           setMerchantData(null);
         }
-        setIsLoading(false);
       }, (error) => {
         console.error("Error fetching merchant data:", error);
-        setIsLoading(false);
+        setMerchantData(null);
       });
       return () => unsubscribe();
     } else {
-        // User is not a merchant, or doesn't have a merchantId
+        // User is authenticated but is not a merchant
         setMerchantData(null);
-        setIsLoading(false);
     }
   }, [user, authLoading, router]);
 
@@ -228,11 +226,11 @@ export default function DashboardPage() {
     }
   };
   
-   if (isLoading || authLoading) {
+   if (authLoading) {
     return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
   }
   
-  if (!merchantData) {
+  if (!user?.merchantId || !merchantData) {
      return (
       <div className="container flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <Card className="w-full max-w-lg text-center p-8">
