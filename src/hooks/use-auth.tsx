@@ -29,71 +29,81 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // 1) Blocked user check
-        const blockedUserDocRef = doc(db, 'blocked_users', firebaseUser.uid);
-        const blockedDocSnap = await getDoc(blockedUserDocRef);
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      let unsubscribeSnapshot = () => {};
 
-        if (blockedDocSnap.exists()) {
-          await auth.signOut();
-          setUser(null);
-          setLoading(false);
-          // Redirect if on a protected route
-          if (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
-            router.push('/login');
-          }
-          return;
-        }
+      const handleUserLogic = async () => {
+        if (firebaseUser) {
+          // 1. Check if the user is in the blocked list first.
+          const blockedUserDocRef = doc(db, 'blocked_users', firebaseUser.uid);
+          const blockedDocSnap = await getDoc(blockedUserDocRef);
 
-        // 2) Live Firestore user snapshot
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const unsubscribeSnapshot = onSnapshot(
-          userDocRef,
-          (docSnap) => {
-            if (docSnap.exists()) {
-              const docData = docSnap.data() as User; // Cast as User to get all fields
-
-              const mergedUser: User = {
-                // Start with data from Firestore, which has role, merchantId, etc.
-                ...docData, 
-                // Overwrite with guaranteed fresh data from Firebase Auth
-                id: firebaseUser.uid,
-                uid: firebaseUser.uid,
-                name: firebaseUser.displayName ?? docData.name ?? '',
-                email: firebaseUser.email ?? docData.email ?? null,
-                avatar: firebaseUser.photoURL ?? docData.avatar ?? null,
-              };
-
-              setUser(mergedUser);
-              
-              // Redirect non-admins from admin routes
-              if (mergedUser.role !== 'admin' && adminRoutes.includes(pathname)) {
-                 router.push('/');
-              }
-            } else {
-              setUser(null); // User deleted from 'users' but still in auth
-            }
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Error fetching user snapshot:', error);
+          if (blockedDocSnap.exists()) {
+            await auth.signOut(); // Ensure user is logged out if blocked.
             setUser(null);
             setLoading(false);
+            if (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
+              router.push('/login');
+            }
+            return;
           }
-        );
+          
+          // 2. Set up a real-time listener for the user's document in Firestore.
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          unsubscribeSnapshot = onSnapshot(
+            userDocRef,
+            (docSnap) => {
+              if (docSnap.exists()) {
+                const docData = docSnap.data() as User;
 
-        return () => unsubscribeSnapshot();
-      } else {
-        // No user logged in
-        setUser(null);
-        setLoading(false);
-        if (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
-          router.push('/login');
+                const mergedUser: User = {
+                  ...docData, // Firestore data (role, merchantId, etc.)
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: firebaseUser.displayName ?? docData.name ?? 'No Name',
+                  email: firebaseUser.email,
+                  avatar: firebaseUser.photoURL ?? docData.avatar ?? null,
+                };
+                
+                // Redirect non-admins away from admin routes.
+                if (mergedUser.role !== 'admin' && adminRoutes.some(p => pathname.startsWith(p))) {
+                   router.push('/');
+                }
+                
+                setUser(mergedUser);
+              } else {
+                // The user exists in Firebase Auth but not in the 'users' collection.
+                // This could happen if a user is deleted from the db but not from auth.
+                setUser(null);
+              }
+              setLoading(false);
+            },
+            (error) => {
+              console.error('Error fetching user snapshot:', error);
+              setUser(null);
+              setLoading(false);
+            }
+          );
+        } else {
+          // No user is logged in.
+          setUser(null);
+          setLoading(false);
+          // Redirect if the user is on a protected route.
+          if (protectedRoutes.includes(pathname) || adminRoutes.some(p => pathname.startsWith(p)) || pathname.startsWith('/chat/')) {
+            router.push('/login');
+          }
         }
-      }
+      };
+
+      handleUserLogic();
+      
+      // Cleanup function for onAuthStateChanged.
+      return () => {
+        unsubscribeSnapshot();
+      };
     });
 
+    // Cleanup function for the main useEffect.
     return () => unsubscribeAuth();
   }, [router, pathname]);
 
