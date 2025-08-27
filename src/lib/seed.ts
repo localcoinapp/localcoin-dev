@@ -14,4 +14,12 @@ async function setDocument(collectionName: string, docId: string, data: any) {
 
 
 export async function seedDatabase() {
-  try
+  try {
+    console.log('Seeding database...');
+    // Add any seed logic here in the future
+    console.log('Database seeded successfully.');
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    throw error; // Re-throw the error to fail the script if seeding fails
+  }
+}
