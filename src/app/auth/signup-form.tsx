@@ -1,4 +1,3 @@
-
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -15,7 +14,6 @@ import { Button } from "@/components/ui/button"
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -30,15 +28,12 @@ import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
-  password: z.string().min(8, {
-    message: "Password must be at least 8 characters.",
-  }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   country: z.string().min(1, { message: "Please select a country." }),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms and conditions to continue." }),
+  // Allow boolean, but require it to be true at submit
+  terms: z.boolean().refine(v => v === true, {
+    message: "You must accept the terms and conditions to continue.",
   }),
 })
 
@@ -52,29 +47,28 @@ export function SignupForm() {
       email: "",
       password: "",
       country: "",
-      terms: false,
+      terms: false, // starts unchecked; schema enforces true on submit
     },
-  })
+  });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-        const user = userCredential.user;
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
 
-        // Send verification email
-        await sendEmailVerification(user);
+      await sendEmailVerification(user);
 
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          id: user.uid,
-          email: values.email,
-          country: values.country,
-          role: 'user',
-          profileComplete: false, // Add this flag
-        });
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        id: user.uid,
+        email: values.email,
+        country: values.country,
+        role: 'user',
+        profileComplete: false,
+      });
 
-      toast({ 
-        title: "Almost there!", 
+      toast({
+        title: "Almost there!",
         description: "Your account has been created. Please check your email to verify your account and then log in.",
         duration: 9000,
       });
@@ -100,14 +94,14 @@ export function SignupForm() {
 
       if (!userDoc.exists()) {
         await setDoc(userDocRef, {
-            uid: user.uid,
-            id: user.uid,
-            email: user.email,
-            name: user.displayName,
-            avatar: user.photoURL,
-            role: 'user',
-            country: 'US', // Default country, can be improved later
-            profileComplete: true, // Social sign-ins are considered complete
+          uid: user.uid,
+          id: user.uid,
+          email: user.email,
+          name: user.displayName,
+          avatar: user.photoURL,
+          role: 'user',
+          country: 'US',
+          profileComplete: true,
         });
       }
       toast({ title: "Success", description: "You have been logged in." });
@@ -121,7 +115,6 @@ export function SignupForm() {
       });
     }
   }
-
 
   const handleGoogleSignIn = () => {
     const provider = new GoogleAuthProvider();
@@ -158,11 +151,10 @@ export function SignupForm() {
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">
-              Or continue with
-            </span>
+            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
           </div>
         </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -178,6 +170,7 @@ export function SignupForm() {
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="password"
@@ -191,58 +184,61 @@ export function SignupForm() {
                 </FormItem>
               )}
             />
-             <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Country</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your country" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countries.map((country) => (
-                            <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              <FormField
-                control={form.control}
-                name="terms"
-                render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+            <FormField
+              control={form.control}
+              name="country"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Country</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                        <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your country" />
+                      </SelectTrigger>
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                        <FormLabel>
-                          I accept the{" "}
-                           <Link href="/user-agreement" className="underline hover:text-primary" target="_blank">
-                             terms and conditions
-                          </Link>
-                          .
-                        </FormLabel>
-                         <FormMessage />
-                    </div>
-                    </FormItem>
-                )}
-                />
+                    <SelectContent>
+                      {countries.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          {country.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
+            <FormField
+              control={form.control}
+              name="terms"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      I accept the{" "}
+                      <Link href="/user-agreement" className="underline hover:text-primary" target="_blank">
+                        terms and conditions
+                      </Link>
+                      .
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
 
             <Button type="submit" className="w-full">Create Account</Button>
           </form>
         </Form>
+
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/login" className="underline hover:text-primary">

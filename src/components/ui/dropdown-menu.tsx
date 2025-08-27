@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -8,15 +7,10 @@ import { Check, ChevronRight, Circle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
-
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
-
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
-
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal
-
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
-
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 
 const DropdownMenuSubTrigger = React.forwardRef<
@@ -75,27 +69,47 @@ const DropdownMenuContent = React.forwardRef<
 ))
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
+// --- Fixed DropdownMenuItem ---
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
-    inset?: boolean,
-    asChild?: boolean,
+    inset?: boolean
+    asChild?: boolean
   }
->(({ className, inset, asChild, ...props }, ref) => {
-  const Comp = asChild ? "div" : DropdownMenuPrimitive.Item;
+>(({ className, inset, asChild, onSelect, ...props }, ref) => {
+  // Branch explicitly so TS knows the exact element and prop types.
+  if (asChild) {
+    // Render a plain div WITHOUT Radix's onSelect (which uses native Event)
+    const { /* strip anything you don't want on a div */ } = props
+    return (
+      <div
+        ref={ref as unknown as React.Ref<HTMLDivElement>}
+        className={cn(
+          "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+          inset && "pl-8",
+          className
+        )}
+        {...(props as React.HTMLAttributes<HTMLDivElement>)}
+      />
+    )
+  }
+
+  // Render the Radix Item WITH its correctly-typed onSelect
   return (
-    <Comp
+    <DropdownMenuPrimitive.Item
       ref={ref}
       className={cn(
         "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         inset && "pl-8",
         className
       )}
+      onSelect={onSelect}
       {...props}
     />
   )
 })
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
+// --- end fix ---
 
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,

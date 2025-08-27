@@ -1,7 +1,6 @@
-
 'use client'
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -24,20 +23,18 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Activity, CheckCircle, Loader2 } from "lucide-react"
+import { Activity, Loader2 } from "lucide-react"
 import { countries } from "@/data/countries"
 import { states } from "@/data/states"
 import { provinces } from "@/data/provinces"
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, where, query, onSnapshot, updateDoc, getDocs } from "firebase/firestore";
-import { useEffect } from "react";
+import { addDoc, collection, serverTimestamp, where, query, onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { geohashForLocation } from "geofire-common";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
-
 
 const formSchema = z.object({
   companyName: z.string().min(2, { message: "Please enter a company name." }),
@@ -52,18 +49,19 @@ const formSchema = z.object({
   website: z.string().url().optional().or(z.literal('')),
   instagram: z.string().optional(),
   description: z.string().min(20, { message: "Description must be at least 20 characters." }),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the Merchant Agreement to continue." }),
+  // Allow boolean default false, but enforce true on submit
+  terms: z.boolean().refine(v => v === true, {
+    message: "You must accept the Merchant Agreement to continue.",
   }),
 }).refine(data => {
-    if (data.country === 'US') {
-        const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
-        return usPhoneRegex.test(data.phone);
-    }
-    return true;
+  if (data.country === 'US') {
+    const usPhoneRegex = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
+    return usPhoneRegex.test(data.phone);
+  }
+  return true;
 }, {
-    message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
-    path: ["phone"],
+  message: "Please enter a valid US phone number format (e.g., (123) 456-7890).",
+  path: ["phone"],
 });
 
 type Position = { lat: number; lng: number };
@@ -94,9 +92,7 @@ async function geocodeAddressOSM({
     },
   });
 
-  if (!res.ok) {
-    throw new Error("Geocoding API request failed");
-  }
+  if (!res.ok) throw new Error("Geocoding API request failed");
 
   const data = await res.json();
   if (!Array.isArray(data) || data.length === 0) return null;
@@ -109,7 +105,6 @@ async function geocodeAddressOSM({
 }
 // --------------------------------------------------------
 
-
 export default function BecomeMerchantPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -121,34 +116,36 @@ export default function BecomeMerchantPage() {
     if (user && user.id) {
       const merchantsRef = collection(db, "merchants");
       const q = query(merchantsRef, where("owner", "==", user.id));
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        if (!querySnapshot.empty) {
-          const merchantDoc = querySnapshot.docs[0];
-          const data = merchantDoc.data();
-          if(data.status === 'pending') {
-            setApplicationStatus('pending');
-          } else if (data.status === 'approved') {
-            router.push('/dashboard');
+      const unsubscribe = onSnapshot(
+        q,
+        (querySnapshot) => {
+          if (!querySnapshot.empty) {
+            const data = querySnapshot.docs[0].data();
+            if (data.status === 'pending') {
+              setApplicationStatus('pending');
+            } else if (data.status === 'approved') {
+              router.push('/dashboard');
+            } else {
+              // covers 'rejected' or 'blocked'
+              setApplicationStatus('idle');
+            }
           } else {
-             // covers 'rejected' or 'blocked'
             setApplicationStatus('idle');
           }
-        } else {
+          setIsSubmitting(false);
+        },
+        (error) => {
+          console.error("Error fetching merchant status:", error);
           setApplicationStatus('idle');
+          setIsSubmitting(false);
         }
-        setIsSubmitting(false); // also applies to loading state
-      }, (error) => {
-         console.error("Error fetching merchant status:", error);
-         setApplicationStatus('idle');
-         setIsSubmitting(false);
-      });
+      );
       return () => unsubscribe();
-    } else if (!user) {
-        setIsSubmitting(false);
-        setApplicationStatus('idle'); // No user, no application
+    } else {
+      setIsSubmitting(false);
+      setApplicationStatus('idle');
     }
   }, [user, router]);
-
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -165,26 +162,25 @@ export default function BecomeMerchantPage() {
       website: "",
       instagram: "",
       description: "",
-      terms: false,
+      terms: false, // unchecked by default; schema enforces true on submit
     },
   });
-  
+
   // Set user's email as default when user data is available
   useEffect(() => {
-    if(user?.email) {
+    if (user?.email) {
       form.setValue('contactEmail', user.email);
     }
   }, [user, form]);
-
 
   const selectedCountry = form.watch("country");
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) {
-        toast({ title: "Error", description: "You must be logged in to apply.", variant: "destructive" });
-        return;
+      toast({ title: "Error", description: "You must be logged in to apply.", variant: "destructive" });
+      return;
     }
-    
+
     setIsSubmitting(true);
 
     try {
@@ -197,7 +193,7 @@ export default function BecomeMerchantPage() {
       });
 
       if (!position) {
-          throw new Error("Could not geocode the address. Please check it and try again.");
+        throw new Error("Could not geocode the address. Please check it and try again.");
       }
 
       const applicationData = {
@@ -212,16 +208,15 @@ export default function BecomeMerchantPage() {
         listings: [],
         rating: 0,
       };
-      
+
       await addDoc(collection(db, 'merchants'), applicationData);
 
       toast({
-          title: "Application Submitted!",
-          description: "Your application is now under review. We'll notify you of the outcome."
+        title: "Application Submitted!",
+        description: "Your application is now under review. We'll notify you of the outcome.",
       });
 
       setApplicationStatus('pending');
-
     } catch (error) {
       console.error("Error during application submission:", error);
       toast({
@@ -231,9 +226,9 @@ export default function BecomeMerchantPage() {
       });
       setApplicationStatus('idle');
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const renderStateField = () => {
     if (selectedCountry === 'US') {
@@ -289,12 +284,15 @@ export default function BecomeMerchantPage() {
       );
     }
     return null;
-  }
-  
-  if (applicationStatus === 'loading') {
-    return <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-12 w-12 animate-spin" /></div>;
-  }
+  };
 
+  if (applicationStatus === 'loading') {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
+        <Loader2 className="h-12 w-12 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -307,16 +305,54 @@ export default function BecomeMerchantPage() {
         </CardHeader>
         <CardContent>
           {applicationStatus === 'idle' && (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                 <FormField
-                    control={form.control}
-                    name="companyName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Name</FormLabel>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="companyName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., SunnySide Cafe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <Input placeholder="e.g., SunnySide Cafe" {...field} />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your country" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="street"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Street</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Sonnenallee" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -324,154 +360,72 @@ export default function BecomeMerchantPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="country"
+                    name="houseNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Country</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select your country" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {countries.map((country) => (
-                                <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        <FormLabel>House No.</FormLabel>
+                        <FormControl>
+                          <Input placeholder="223" {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="street"
-                      render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                          <FormLabel>Street</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Sonnenallee" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="houseNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>House No.</FormLabel>
-                          <FormControl>
-                            <Input placeholder="223" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                     <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>City</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Berlin" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     {renderStateField()}
-                     <FormField
-                      control={form.control}
-                      name="zipCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>ZIP / Postal Code</FormLabel>
-                          <FormControl>
-                            <Input placeholder="12059" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="contactEmail"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="contact@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input 
-                               placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "Your phone number"} 
-                               {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                      control={form.control}
-                      name="website"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Website (Optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="https://example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="instagram"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Instagram (Optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="@yourhandle" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
                     control={form.control}
-                    name="description"
+                    name="city"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tell us about what you offer</FormLabel>
+                        <FormLabel>City</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder="Describe your business, services, and what makes you unique."
-                            className="resize-none"
+                          <Input placeholder="Berlin" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {renderStateField()}
+                  <FormField
+                    control={form.control}
+                    name="zipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ZIP / Postal Code</FormLabel>
+                        <FormControl>
+                          <Input placeholder="12059" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="contactEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Email</FormLabel>
+                        <FormControl>
+                          <Input placeholder="contact@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={selectedCountry === 'US' ? "(555) 123-4567" : "Your phone number"}
                             {...field}
                           />
                         </FormControl>
@@ -479,56 +433,107 @@ export default function BecomeMerchantPage() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="website"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Website (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="instagram"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Instagram (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="@yourhandle" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
-                    control={form.control}
-                    name="terms"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                            <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                            <FormLabel>
-                            I accept the{" "}
-                            <Link href="/merchant-agreement" className="underline hover:text-primary" target="_blank">
-                                Merchant Agreement
-                            </Link>
-                            .
-                            </FormLabel>
-                            <FormMessage />
-                        </div>
-                        </FormItem>
-                    )}
-                    />
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tell us about what you offer</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe your business, services, and what makes you unique."
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <div className="text-center pt-4">
-                    <Button type="submit" size="lg" disabled={isSubmitting}>
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        'Submit Application'
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
+                <FormField
+                  control={form.control}
+                  name="terms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I accept the{" "}
+                          <Link href="/merchant-agreement" className="underline hover:text-primary" target="_blank">
+                            Merchant Agreement
+                          </Link>
+                          .
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <div className="text-center pt-4">
+                  <Button type="submit" size="lg" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit Application'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           )}
+
           {applicationStatus === 'pending' && (
-              <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px]">
-                  <Activity className="h-16 w-16 mx-auto text-primary mb-4"/>
-                  <p className="text-xl font-semibold">Application Under Review</p>
-                  <p className="text-muted-foreground mt-2">Thank you for submitting. We are currently reviewing your application and this may take a few days.</p>
-              </div>
+            <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px]">
+              <Activity className="h-16 w-16 mx-auto text-primary mb-4" />
+              <p className="text-xl font-semibold">Application Under Review</p>
+              <p className="text-muted-foreground mt-2">
+                Thank you for submitting. We are currently reviewing your application and this may take a few days.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
