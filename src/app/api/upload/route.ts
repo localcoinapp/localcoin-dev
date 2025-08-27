@@ -1,10 +1,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
+import { promises as fs } from 'fs';
+import path from 'path';
 import mime from 'mime-types';
 
 export const runtime = 'nodejs';
+
+// Define the base directory for uploads. In a real VM, you'd set this
+// via an environment variable to a persistent path like /var/www/uploads.
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public/uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -19,22 +23,27 @@ export async function POST(req: NextRequest) {
     try {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         
+        // Define the directory path for this specific merchant
+        const dirPath = path.join(UPLOAD_DIR, 'merchants', merchantId);
+        // Ensure the directory exists
+        await fs.mkdir(dirPath, { recursive: true });
+
         // Use a generic name like 'logo' or 'banner' and preserve the extension
         const extension = file.name.split('.').pop() || mime.extension(file.type) || 'png';
         const filename = `${fileType}.${extension}`;
-        const storagePath = `merchants/${merchantId}/${filename}`;
-        
-        const storageRef = ref(storage, storagePath);
+        const fullPath = path.join(dirPath, filename);
 
-        const metadata = { contentType: file.type };
-        await uploadBytes(storageRef, fileBuffer, metadata);
+        // Write the file to the filesystem
+        await fs.writeFile(fullPath, fileBuffer);
 
-        const url = await getDownloadURL(storageRef);
+        // The URL path that will be stored in the database and used by the client.
+        // This is a relative URL, which makes it portable.
+        const url = `/uploads/merchants/${merchantId}/${filename}`;
         
         return NextResponse.json({ url });
 
     } catch (error) {
-        console.error('Error uploading merchant file to Cloud Storage:', error);
+        console.error('Error saving merchant file to filesystem:', error);
         return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
     }
 }
