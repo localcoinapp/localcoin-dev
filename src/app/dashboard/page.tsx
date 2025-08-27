@@ -395,16 +395,11 @@ export default function DashboardPage() {
   const handleRedeemOrder = async (order: CartItem) => {
     setIsRedeemModalOpen(false);
     toast({ title: "Processing Redemption...", description: "Please wait while we transfer the tokens." });
-
-    // Create a deep copy and convert Timestamps to JS Dates for serialization
-    const serializableOrder = JSON.parse(JSON.stringify(order, (key, value) => {
-        if (value && typeof value === 'object' && value.hasOwnProperty('seconds') && value.hasOwnProperty('nanoseconds')) {
-            return new Timestamp(value.seconds, value.nanoseconds).toDate();
-        }
-        return value;
-    }));
   
     try {
+      // Deep copy the order object and convert any Timestamps to serializable format
+      const serializableOrder = JSON.parse(JSON.stringify(order));
+  
       const response = await fetch('/api/merchant/redeem-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -416,7 +411,7 @@ export default function DashboardPage() {
       if (!response.ok) {
         throw new Error(result.details || 'Failed to redeem order.');
       }
-      
+  
       // Manually trigger a balance refresh after successful redemption
       fetchBalance();
   
@@ -433,7 +428,7 @@ export default function DashboardPage() {
         variant: "destructive",
       });
     } finally {
-        setRedeemingOrder(null);
+      setRedeemingOrder(null);
     }
   };
 

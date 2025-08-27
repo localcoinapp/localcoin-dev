@@ -63,6 +63,8 @@ export async function seedDatabase() {
             description: 'Your local source for fresh, organic produce right from the heart of the city.',
             rating: 4.8,
             status: 'live',
+            logo: '/api/serve-uploads/merchants/merchant-katari-farms-001/logo.png',
+            banner: '/api/serve-uploads/merchants/merchant-katari-farms-001/banner.jpg',
         },
         {
             id: 'merchant-berlin-wall-tours-002',
@@ -74,6 +76,8 @@ export async function seedDatabase() {
             description: 'Explore the history of the Berlin Wall with our expert guides.',
             rating: 4.9,
             status: 'live',
+            logo: '/api/serve-uploads/merchants/merchant-berlin-wall-tours-002/logo.png',
+            banner: '/api/serve-uploads/merchants/merchant-berlin-wall-tours-002/banner.jpg',
         },
         {
             id: 'merchant-some-club-003',
@@ -85,6 +89,8 @@ export async function seedDatabase() {
             description: 'The best underground beats in Berlin. Join us for a night of electronic music.',
             rating: 4.5,
             status: 'live',
+            logo: '/api/serve-uploads/merchants/merchant-some-club-003/logo.png',
+            banner: '/api/serve-uploads/merchants/merchant-some-club-003/banner.jpg',
         }
     ];
 
@@ -98,8 +104,6 @@ export async function seedDatabase() {
             ...merchant,
             walletAddress: userData?.walletAddress || '', // Use existing wallet info if available
             geohash: geohashForLocation([merchant.position.lat, merchant.position.lng]),
-            logo: `/api/uploads/merchants/${merchant.id}/logo.png`, // Correct path to serving API
-            banner: `/api/uploads/merchants/${merchant.id}/banner.jpg`, // Correct path to serving API
             listings: [],
             pendingOrders: [],
             recentTransactions: [],
