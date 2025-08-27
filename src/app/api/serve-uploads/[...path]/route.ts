@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 // This is the base directory on the server's filesystem where uploads are stored.
 // On a self-hosted VM, this should be an absolute path outside the app's code,
 // e.g., '/var/www/uploads'. The default is for local development.
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
   const filePathParts = params.path;
@@ -30,7 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
     const fileBuffer = await fs.readFile(requestedPath);
     const mimeType = mime.lookup(requestedPath) || 'application/octet-stream';
 
-    return new NextResponse(fileBuffer, {
+    // The fix is ensuring the Buffer is passed as a Uint8Array.
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': mimeType,
