@@ -13,6 +13,7 @@
     "seed": "node scripts/seed-db.js"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.11.0",
     "@genkit-ai/firebase": "latest",
     "@genkit-ai/googleai": "latest",
     "@hookform/resolvers": "^3.4.2",

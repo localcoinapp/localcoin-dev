@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import mime from 'mime-types';
+import { adminStorage } from '@/lib/firebase-admin';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 export const runtime = 'nodejs';
-
-// Define the base directory for uploads.
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -20,28 +15,33 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+        const bucket = adminStorage.bucket();
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         
-        const dirPath = path.join(UPLOAD_DIR, 'users', userId);
-        await fs.mkdir(dirPath, { recursive: true });
-        
-        const extension = mime.extension(file.type) || file.name.split('.').pop() || 'png';
+        // Define the path in Firebase Storage
+        const extension = file.name.split('.').pop() || 'png';
         const filename = `avatar.${extension}`;
-        const fullPath = path.join(dirPath, filename);
+        const filePath = `users/${userId}/${filename}`;
         
-        await fs.writeFile(fullPath, fileBuffer);
+        const fileUpload = bucket.file(filePath);
 
-        // The URL path that will be stored in the database and used by the client.
-        // This is a relative URL that will be handled by our /api/serve-uploads route.
-        const url = `/api/serve-uploads/users/${userId}/${filename}`;
+        await fileUpload.save(fileBuffer, {
+            metadata: {
+                contentType: file.type,
+            },
+        });
 
-        // Also update the user's profile in Firestore
+        // Make the file public and get its URL
+        await fileUpload.makePublic();
+        const url = fileUpload.publicUrl();
+
+        // Update the user's profile in Firestore with the new public URL
         const userDocRef = doc(db, "users", userId);
         await setDoc(userDocRef, { avatar: url }, { merge: true });
 
         return NextResponse.json({ url });
     } catch (error) {
-        console.error('Error saving user avatar to filesystem:', error);
+        console.error('Error uploading avatar to Firebase Storage:', error);
         return NextResponse.json({ error: 'Failed to save avatar file' }, { status: 500 });
     }
 }

@@ -1,14 +1,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import mime from 'mime-types';
+import { adminStorage } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 export const runtime = 'nodejs';
-
-// Define the base directory for uploads. On a production VM, you would set this
-// via an environment variable to a persistent path like /var/www/uploads.
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 export async function POST(req: NextRequest) {
     const formData = await req.formData();
@@ -21,29 +17,34 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+        const bucket = adminStorage.bucket();
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         
-        // Define the directory path for this specific merchant
-        const dirPath = path.join(UPLOAD_DIR, 'merchants', merchantId);
-        // Ensure the directory exists
-        await fs.mkdir(dirPath, { recursive: true });
-
-        // Use a generic name like 'logo' or 'banner' and preserve the extension
-        const extension = mime.extension(file.type) || file.name.split('.').pop() || 'png';
+        // Define the path in Firebase Storage
+        const extension = file.name.split('.').pop() || 'png';
         const filename = `${fileType}.${extension}`;
-        const fullPath = path.join(dirPath, filename);
+        const filePath = `merchants/${merchantId}/${filename}`;
+        
+        const fileUpload = bucket.file(filePath);
 
-        // Write the file to the filesystem
-        await fs.writeFile(fullPath, fileBuffer);
+        await fileUpload.save(fileBuffer, {
+            metadata: {
+                contentType: file.type,
+            },
+        });
 
-        // The URL path that will be stored in the database and used by the client.
-        // This is a relative URL that will be handled by our /api/serve-uploads route.
-        const url = `/api/serve-uploads/merchants/${merchantId}/${filename}`;
+        // Make the file public and get its URL
+        await fileUpload.makePublic();
+        const url = fileUpload.publicUrl();
+
+        // Update the merchant's profile in Firestore with the new public URL
+        const merchantDocRef = doc(db, "merchants", merchantId);
+        await setDoc(merchantDocRef, { [fileType]: url }, { merge: true });
         
         return NextResponse.json({ url });
 
     } catch (error) {
-        console.error('Error saving merchant file to filesystem:', error);
+        console.error('Error uploading file to Firebase Storage:', error);
         return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
     }
 }
