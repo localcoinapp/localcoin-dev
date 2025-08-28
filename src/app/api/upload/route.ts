@@ -1,50 +1,58 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { adminStorage } from '@/lib/firebase-admin';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
 
 export const runtime = 'nodejs';
 
+// This is the base directory on the server's filesystem where uploads are stored.
+// On a self-hosted VM, this should be an absolute path outside the app's code,
+// e.g., '/var/www/uploads'. The default is for local development.
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+
 export async function POST(req: NextRequest) {
+  try {
     const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const merchantId = formData.get('merchantId') as string;
-    const fileType = formData.get('fileType') as 'logo' | 'banner';
+    const file = formData.get('file') as File | null;
+    const merchantId = formData.get('merchantId') as string | null;
+    const fileType = formData.get('fileType') as 'logo' | 'banner' | null;
 
     if (!file || !merchantId || !fileType) {
-        return NextResponse.json({ error: 'Missing file, merchantId, or fileType' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing file, merchantId, or fileType' },
+        { status: 400 }
+      );
     }
 
-    try {
-        const bucket = adminStorage.bucket();
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
-        
-        // Define the path in Firebase Storage
-        const extension = file.name.split('.').pop() || 'png';
-        const filename = `${fileType}.${extension}`;
-        const filePath = `merchants/${merchantId}/${filename}`;
-        
-        const fileUpload = bucket.file(filePath);
+    // --- Create directory if it doesn't exist ---
+    const merchantUploadDir = path.join(UPLOAD_DIR, 'merchants', merchantId);
+    await fs.mkdir(merchantUploadDir, { recursive: true });
+    // ---------------------------------------------
 
-        await fileUpload.save(fileBuffer, {
-            metadata: {
-                contentType: file.type,
-            },
-        });
+    // --- Standardize filename ---
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const filename = `${fileType}.${extension}`;
+    const filePath = path.join(merchantUploadDir, filename);
+    // --------------------------
 
-        // Make the file public and get its URL
-        await fileUpload.makePublic();
-        const url = fileUpload.publicUrl();
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    await fs.writeFile(filePath, fileBuffer);
 
-        // Update the merchant's profile in Firestore with the new public URL
-        const merchantDocRef = doc(db, "merchants", merchantId);
-        await setDoc(merchantDocRef, { [fileType]: url }, { merge: true });
-        
-        return NextResponse.json({ url });
+    // The URL path should be relative and handled by our serving API
+    const url = `/api/serve-uploads/merchants/${merchantId}/${filename}`;
 
-    } catch (error) {
-        console.error('Error uploading file to Firebase Storage:', error);
-        return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
-    }
+    // Update Firestore with the relative URL
+    const merchantDocRef = doc(db, 'merchants', merchantId);
+    await updateDoc(merchantDocRef, { [fileType]: url });
+
+    return NextResponse.json({ url });
+  } catch (error: any) {
+    console.error('Error in upload API:', error);
+    return NextResponse.json(
+      { error: 'Failed to save file', details: error.message },
+      { status: 500 }
+    );
+  }
 }

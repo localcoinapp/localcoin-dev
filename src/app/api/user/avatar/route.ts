@@ -1,47 +1,45 @@
+
 import { NextRequest, NextResponse } from 'next/server';
-import { adminStorage } from '@/lib/firebase-admin';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
 
 export const runtime = 'nodejs';
 
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+
 export async function POST(req: NextRequest) {
+  try {
     const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const userId = formData.get('userId') as string;
+    const file = formData.get('file') as File | null;
+    const userId = formData.get('userId') as string | null;
 
     if (!file || !userId) {
-        return NextResponse.json({ error: 'Missing file or userId' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing file or userId' }, { status: 400 });
     }
 
-    try {
-        const bucket = adminStorage.bucket();
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
-        
-        // Define the path in Firebase Storage
-        const extension = file.name.split('.').pop() || 'png';
-        const filename = `avatar.${extension}`;
-        const filePath = `users/${userId}/${filename}`;
-        
-        const fileUpload = bucket.file(filePath);
+    const userUploadDir = path.join(UPLOAD_DIR, 'users', userId);
+    await fs.mkdir(userUploadDir, { recursive: true });
 
-        await fileUpload.save(fileBuffer, {
-            metadata: {
-                contentType: file.type,
-            },
-        });
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const filename = `avatar.${extension}`;
+    const filePath = path.join(userUploadDir, filename);
 
-        // Make the file public and get its URL
-        await fileUpload.makePublic();
-        const url = fileUpload.publicUrl();
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    await fs.writeFile(filePath, fileBuffer);
 
-        // Update the user's profile in Firestore with the new public URL
-        const userDocRef = doc(db, "users", userId);
-        await setDoc(userDocRef, { avatar: url }, { merge: true });
+    const url = `/api/serve-uploads/users/${userId}/${filename}`;
 
-        return NextResponse.json({ url });
-    } catch (error) {
-        console.error('Error uploading avatar to Firebase Storage:', error);
-        return NextResponse.json({ error: 'Failed to save avatar file' }, { status: 500 });
-    }
+    const userDocRef = doc(db, "users", userId);
+    await updateDoc(userDocRef, { avatar: url });
+
+    return NextResponse.json({ url });
+  } catch (error: any) {
+    console.error('Error in avatar upload API:', error);
+    return NextResponse.json(
+      { error: 'Failed to save avatar', details: error.message },
+      { status: 500 }
+    );
+  }
 }
