@@ -1,13 +1,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { storageService } from '@/lib/storage';
 
 export const runtime = 'nodejs';
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,18 +16,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing file or userId' }, { status: 400 });
     }
 
-    const userUploadDir = path.join(UPLOAD_DIR, 'users', userId);
-    await fs.mkdir(userUploadDir, { recursive: true });
-
     const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
     const filename = `avatar.${extension}`;
-    const filePath = path.join(userUploadDir, filename);
+    const destinationPath = `users/${userId}/${filename}`;
 
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filePath, fileBuffer);
+    // Use the storage service to upload the file
+    const url = await storageService.upload(file, destinationPath);
 
-    const url = `/api/serve-uploads/users/${userId}/${filename}`;
-
+    // Update Firestore with the returned URL
     const userDocRef = doc(db, "users", userId);
     await updateDoc(userDocRef, { avatar: url });
 
