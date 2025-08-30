@@ -31,7 +31,6 @@ export default function MerchantCard({ merchant }: MerchantCardProps) {
             objectFit="contain"
             className="p-2"
             data-ai-hint={merchant.aiHint}
-            unoptimized // Crucial for serving from a custom API route
           />
         </div>
       </CardHeader>
