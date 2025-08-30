@@ -1,7 +1,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { adminStorage } from './firebase-admin'; // Server-side Firebase
+import { getAdminStorage } from './firebase-admin'; // Server-side Firebase
 
 // ======================= LOCAL STORAGE IMPLEMENTATION =======================
 
@@ -22,7 +22,8 @@ async function uploadToLocalDisk(file: File, relativePath: string): Promise<stri
 // ===================== FIREBASE STORAGE IMPLEMENTATION ======================
 
 async function uploadToFirebase(file: File, destinationPath: string): Promise<string> {
-  const bucket = adminStorage.bucket();
+  // Lazily get the storage instance only when this function is called
+  const bucket = getAdminStorage().bucket();
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const fileInBucket = bucket.file(destinationPath);
 

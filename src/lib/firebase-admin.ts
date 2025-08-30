@@ -1,24 +1,33 @@
 
 import * as admin from 'firebase-admin';
 
-// This is a singleton pattern to prevent re-initializing the app on every hot-reload.
-let app: admin.app.App;
+// This function ensures Firebase Admin is initialized only once (singleton pattern)
+// and only when it's actually needed, avoiding build-time errors.
+function initializeAdminApp() {
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
 
-if (!admin.apps.length) {
   const serviceAccountString = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   if (!serviceAccountString) {
     throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
   }
 
-  const serviceAccount = JSON.parse(serviceAccountString);
-  
-  app = admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    storageBucket: `${serviceAccount.project_id}.appspot.com`
-  });
-} else {
-  app = admin.app();
+  try {
+    const serviceAccount = JSON.parse(serviceAccountString);
+    return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: `${serviceAccount.project_id}.appspot.com`,
+    });
+  } catch (error) {
+    console.error('Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT. Make sure it is a valid JSON string.', error);
+    throw new Error('Firebase Admin initialization failed.');
+  }
 }
 
-const storage = admin.storage();
-export { app as adminApp, storage as adminStorage };
+// Export a function that provides the storage instance.
+// This function will ensure the app is initialized before returning the storage client.
+export function getAdminStorage() {
+  initializeAdminApp();
+  return admin.storage();
+}
