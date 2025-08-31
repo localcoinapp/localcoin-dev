@@ -42,8 +42,17 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
 
 // ======================= SERVICE EXPORT =======================
 
-const storageProvider = process.env.STORAGE_PROVIDER || 'local'; // Default to local
+// This is the core fix. By checking the environment variable inside the exported
+// function, we ensure the check happens at RUNTIME, not at BUILD time.
+const upload = (file: File, destinationPath: string): Promise<string> => {
+  const provider = process.env.STORAGE_PROVIDER || 'local';
+  if (provider === 'firebase') {
+    return uploadToFirebase(file, destinationPath);
+  }
+  return uploadToLocalDisk(file, destinationPath);
+};
+
 
 export const storageService = {
-  upload: storageProvider === 'firebase' ? uploadToFirebase : uploadToLocalDisk,
+  upload,
 };
