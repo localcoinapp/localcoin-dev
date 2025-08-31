@@ -10,7 +10,7 @@ function initializeAdminApp() {
 
   const serviceAccountString = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   if (!serviceAccountString) {
-    throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
+    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
   }
 
   try {
@@ -21,7 +21,7 @@ function initializeAdminApp() {
     });
   } catch (error) {
     console.error('Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT. Make sure it is a valid JSON string.', error);
-    throw new Error('Firebase Admin initialization failed.');
+    throw new Error('Firebase Admin initialization failed due to invalid credentials.');
   }
 }
 
