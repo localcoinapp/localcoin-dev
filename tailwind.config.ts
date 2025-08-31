@@ -1,6 +1,6 @@
 import type {Config} from 'tailwindcss';
 
-export default {
+const config = {
   darkMode: ['class'],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -93,3 +93,10 @@ export default {
   },
   plugins: [require('tailwindcss-animate')],
 } satisfies Config;
+
+const nextConfig = {
+  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://your-production-url.com' : undefined,
+  ...config
+}
+
+export default nextConfig;
