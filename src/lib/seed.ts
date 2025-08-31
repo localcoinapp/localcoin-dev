@@ -16,8 +16,9 @@ async function setDocument(collectionName: string, docId: string, data: any) {
 export async function seedDatabase() {
   try {
     console.log('Seeding database...');
-    // Add any seed logic here in the future
-    console.log('Database seeded successfully.');
+    // All seeding logic has been removed from this function.
+    // Users and merchants should be created through the app's UI.
+    console.log('Database seeding is disabled.');
   } catch (error) {
     console.error('Error seeding database:', error);
     throw error; // Re-throw the error to fail the script if seeding fails
