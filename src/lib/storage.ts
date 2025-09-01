@@ -45,9 +45,8 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
 // ensuring the check for the environment happens at RUNTIME, not build time.
 
 const upload = (file: File, destinationPath: string): Promise<string> => {
-  // Use VERCEL_ENV or a similar standard environment variable to detect production.
-  // App Hosting sets specific variables we can check. A common one is 'K_SERVICE'.
-  const isProduction = !!process.env.K_SERVICE;
+  // Use NODE_ENV to reliably detect production. This is standard in Next.js.
+  const isProduction = process.env.NODE_ENV === 'production';
   
   if (isProduction) {
     console.log(`Using 'firebase' storage provider for: ${destinationPath}`);
