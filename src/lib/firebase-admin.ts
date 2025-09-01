@@ -10,9 +10,8 @@ let adminApp: admin.app.App;
 
 /**
  * Initializes the Firebase Admin SDK if it hasn't been already.
- * This function is called internally and relies on environment variables
- * for credentials and configuration. It is designed to be safe for both
- * build-time and run-time environments in Next.js.
+ * This function is designed to be safe for both build-time and run-time environments.
+ * It checks for existing initializations and uses environment variables for credentials.
  */
 function initializeAdminApp(): admin.app.App {
   // Check if the app is already initialized
@@ -27,8 +26,7 @@ function initializeAdminApp(): admin.app.App {
 
   if (!serviceAccount || !storageBucket) {
     // This check will fail during the build process (`next build`), which is expected.
-    // We throw an error to prevent initialization during build, but the lazy-loading
-    // approach ensures this function is only truly executed at runtime.
+    // The lazy-loading approach in getAdminApp() ensures this doesn't crash the build.
     throw new Error('CRITICAL: Firebase Admin credentials or storage bucket are not set in the environment.');
   }
 
@@ -54,6 +52,7 @@ function initializeAdminApp(): admin.app.App {
 /**
  * Lazily gets the initialized Firebase Admin App instance.
  * This is the key function that prevents the build process from crashing.
+ * It ensures initialization only happens when the services are first accessed at runtime.
  */
 function getAdminApp() {
     if (!adminApp) {
