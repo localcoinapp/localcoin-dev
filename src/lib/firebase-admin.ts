@@ -13,13 +13,16 @@ function initializeAdminApp() {
     throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
   }
 
+  // This is the variable made available by apphosting.yaml
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!storageBucket) {
-    throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.');
+    throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not available to the server. Check apphosting.yaml.');
   }
 
   try {
     const serviceAccount = JSON.parse(serviceAccountString);
+    
+    // Correctly initialize with the parsed credentials and the direct storageBucket URL.
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: storageBucket,
