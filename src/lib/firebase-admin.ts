@@ -3,20 +3,9 @@
 
 import * as admin from 'firebase-admin';
 
-// This is the single source of truth for the Firebase Admin SDK instance.
 let adminApp: admin.app.App;
 
-/**
- * Initializes the Firebase Admin SDK, reusing the instance if it already exists.
- * This is the standard pattern for using the Admin SDK in a serverless environment.
- */
-function initializeAdminApp(): admin.app.App {
-  if (admin.apps.length > 0) {
-    return admin.app();
-  }
-
-  // When deployed to App Hosting, these env vars are automatically set.
-  // When running locally, they must be in the .env file.
+if (admin.apps.length === 0) {
   const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
@@ -38,19 +27,18 @@ function initializeAdminApp(): admin.app.App {
         credential,
         storageBucket,
     });
-
-    return adminApp;
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
-        // This can happen in some hot-reload scenarios. Return the existing default app.
-        return admin.app();
+        adminApp = admin.app();
+    } else {
+        throw error;
     }
-    throw error; // Re-throw other initialization errors
   }
+} else {
+    adminApp = admin.app();
 }
 
-// Export a function that ensures initialization and returns the app.
-// Other server-side modules will use this to get the Admin instance.
-export function getFirebaseAdminApp() {
-    return adminApp || initializeAdminApp();
-}
+const adminDb = adminApp.firestore();
+const adminStorage = adminApp.storage();
+
+export { adminDb, adminStorage };
