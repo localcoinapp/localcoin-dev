@@ -1,3 +1,4 @@
+
 'use server';
 
 import * as admin from 'firebase-admin';
@@ -10,8 +11,8 @@ let adminApp: admin.app.App;
  * This is the standard pattern for using the Admin SDK in a serverless environment.
  */
 function initializeAdminApp(): admin.app.App {
-  if (adminApp) {
-    return adminApp;
+  if (admin.apps.length > 0) {
+    return admin.app();
   }
 
   // When deployed to App Hosting, these env vars are automatically set.
@@ -36,7 +37,7 @@ function initializeAdminApp(): admin.app.App {
     adminApp = admin.initializeApp({
         credential,
         storageBucket,
-    }, `admin-${Date.now()}`); // Use a unique app name to avoid conflicts
+    });
 
     return adminApp;
   } catch (error) {
