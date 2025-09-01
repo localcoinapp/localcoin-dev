@@ -1,4 +1,3 @@
-
 'use server';
 
 import * as admin from 'firebase-admin';
@@ -14,32 +13,31 @@ let adminApp: admin.app.App;
  * It checks for existing initializations and uses environment variables for credentials.
  */
 function initializeAdminApp(): admin.app.App {
-  // Check if the app is already initialized
+  // Check if the app is already initialized to prevent re-initialization.
   if (admin.apps.length > 0) {
     return admin.app();
   }
 
-  // In a server-side environment (like an API route at runtime),
-  // environment variables will be available.
+  // In a server-side environment like App Hosting, environment variables will be available at runtime.
   const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
+  // The build process might not have these variables, but the runtime will.
+  // This check is primarily for runtime validation.
   if (!serviceAccount || !storageBucket) {
-    // This check will fail during the build process (`next build`), which is expected.
-    // The lazy-loading approach in getAdminApp() ensures this doesn't crash the build.
     throw new Error('CRITICAL: Firebase Admin credentials or storage bucket are not set in the environment.');
   }
 
   try {
     const credential = admin.credential.cert(JSON.parse(serviceAccount));
     
-    // Initialize the app.
+    // Initialize the app with the retrieved credentials.
     return admin.initializeApp({
       credential,
       storageBucket,
     });
   } catch (error: any) {
-    // A specific check for re-initialization race conditions.
+    // A specific check for race conditions or redundant initializations.
     if (error.code === 'app/duplicate-app') {
       return admin.app();
     }
@@ -51,7 +49,7 @@ function initializeAdminApp(): admin.app.App {
 
 /**
  * Lazily gets the initialized Firebase Admin App instance.
- * This is the key function that prevents the build process from crashing.
+ * This is the key function that prevents build crashes.
  * It ensures initialization only happens when the services are first accessed at runtime.
  */
 function getAdminApp() {
@@ -62,6 +60,6 @@ function getAdminApp() {
 }
 
 // Export lazy-loaded services.
-// Other modules will import these constants.
+// Other modules will import these, and the app will be initialized on first use.
 export const adminDb = getAdminApp().firestore();
 export const adminStorage = getAdminApp().storage();
