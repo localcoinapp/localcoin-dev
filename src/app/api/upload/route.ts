@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { storageService } from '@/lib/storage';
-import { getFirebaseAdminApp } from '@genkit-ai/firebase/app';
+import { getFirebaseAdminApp } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
 

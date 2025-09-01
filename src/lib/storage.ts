@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getFirebaseAdminApp } from '@genkit-ai/firebase/app';
+import { getFirebaseAdminApp } from '@/lib/firebase-admin';
 import {promises as fs} from 'fs';
 import path from 'path';
 
@@ -39,7 +39,6 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
   });
 
   // Make the file public and return its URL.
-  // Note: Your bucket needs to have "allUsers" permission to "Storage Object Viewer" in IAM.
   await fileInBucket.makePublic();
   return fileInBucket.publicUrl();
 }
