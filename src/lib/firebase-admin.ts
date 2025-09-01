@@ -17,7 +17,7 @@ function initializeAdminApp() {
   // Check for the storage bucket URL from environment variables.
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!storageBucket) {
-    throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not available. Check that it is in your .env file for local development and in apphosting.yaml for production.');
+    throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not available. If running locally, please add it to your .env file.');
   }
 
   try {
