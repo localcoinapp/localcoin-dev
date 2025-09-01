@@ -11,13 +11,13 @@ function initializeAdminApp() {
   // Check for the required service account credentials from environment variables.
   const serviceAccountString = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   if (!serviceAccountString) {
-    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
+    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. If running locally, please add it to your .env file.');
   }
 
   // Check for the storage bucket URL from environment variables.
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!storageBucket) {
-    throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not available to the server. Check apphosting.yaml.');
+    throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not available. Check that it is in your .env file for local development and in apphosting.yaml for production.');
   }
 
   try {
