@@ -1,10 +1,12 @@
+
 'use server';
 
-import { getAdminStorage } from '@/lib/firebase-admin';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { adminStorage } from '@/lib/firebase-admin'; // Use the initialized adminStorage directly
 
 // ======================= LOCAL STORAGE IMPLEMENTATION =======================
+// This is for local development only, where `npm run dev` is used.
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 async function uploadToLocalDisk(file: File, relativePath: string): Promise<string> {
@@ -15,14 +17,14 @@ async function uploadToLocalDisk(file: File, relativePath: string): Promise<stri
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(filePath, fileBuffer);
 
-  // Return a path that can be served by our local server endpoint
+  // Return a path that can be served by the local server endpoint
   return `/api/serve-uploads/${relativePath}`;
 }
 
 // ===================== FIREBASE STORAGE IMPLEMENTATION ======================
+// This is for the published production environment.
 async function uploadToFirebase(file: File, destinationPath: string): Promise<string> {
-  const storage = getAdminStorage();
-  const bucket = storage.bucket();
+  const bucket = adminStorage.bucket();
   
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const fileInBucket = bucket.file(destinationPath);
@@ -34,8 +36,6 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
     },
   });
 
-  // No need to make the file public if using signed URLs, but for simplicity
-  // and public assets like avatars, making them public is common.
   await fileInBucket.makePublic();
   
   // Return the public URL
@@ -43,9 +43,8 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
 }
 
 // ======================= SERVICE EXPORT =======================
-// Determine which upload function to use based on the environment
+// Determine which upload function to use based on the standard NODE_ENV variable.
 const upload = (file: File, destinationPath: string): Promise<string> => {
-  // NODE_ENV is set to 'production' by Next.js during a production build
   if (process.env.NODE_ENV === 'production') {
     return uploadToFirebase(file, destinationPath);
   }

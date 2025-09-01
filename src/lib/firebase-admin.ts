@@ -1,9 +1,17 @@
+
 'use server';
 
 import * as admin from 'firebase-admin';
 
-let adminApp: admin.app.App | null = null;
+// This module provides a singleton instance of the Firebase Admin SDK.
+// It ensures the SDK is initialized only once across the server.
 
+let adminApp: admin.app.App;
+
+/**
+ * Initializes the Firebase Admin SDK if it hasn't been already.
+ * This function is designed to be safe to call multiple times.
+ */
 function initializeAdminApp(): admin.app.App {
   if (admin.apps.length > 0) {
     return admin.app();
@@ -24,6 +32,8 @@ function initializeAdminApp(): admin.app.App {
       storageBucket,
     });
   } catch (error: any) {
+    // A race condition can still occur in some serverless environments,
+    // so we check for the duplicate app error again.
     if (error.code === 'app/duplicate-app') {
       return admin.app();
     }
@@ -32,17 +42,10 @@ function initializeAdminApp(): admin.app.App {
   }
 }
 
-function getAdminApp(): admin.app.App {
-  if (!adminApp) {
-    adminApp = initializeAdminApp();
-  }
-  return adminApp;
-}
+// Initialize the app when the module is first loaded.
+// The logic inside initializeAdminApp prevents re-initialization.
+adminApp = initializeAdminApp();
 
-export function getAdminDb() {
-  return getAdminApp().firestore();
-}
-
-export function getAdminStorage() {
-  return getAdminApp().storage();
-}
+// Export the initialized services directly.
+export const adminDb = adminApp.firestore();
+export const adminStorage = adminApp.storage();

@@ -1,6 +1,7 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { storageService } from '@/lib/storage';
-import { getAdminDb } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin'; // Use the initialized adminDb directly
 
 export const runtime = 'nodejs';
 
@@ -26,7 +27,6 @@ export async function POST(req: NextRequest) {
     const url = await storageService.upload(file, destinationPath);
     
     // Get Firestore instance via the admin SDK helper
-    const adminDb = getAdminDb();
     const merchantDocRef = adminDb.collection('merchants').doc(merchantId);
     
     // Update the specific field (logo or banner)
