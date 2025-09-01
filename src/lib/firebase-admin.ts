@@ -11,7 +11,7 @@ function initializeAdminApp() {
   // Check for the required service account credentials from environment variables.
   const serviceAccountString = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   if (!serviceAccountString) {
-    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. If running locally, please add it to your .env file.');
+    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. If running locally, add it to your .env file. See https://firebase.google.com/docs/admin/setup#initialize-sdk for details on how to get your service account key.');
   }
 
   // Check for the storage bucket URL from environment variables.
