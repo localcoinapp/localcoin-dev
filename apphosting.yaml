@@ -38,8 +38,6 @@ runConfig:
       secret: NEXT_PUBLIC_EURUSD_RATE
     FIREBASE_ADMIN_SERVICE_ACCOUNT:
       secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
-    STORAGE_PROVIDER:
-      secret: STORAGE_PROVIDER
     # This variable is required by the backend to know where to upload files.
     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:
       secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
