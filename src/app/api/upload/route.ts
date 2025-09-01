@@ -1,12 +1,67 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { storageService } from '@/lib/storage';
-import { adminDb } from '@/lib/firebase-admin'; // Use the initialized adminDb directly
+import * as admin from 'firebase-admin';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+// Helper function to initialize Firebase Admin SDK safely.
+// It ensures the SDK is initialized only once per server instance.
+function initializeAdminApp() {
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
+
+  const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
+  if (!serviceAccount) {
+    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
+  }
+
+  return admin.initializeApp({
+    credential: admin.credential.cert(JSON.parse(serviceAccount)),
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  });
+}
+
+// Local storage for development
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+async function uploadToLocalDisk(file: File, relativePath: string): Promise<string> {
+  const directory = path.join(UPLOAD_DIR, path.dirname(relativePath));
+  await fs.mkdir(directory, { recursive: true });
+
+  const filePath = path.join(directory, path.basename(relativePath));
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(filePath, fileBuffer);
+
+  return `/api/serve-uploads/${relativePath}`;
+}
+
+// Firebase Storage for production
+async function uploadToFirebase(app: admin.app.App, file: File, destinationPath: string): Promise<string> {
+  const bucket = app.storage().bucket();
+  
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const fileInBucket = bucket.file(destinationPath);
+
+  await fileInBucket.save(fileBuffer, {
+    metadata: {
+      contentType: file.type,
+      cacheControl: 'public, max-age=31536000',
+    },
+  });
+
+  await fileInBucket.makePublic();
+  
+  return fileInBucket.publicUrl();
+}
+
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
+    const adminApp = initializeAdminApp();
+    const adminDb = adminApp.firestore();
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const merchantId = formData.get('merchantId') as string | null;
@@ -22,12 +77,16 @@ export async function POST(req: NextRequest) {
     const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
     const filename = `${fileType}-${Date.now()}.${extension}`;
     const destinationPath = `merchants/${merchantId}/${filename}`;
-
-    const url = await storageService.upload(file, destinationPath);
+    
+    let url: string;
+    if (process.env.NODE_ENV === 'production') {
+      url = await uploadToFirebase(adminApp, file, destinationPath);
+    } else {
+      url = await uploadToLocalDisk(file, destinationPath);
+    }
     
     const merchantDocRef = adminDb.collection('merchants').doc(merchantId);
     
-    // Update the specific field (logo or banner)
     await merchantDocRef.update({ [fileType]: url });
 
     return NextResponse.json({ url });
