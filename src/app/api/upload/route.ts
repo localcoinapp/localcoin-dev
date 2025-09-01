@@ -1,7 +1,6 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { storageService } from '@/lib/storage';
-import { adminDb } from '@/lib/firebase-admin';
+import { getAdminDb } from '@/lib/firebase-admin';
 
 export const runtime = 'nodejs';
 
@@ -19,13 +18,18 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // Generate a unique filename to avoid caching issues
     const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const filename = `${fileType}.${extension}`;
+    const filename = `${fileType}-${Date.now()}.${extension}`;
     const destinationPath = `merchants/${merchantId}/${filename}`;
 
     const url = await storageService.upload(file, destinationPath);
     
+    // Get Firestore instance via the admin SDK helper
+    const adminDb = getAdminDb();
     const merchantDocRef = adminDb.collection('merchants').doc(merchantId);
+    
+    // Update the specific field (logo or banner)
     await merchantDocRef.update({ [fileType]: url });
 
     return NextResponse.json({ url });

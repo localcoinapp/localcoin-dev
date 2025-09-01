@@ -1,8 +1,7 @@
-
 'use server';
 
-import { adminStorage } from '@/lib/firebase-admin';
-import {promises as fs} from 'fs';
+import { getAdminStorage } from '@/lib/firebase-admin';
+import { promises as fs } from 'fs';
 import path from 'path';
 
 // ======================= LOCAL STORAGE IMPLEMENTATION =======================
@@ -16,12 +15,14 @@ async function uploadToLocalDisk(file: File, relativePath: string): Promise<stri
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(filePath, fileBuffer);
 
+  // Return a path that can be served by our local server endpoint
   return `/api/serve-uploads/${relativePath}`;
 }
 
 // ===================== FIREBASE STORAGE IMPLEMENTATION ======================
 async function uploadToFirebase(file: File, destinationPath: string): Promise<string> {
-  const bucket = adminStorage.bucket();
+  const storage = getAdminStorage();
+  const bucket = storage.bucket();
   
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const fileInBucket = bucket.file(destinationPath);
@@ -33,12 +34,18 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
     },
   });
 
+  // No need to make the file public if using signed URLs, but for simplicity
+  // and public assets like avatars, making them public is common.
   await fileInBucket.makePublic();
+  
+  // Return the public URL
   return fileInBucket.publicUrl();
 }
 
 // ======================= SERVICE EXPORT =======================
+// Determine which upload function to use based on the environment
 const upload = (file: File, destinationPath: string): Promise<string> => {
+  // NODE_ENV is set to 'production' by Next.js during a production build
   if (process.env.NODE_ENV === 'production') {
     return uploadToFirebase(file, destinationPath);
   }

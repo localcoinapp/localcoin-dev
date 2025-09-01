@@ -1,44 +1,48 @@
-
 'use server';
 
 import * as admin from 'firebase-admin';
 
-let adminApp: admin.app.App;
+let adminApp: admin.app.App | null = null;
 
-if (admin.apps.length === 0) {
+function initializeAdminApp(): admin.app.App {
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
+
   const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
-  if (!serviceAccount) {
-    throw new Error(
-      'CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.'
-    );
-  }
-  if (!storageBucket) {
-     throw new Error(
-      'CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.'
-    );
+  if (!serviceAccount || !storageBucket) {
+    console.error('CRITICAL: Firebase Admin credentials or storage bucket are not set in the environment.');
+    throw new Error('Server is not configured for Firebase Admin operations.');
   }
 
   try {
     const credential = admin.credential.cert(JSON.parse(serviceAccount));
-    
-    adminApp = admin.initializeApp({
-        credential,
-        storageBucket,
+    return admin.initializeApp({
+      credential,
+      storageBucket,
     });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
-        adminApp = admin.app();
-    } else {
-        throw error;
+  } catch (error: any) {
+    if (error.code === 'app/duplicate-app') {
+      return admin.app();
     }
+    console.error('Error initializing Firebase Admin SDK:', error);
+    throw new Error('Could not initialize Firebase Admin SDK.');
   }
-} else {
-    adminApp = admin.app();
 }
 
-const adminDb = adminApp.firestore();
-const adminStorage = adminApp.storage();
+function getAdminApp(): admin.app.App {
+  if (!adminApp) {
+    adminApp = initializeAdminApp();
+  }
+  return adminApp;
+}
 
-export { adminDb, adminStorage };
+export function getAdminDb() {
+  return getAdminApp().firestore();
+}
+
+export function getAdminStorage() {
+  return getAdminApp().storage();
+}
