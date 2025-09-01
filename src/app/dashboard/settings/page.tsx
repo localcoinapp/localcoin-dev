@@ -289,18 +289,14 @@ export default function StoreSettingsPage() {
           });
 
           if (!response.ok) {
-              throw new Error('Upload failed');
+              const errorData = await response.json();
+              throw new Error(errorData.details || 'Upload failed on the server.');
           }
-
-          const { url } = await response.json();
-          
-          const merchantDocRef = doc(db, 'merchants', user.merchantId);
-          await setDoc(merchantDocRef, { [fileType]: url }, { merge: true });
 
           toast({ title: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} Updated`, description: `Your new ${fileType} has been saved.` });
       } catch (error) {
           console.error("Upload failed:", error);
-          toast({ title: "Upload Failed", description: `Could not upload the ${fileType}.`, variant: "destructive" });
+          toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
       } finally {
         if (fileType === 'logo') {
           setIsUploading(false);
