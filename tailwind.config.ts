@@ -94,9 +94,4 @@ const config = {
   plugins: [require('tailwindcss-animate')],
 } satisfies Config;
 
-const nextConfig = {
-  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://your-production-url.com' : undefined,
-  ...config
-}
-
-export default nextConfig;
+export default config;
