@@ -1,8 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { storageService } from '@/lib/storage';
+import { getAdminFirestore } from '@/lib/firebase-admin'; // Use the Admin SDK for server-side DB operations
 
 export const runtime = 'nodejs';
 
@@ -28,9 +27,11 @@ export async function POST(req: NextRequest) {
     // Use the storage service to upload the file
     const url = await storageService.upload(file, destinationPath);
     
-    // Update Firestore with the returned URL
-    const merchantDocRef = doc(db, 'merchants', merchantId);
-    await updateDoc(merchantDocRef, { [fileType]: url });
+    // --- FIX: Use Admin SDK to update Firestore from the server ---
+    const adminDb = getAdminFirestore();
+    const merchantDocRef = adminDb.collection('merchants').doc(merchantId);
+    await merchantDocRef.update({ [fileType]: url });
+    // -------------------------------------------------------------
 
     return NextResponse.json({ url });
   } catch (error: any) {

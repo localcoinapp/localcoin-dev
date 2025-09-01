@@ -1,28 +1,30 @@
 
 import * as admin from 'firebase-admin';
 
-// This function ensures Firebase Admin is initialized only once (singleton pattern)
-// and only when it's actually needed, avoiding build-time errors.
+// This function ensures Firebase Admin is initialized only once (singleton pattern).
 function initializeAdminApp() {
+  // If already initialized, return the existing app.
   if (admin.apps.length > 0) {
     return admin.app();
   }
 
+  // Check for the required service account credentials from environment variables.
   const serviceAccountString = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   if (!serviceAccountString) {
     throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
   }
 
-  // This is the variable made available by apphosting.yaml
+  // Check for the storage bucket URL from environment variables.
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!storageBucket) {
     throw new Error('CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not available to the server. Check apphosting.yaml.');
   }
 
   try {
+    // Parse the JSON string into an object.
     const serviceAccount = JSON.parse(serviceAccountString);
     
-    // Correctly initialize with the parsed credentials and the direct storageBucket URL.
+    // Initialize the app with the parsed credentials and the direct storageBucket URL.
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: storageBucket,
@@ -33,9 +35,14 @@ function initializeAdminApp() {
   }
 }
 
-// Export a function that provides the storage instance.
-// This function will ensure the app is initialized before returning the storage client.
+// Export functions that provide initialized services.
+// This "lazy-loading" pattern ensures initialization only happens when a service is first needed.
 export function getAdminStorage() {
   initializeAdminApp();
   return admin.storage();
+}
+
+export function getAdminFirestore() {
+  initializeAdminApp();
+  return admin.firestore();
 }
