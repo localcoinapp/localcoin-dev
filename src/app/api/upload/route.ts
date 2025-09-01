@@ -36,6 +36,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url });
   } catch (error: any) {
     console.error('Error in upload API:', error);
+    // Provide a more specific error message if it's a known initialization issue.
+    if (error.message.includes('FIREBASE_ADMIN_SERVICE_ACCOUNT')) {
+       return NextResponse.json(
+        { 
+          error: 'Server configuration error.', 
+          details: 'The Firebase Admin credentials are not set for the local development environment. Please add FIREBASE_ADMIN_SERVICE_ACCOUNT to your .env file.' 
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to save file', details: error.message },
       { status: 500 }

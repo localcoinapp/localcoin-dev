@@ -42,12 +42,14 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
 
 // ======================= SERVICE EXPORT =======================
 // This is the core fix. The decision logic is now inside the exported function,
-// ensuring the check for STORAGE_PROVIDER happens at RUNTIME, not build time.
+// ensuring the check for the environment happens at RUNTIME, not build time.
 
 const upload = (file: File, destinationPath: string): Promise<string> => {
-  const provider = process.env.STORAGE_PROVIDER || 'local';
+  // Use VERCEL_ENV or a similar standard environment variable to detect production.
+  // App Hosting sets specific variables we can check. A common one is 'K_SERVICE'.
+  const isProduction = !!process.env.K_SERVICE;
   
-  if (provider === 'firebase') {
+  if (isProduction) {
     console.log(`Using 'firebase' storage provider for: ${destinationPath}`);
     return uploadToFirebase(file, destinationPath);
   }
