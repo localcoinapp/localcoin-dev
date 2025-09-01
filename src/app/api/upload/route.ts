@@ -39,7 +39,11 @@ async function uploadToLocalDisk(file: File, relativePath: string): Promise<stri
 
 // Firebase Storage for production
 async function uploadToFirebase(app: admin.app.App, file: File, destinationPath: string): Promise<string> {
-  const bucket = app.storage().bucket();
+  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!bucketName) {
+      throw new Error("CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set.");
+  }
+  const bucket = app.storage().bucket(bucketName);
   
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const fileInBucket = bucket.file(destinationPath);
