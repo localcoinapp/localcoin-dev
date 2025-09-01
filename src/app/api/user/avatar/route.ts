@@ -1,13 +1,77 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { storageService } from '@/lib/storage';
+import * as admin from 'firebase-admin';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+// --- Helper Functions (self-contained in this route) ---
+
+/**
+ * Initializes the Firebase Admin SDK if it hasn't been already.
+ * This is a "singleton" pattern to avoid re-initialization on every API call.
+ */
+function initializeAdminApp() {
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
+
+  const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+
+  if (!serviceAccount || !storageBucket) {
+    throw new Error('CRITICAL: Firebase Admin credentials or storage bucket are not set in the environment.');
+  }
+
+  try {
+    const credential = admin.credential.cert(JSON.parse(serviceAccount));
+    return admin.initializeApp({
+      credential,
+      storageBucket,
+    });
+  } catch (error: any) {
+    if (error.code === 'app/duplicate-app') {
+      return admin.app();
+    }
+    console.error('Error initializing Firebase Admin SDK:', error);
+    throw new Error('Could not initialize Firebase Admin SDK.');
+  }
+}
+
+/**
+ * A storage service that abstracts away the differences between local and production environments.
+ */
+const storageService = {
+  upload: (file: File, destinationPath: string): Promise<string> => {
+    if (process.env.NODE_ENV === 'production') {
+      const adminApp = initializeAdminApp();
+      const bucket = adminApp.storage().bucket();
+      
+      return async function uploadToFirebase() {
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+        const fileInBucket = bucket.file(destinationPath);
+        await fileInBucket.save(fileBuffer, {
+          metadata: { contentType: file.type, cacheControl: 'public, max-age=31536000' },
+        });
+        await fileInBucket.makePublic();
+        return fileInBucket.publicUrl();
+      }();
+    } else {
+      const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+      return async function uploadToLocalDisk() {
+        const directory = path.join(UPLOAD_DIR, path.dirname(destinationPath));
+        await fs.mkdir(directory, { recursive: true });
+        const filePath = path.join(directory, path.basename(destinationPath));
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+        await fs.writeFile(filePath, fileBuffer);
+        return `/api/serve-uploads/${destinationPath}`;
+      }();
+    }
+  },
+};
+
+// --- API Route Handler ---
 
 export const runtime = 'nodejs';
-
-// This is the API route for uploading a user's avatar.
-// It handles both local and production storage environments.
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,17 +85,16 @@ export async function POST(req: NextRequest) {
 
     const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
     const filename = `avatar.${extension}`;
-    // The destination path in the storage bucket or local directory.
     const destinationPath = `users/${userId}/${filename}`;
 
-    // The storageService handles whether to upload to local disk or Firebase Storage.
+    // The self-contained storageService handles the upload.
     const url = await storageService.upload(file, destinationPath);
 
-    // After uploading, update the user's document in Firestore with the new avatar URL.
-    // This uses the CLIENT-side SDK, which is fine for this action as it's triggered
-    // by the authenticated user for their own profile.
-    const userDocRef = doc(db, "users", userId);
-    await updateDoc(userDocRef, { avatar: url });
+    // After uploading, update the user's document in Firestore.
+    // We must use the Admin SDK here for server-side updates.
+    const adminDb = initializeAdminApp().firestore();
+    const userDocRef = adminDb.collection("users").doc(userId);
+    await userDocRef.update({ avatar: url });
 
     return NextResponse.json({ url });
   } catch (error: any) {
