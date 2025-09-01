@@ -1,7 +1,9 @@
 
-import { promises as fs } from 'fs';
+'use server';
+
+import { getFirebaseAdminApp } from '@genkit-ai/firebase/app';
+import {promises as fs} from 'fs';
 import path from 'path';
-import { getAdminStorage } from './firebase-admin'; // Server-side Firebase
 
 // ======================= LOCAL STORAGE IMPLEMENTATION =======================
 // This is intended for local development only.
@@ -19,11 +21,13 @@ async function uploadToLocalDisk(file: File, relativePath: string): Promise<stri
   return `/api/serve-uploads/${relativePath}`;
 }
 
+
 // ===================== FIREBASE STORAGE IMPLEMENTATION ======================
 // This is for all deployed environments (staging, production).
 async function uploadToFirebase(file: File, destinationPath: string): Promise<string> {
-  // Lazily get the storage instance only when this function is called.
-  const bucket = getAdminStorage().bucket();
+  const adminApp = getFirebaseAdminApp();
+  const bucket = adminApp.storage().bucket();
+  
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const fileInBucket = bucket.file(destinationPath);
 
@@ -41,22 +45,13 @@ async function uploadToFirebase(file: File, destinationPath: string): Promise<st
 }
 
 // ======================= SERVICE EXPORT =======================
-// This is the core fix. The decision logic is now inside the exported function,
-// ensuring the check for the environment happens at RUNTIME, not build time.
-
+// Use NODE_ENV to reliably detect production. This is standard in Next.js.
 const upload = (file: File, destinationPath: string): Promise<string> => {
-  // Use NODE_ENV to reliably detect production. This is standard in Next.js.
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  if (isProduction) {
-    console.log(`Using 'firebase' storage provider for: ${destinationPath}`);
+  if (process.env.NODE_ENV === 'production') {
     return uploadToFirebase(file, destinationPath);
   }
-  
-  console.log(`Using 'local' storage provider for: ${destinationPath}`);
   return uploadToLocalDisk(file, destinationPath);
 };
-
 
 export const storageService = {
   upload,
