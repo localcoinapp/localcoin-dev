@@ -36,22 +36,18 @@ export async function POST(req: NextRequest) {
     const { firestore, storage } = await getAdminInstances();
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const merchantId = formData.get('merchantId') as string | null;
-    const fileType = formData.get('fileType') as 'logo' | 'banner' | null;
+    const userId = formData.get('userId') as string | null;
 
-    if (!file || !merchantId || !fileType) {
-      return NextResponse.json(
-        { error: 'Missing file, merchantId, or fileType' },
-        { status: 400 }
-      );
+    if (!file || !userId) {
+      return NextResponse.json({ error: 'Missing file or userId' }, { status: 400 });
     }
-    
+
     const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const filename = `${fileType}-${Date.now()}.${extension}`;
-    const destinationPath = `merchants/${merchantId}/${filename}`;
+    const filename = `avatar.${extension}`;
+    const destinationPath = `users/${userId}/${filename}`;
     
     let url: string;
-
+    
     if (process.env.NODE_ENV === 'production') {
       const bucket = storage.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
       const fileInBucket = bucket.file(destinationPath);
@@ -66,7 +62,7 @@ export async function POST(req: NextRequest) {
       url = fileInBucket.publicUrl();
     } else {
       const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
-      const relativePath = `merchants/${merchantId}/${filename}`;
+      const relativePath = `users/${userId}/${filename}`;
       const directory = path.join(UPLOAD_DIR, path.dirname(relativePath));
       await fs.mkdir(directory, { recursive: true });
       const filePath = path.join(directory, path.basename(relativePath));
@@ -74,15 +70,15 @@ export async function POST(req: NextRequest) {
       await fs.writeFile(filePath, fileBuffer);
       url = `/api/serve-uploads/${relativePath}`;
     }
-    
-    const merchantDocRef = firestore.collection('merchants').doc(merchantId);
-    await merchantDocRef.update({ [fileType]: url });
+
+    const userDocRef = firestore.collection("users").doc(userId);
+    await userDocRef.update({ avatar: url });
 
     return NextResponse.json({ url });
   } catch (error: any) {
-    console.error('Error in upload API:', error);
+    console.error('Error in avatar upload API:', error);
     return NextResponse.json(
-      { error: 'Failed to save file', details: error.message },
+      { error: 'Failed to save avatar', details: error.message },
       { status: 500 }
     );
   }
