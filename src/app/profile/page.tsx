@@ -40,6 +40,7 @@ import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import React, { useRef, useState } from "react"
+import { uploadFileAction } from "../actions/storageActions"
 
 
 const profileFormSchema = z.object({
@@ -114,20 +115,15 @@ export default function ProfilePage() {
     
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('userId', user.id);
+    formData.append('id', user.id);
+    formData.append('type', 'user');
+    formData.append('fileType', 'avatar');
 
     try {
-        const response = await fetch('/api/user/avatar', {
-            method: 'POST',
-            body: formData,
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Upload failed');
-        }
-
-        toast({ title: "Avatar Updated", description: "Your new avatar has been saved." });
+        await uploadFileAction(formData);
+        toast({ title: "Avatar Updated", description: "Your new avatar has been saved. The page will now refresh." });
+        // It's often better to let the real-time listener update the state,
+        // but a reload is a simple way to ensure all components see the change.
         window.location.reload();
 
     } catch (error) {
@@ -197,7 +193,6 @@ export default function ProfilePage() {
                     onChange={handleFileChange}
                     className="hidden"
                     accept="image/*"
-                    capture="environment"
                   />
                   <Button
                     type="button"

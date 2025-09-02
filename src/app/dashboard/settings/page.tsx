@@ -62,6 +62,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { uploadFileAction } from "@/app/actions/storageActions";
 
 
 type Position = { lat: number; lng: number };
@@ -279,20 +280,12 @@ export default function StoreSettingsPage() {
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('merchantId', user.merchantId);
+      formData.append('id', user.merchantId);
+      formData.append('type', 'merchant');
       formData.append('fileType', fileType);
 
       try {
-          const response = await fetch('/api/upload', {
-              method: 'POST',
-              body: formData,
-          });
-
-          if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.details || 'Upload failed on the server.');
-          }
-
+          await uploadFileAction(formData);
           toast({ title: `${fileType.charAt(0).toUpperCase() + fileType.slice(1)} Updated`, description: `Your new ${fileType} has been saved.` });
       } catch (error) {
           console.error("Upload failed:", error);
