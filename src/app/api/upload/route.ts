@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// These declarations tell Next.js to treat this as a dynamic server-side route.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
