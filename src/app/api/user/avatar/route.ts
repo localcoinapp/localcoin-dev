@@ -1,70 +1,46 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
 import { promises as fs } from 'fs';
 import path from 'path';
 
+// These declarations tell Next.js to treat this as a dynamic server-side route.
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// Helper function to initialize Firebase Admin SDK safely.
-// It ensures the SDK is initialized only once per server instance.
-function initializeAdminApp() {
-  if (admin.apps.length > 0) {
-    return admin.app();
+/**
+ * Initializes the Firebase Admin SDK safely, only when needed.
+ * This function is designed to run only at runtime on the server, not during the build.
+ */
+async function getAdminInstances() {
+  const { getApps, initializeApp, cert } = await import('firebase-admin/app');
+  const { getFirestore } = await import('firebase-admin/firestore');
+  const { getStorage } = await import('firebase-admin/storage');
+
+  // Check if an app is already initialized to prevent errors.
+  if (getApps().length === 0) {
+    const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
+    const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+
+    if (!serviceAccount || !storageBucket) {
+        throw new Error('CRITICAL: Firebase Admin credentials or storage bucket are not set in the environment.');
+    }
+    
+    initializeApp({
+      credential: cert(JSON.parse(serviceAccount)),
+      storageBucket: storageBucket,
+    });
   }
-
-  const serviceAccount = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
-  if (!serviceAccount) {
-    throw new Error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set.');
-  }
-
-  return admin.initializeApp({
-    credential: admin.credential.cert(JSON.parse(serviceAccount)),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  });
-}
-
-// Local storage for development
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
-async function uploadToLocalDisk(file: File, relativePath: string): Promise<string> {
-  const directory = path.join(UPLOAD_DIR, path.dirname(relativePath));
-  await fs.mkdir(directory, { recursive: true });
-
-  const filePath = path.join(directory, path.basename(relativePath));
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(filePath, fileBuffer);
-
-  return `/api/serve-uploads/${relativePath}`;
-}
-
-// Firebase Storage for production
-async function uploadToFirebase(app: admin.app.App, file: File, destinationPath: string): Promise<string> {
-  const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-  if (!bucketName) {
-      throw new Error("CRITICAL: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set.");
-  }
-  const bucket = app.storage().bucket(bucketName);
-  
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  const fileInBucket = bucket.file(destinationPath);
-
-  await fileInBucket.save(fileBuffer, {
-    metadata: {
-      contentType: file.type,
-      cacheControl: 'public, max-age=31536000',
-    },
-  });
-
-  await fileInBucket.makePublic();
-  
-  return fileInBucket.publicUrl();
+  return { firestore: getFirestore(), storage: getStorage() };
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const adminApp = initializeAdminApp();
-    const adminDb = adminApp.firestore();
+  // This check prevents the function from executing during the build process.
+  if (process.env.NODE_ENV === 'production' && !process.env.K_SERVICE) {
+    return new NextResponse('Service unavailable during build phase', { status: 503 });
+  }
 
+  try {
+    const { firestore, storage } = await getAdminInstances();
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const userId = formData.get('userId') as string | null;
@@ -78,13 +54,35 @@ export async function POST(req: NextRequest) {
     const destinationPath = `users/${userId}/${filename}`;
     
     let url: string;
+    
     if (process.env.NODE_ENV === 'production') {
-      url = await uploadToFirebase(adminApp, file, destinationPath);
+      const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+       if (!bucketName) {
+        throw new Error("Firebase Storage bucket name is not configured.");
+      }
+      const bucket = storage.bucket(bucketName);
+      const fileInBucket = bucket.file(destinationPath);
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+      await fileInBucket.save(fileBuffer, {
+        metadata: {
+          contentType: file.type,
+          cacheControl: 'public, max-age=31536000',
+        },
+      });
+      await fileInBucket.makePublic();
+      url = fileInBucket.publicUrl();
     } else {
-      url = await uploadToLocalDisk(file, destinationPath);
+      const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+      const relativePath = `users/${userId}/${filename}`;
+      const directory = path.join(UPLOAD_DIR, path.dirname(relativePath));
+      await fs.mkdir(directory, { recursive: true });
+      const filePath = path.join(directory, path.basename(relativePath));
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(filePath, fileBuffer);
+      url = `/api/serve-uploads/${relativePath}`;
     }
 
-    const userDocRef = adminDb.collection("users").doc(userId);
+    const userDocRef = firestore.collection("users").doc(userId);
     await userDocRef.update({ avatar: url });
 
     return NextResponse.json({ url });
