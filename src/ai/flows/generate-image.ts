@@ -43,11 +43,8 @@ const generateImageFlow = ai.defineFlow(
   },
   async ({ prompt }) => {
     const { media } = await ai.generate({
-      model: 'googleai/gemini-2.0-flash-preview-image-generation',
+      model: 'googleai/imagen-4.0-fast-generate-001',
       prompt: `A professional, clean, modern logo or banner for a small business. The prompt is: "${prompt}". The image should be visually appealing and suitable for a company profile.`,
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-      },
     });
 
     const imageDataUri = media?.url;
