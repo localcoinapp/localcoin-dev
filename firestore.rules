@@ -1,19 +1,18 @@
 rules_version = '2';
 
 service cloud.firestore {
-  
-  // Helper function to check if a user is an admin.
-  // This reads the user's document to check their role.
-  function isAdmin() {
-    return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-  }
-
   match /databases/{database}/documents {
+
+    // Helper function to check if a user is an admin.
+    // This must be defined inside this block, before it is used.
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // Users can read and update their own document. Admins can read any.
     match /users/{userId} {
       allow read: if request.auth.uid == userId || isAdmin();
       allow write: if request.auth.uid == userId;
-      // Allow user creation (signup).
       allow create: if request.auth.uid == userId;
     }
     
