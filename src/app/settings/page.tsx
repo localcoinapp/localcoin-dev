@@ -180,6 +180,7 @@ export default function SettingsPage() {
                                                     <SelectItem value="theme-tropics">Tropics</SelectItem>
                                                     <SelectItem value="theme-tropic2">Tropic2</SelectItem>
                                                     <SelectItem value="theme-berlin">Berlin</SelectItem>
+                                                    <SelectItem value="theme-andes">Andes</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <FormDescription>Select your color theme.</FormDescription>
@@ -344,5 +345,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-
-    
