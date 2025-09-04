@@ -5,12 +5,12 @@ service cloud.firestore {
     return request.auth != null && request.auth.uid != null;
   }
 
-  // Safe admin check: only if signed in, and the user doc exists.
-  function isAdmin() {
-    return isSignedIn()
-      && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-  }
+function isAdmin() {
+    // The `get()` method returns null if the document does not exist.
+    // By checking `get(...).data.role` you can safely check the field
+    // on a document that may or may not exist without causing an error.
+    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}
 
   match /databases/{database}/documents {
     // Users can read and update their own document. Admins can read any.
