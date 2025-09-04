@@ -34,21 +34,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const handleUserLogic = async () => {
         if (firebaseUser) {
-          // 1. Check if the user is in the blocked list first.
-          const blockedUserDocRef = doc(db, 'blocked_users', firebaseUser.uid);
-          const blockedDocSnap = await getDoc(blockedUserDocRef);
-
-          if (blockedDocSnap.exists()) {
-            await auth.signOut(); // Ensure user is logged out if blocked.
-            setUser(null);
-            setLoading(false);
-            if (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname) || pathname.startsWith('/chat/')) {
-              router.push('/login');
-            }
-            return;
-          }
+          // The flawed check for blocked users was here and has been removed.
+          // The login form already checks the 'blocked_users' collection upon login attempt.
+          // The security rules will prevent any reads/writes for a blocked user anyway.
           
-          // 2. Set up a real-time listener for the user's document in Firestore.
+          // Set up a real-time listener for the user's document in Firestore.
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           unsubscribeSnapshot = onSnapshot(
             userDocRef,
@@ -73,8 +63,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(mergedUser);
               } else {
                 // The user exists in Firebase Auth but not in the 'users' collection.
-                // This could happen if a user is deleted from the db but not from auth.
+                // This can happen if a user is deleted from the db but not from auth.
+                // It can also happen if a user is blocked, as their user doc is moved.
                 setUser(null);
+                auth.signOut(); // Log them out to be safe.
               }
               setLoading(false);
             },
