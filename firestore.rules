@@ -3,17 +3,51 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 10, 4);
+    // Helper function to check if a user is an admin.
+    // This reads the user's document to check their role.
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users can read and update their own document. Admins can read any.
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
+      allow write: if request.auth.uid == userId;
+      // Allow user creation (signup).
+      allow create: if request.auth.uid == userId;
+    }
+    
+    // Anyone can read live merchant data. Only the owner or an admin can update.
+    match /merchants/{merchantId} {
+      allow read: if resource.data.status == 'live';
+      allow write: if request.auth.uid == resource.data.owner || isAdmin();
+      allow create: if request.auth.uid != null;
+    }
+
+    // Only chat participants can read/write messages.
+    match /chats/{chatId} {
+        allow read, write: if request.auth.uid in resource.data.participantIds || isAdmin();
+        
+        match /messages/{messageId} {
+            allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin();
+        }
+    }
+    
+    // Users can create requests. Only admins can manage them.
+    match /tokenPurchaseRequests/{requestId} {
+        allow create: if request.auth.uid != null;
+        allow read, write: if isAdmin();
+    }
+    
+    // Merchants/Users can create requests. Only admins can manage them.
+    match /merchantCashoutRequests/{requestId} {
+        allow create: if request.auth.uid != null;
+        allow read, write: if isAdmin();
+    }
+    
+    // Blocked users collection should only be readable/writable by admins.
+    match /blocked_users/{userId} {
+      allow read, write: if isAdmin();
     }
   }
 }
