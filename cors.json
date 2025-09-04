@@ -6,6 +6,7 @@
       "https://3000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
       "http://localhost:3000",
       "http://localhost:9002",
+      "https://dev.localcoin.cloud"
       "https://studio--localcoin-marketplace.us-central1.hosted.app"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
