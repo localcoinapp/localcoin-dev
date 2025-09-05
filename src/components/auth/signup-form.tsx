@@ -14,7 +14,7 @@ import {
   OAuthProvider,
 } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, getDoc, serverTimestamp } from "firebase/firestore"
+import { setDoc, doc, serverTimestamp } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -62,8 +62,7 @@ export function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
       const user = userCredential.user
 
-      await sendEmailVerification(user)
-
+      // This is now the single source of truth for creating the user document.
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         id: user.uid,
@@ -74,6 +73,8 @@ export function SignupForm() {
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
+      
+      await sendEmailVerification(user)
 
       toast({
         title: "Almost there!",
@@ -98,17 +99,18 @@ export function SignupForm() {
       const result = await signInWithPopup(auth, provider)
       const user = result.user
 
-      // Ensure user document exists with the latest info (Create or Merge)
-      // This is the key change to make the flow deterministic.
+      // Deterministic write: Create or merge the user document immediately.
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
         lastLoginAt: serverTimestamp(),
-        createdAt: serverTimestamp(), // Set createdAt on first social sign-up
+        // Set defaults only if they don't exist
         role: 'user',
         profileComplete: true,
+        createdAt: serverTimestamp(),
       }, { merge: true });
+
 
       toast({ title: "Success", description: "You have been logged in." })
       router.push("/")

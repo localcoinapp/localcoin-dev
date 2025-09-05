@@ -64,6 +64,12 @@ export function LoginForm() {
         return;
       }
 
+      // Ensure user document has a last login timestamp
+      await setDoc(doc(db, 'users', user.uid), {
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
+
+
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
@@ -95,12 +101,16 @@ export function LoginForm() {
         return;
       }
       
-      // Ensure user document exists with the latest info (Create or Merge)
+      // Deterministic write: Create or merge the user document immediately.
+      // This is the critical step.
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
         lastLoginAt: serverTimestamp(),
+        // Set defaults only if they don't exist
+        role: 'user',
+        profileComplete: true,
       }, { merge: true });
 
 

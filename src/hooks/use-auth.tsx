@@ -2,12 +2,12 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, usePathname } from 'next/navigation';
-import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -29,75 +29,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
+    // This effect handles ONLY the Firebase Auth state.
+    // It determines if a user is logged in according to Firebase.
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      let unsubscribeSnapshot = () => {};
-
-      const handleUserLogic = async () => {
-        if (firebaseUser) {
-          // The flawed check for blocked users was here and has been removed.
-          // The login form already checks the 'blocked_users' collection upon login attempt.
-          // The security rules will prevent any reads/writes for a blocked user anyway.
-          
-          // Set up a real-time listener for the user's document in Firestore.
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          unsubscribeSnapshot = onSnapshot(
-            userDocRef,
-            (docSnap) => {
-              if (docSnap.exists()) {
-                const docData = docSnap.data() as User;
-
-                const mergedUser: User = {
-                  ...docData, // Firestore data (role, merchantId, etc.)
-                  id: firebaseUser.uid,
-                  uid: firebaseUser.uid,
-                  name: firebaseUser.displayName ?? docData.name ?? 'No Name',
-                  email: firebaseUser.email,
-                  avatar: firebaseUser.photoURL ?? docData.avatar ?? null,
-                };
-                
-                // Redirect non-admins away from admin routes.
-                if (mergedUser.role !== 'admin' && adminRoutes.some(p => pathname.startsWith(p))) {
-                   router.push('/');
-                }
-                
-                setUser(mergedUser);
-              } else {
-                // The user exists in Firebase Auth but not in the 'users' collection.
-                // This can happen if a user is deleted from the db but not from auth.
-                // It can also happen if a user is blocked, as their user doc is moved.
-                setUser(null);
-                auth.signOut(); // Log them out to be safe.
-              }
-              setLoading(false);
-            },
-            (error) => {
-              console.error('Error fetching user snapshot:', error);
-              setUser(null);
-              setLoading(false);
-            }
-          );
-        } else {
-          // No user is logged in.
-          setUser(null);
-          setLoading(false);
-          // Redirect if the user is on a protected route.
-          if (protectedRoutes.includes(pathname) || adminRoutes.some(p => pathname.startsWith(p)) || pathname.startsWith('/chat/')) {
-            router.push('/login');
-          }
+      if (firebaseUser) {
+        // A user is logged in, but we don't have their Firestore data yet.
+        // The listener below will handle that.
+      } else {
+        // No user is logged in.
+        setUser(null);
+        setLoading(false);
+        // Redirect if the user is on a protected route.
+        const isProtectedRoute = protectedRoutes.some(p => pathname.startsWith(p));
+        const isAdminRoute = adminRoutes.some(p => pathname.startsWith(p));
+        if (isProtectedRoute || isAdminRoute || pathname.startsWith('/chat/')) {
+          router.push('/login');
         }
-      };
-
-      handleUserLogic();
-      
-      // Cleanup function for onAuthStateChanged.
-      return () => {
-        unsubscribeSnapshot();
-      };
+      }
     });
-
-    // Cleanup function for the main useEffect.
     return () => unsubscribeAuth();
   }, [router, pathname]);
+
+  useEffect(() => {
+    // This effect listens for Firestore changes for the currently authenticated user.
+    if (auth.currentUser) {
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      const unsubscribeSnapshot = onSnapshot(
+        userDocRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const docData = docSnap.data() as User;
+            const mergedUser: User = {
+              ...docData,
+              id: auth.currentUser!.uid,
+              uid: auth.currentUser!.uid,
+              name: auth.currentUser!.displayName ?? docData.name ?? 'No Name',
+              email: auth.currentUser!.email,
+              avatar: auth.currentUser!.photoURL ?? docData.avatar ?? null,
+            };
+            setUser(mergedUser);
+          } else {
+            // User is authenticated but has no Firestore document.
+            // This can happen if they were deleted or are in the process of signing up.
+            // Logging them out forces the creation flow to re-run.
+            auth.signOut();
+            setUser(null);
+          }
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Firestore 'users' subscription error:", error);
+          // If we get a permission-denied, don't log the user out.
+          // Just clear their user data and stop loading. The UI will show access denied.
+          setUser(null);
+          setLoading(false);
+        }
+      );
+      return () => unsubscribeSnapshot();
+    } else {
+      // If there's no currentUser, we are done loading.
+      setLoading(false);
+    }
+  }, [auth.currentUser]); // Re-run when the firebase user object changes.
 
   return (
     <AuthContext.Provider value={{ user, loading }}>
