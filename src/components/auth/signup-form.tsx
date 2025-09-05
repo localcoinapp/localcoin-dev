@@ -13,7 +13,7 @@ import {
   OAuthProvider,
 } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, getDoc } from "firebase/firestore"
+import { setDoc, doc, getDoc, serverTimestamp } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -28,17 +28,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Logo } from "@/components/logo"               // <-- fixed path (uses siteConfig fallback)
+import { Logo } from "@/components/logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
-import { Checkbox } from "@/components/ui/checkbox"     // <-- fixed path
+import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   country: z.string().min(1, { message: "Please select a country." }),
-  // Use boolean + refine so default can be false but submit requires true
-  terms: z.boolean().refine((v) => v === true, {
+  terms: z.boolean().refine(v => v === true, {
     message: "You must accept the terms and conditions to continue.",
   }),
 })
@@ -53,7 +52,7 @@ export function SignupForm() {
       email: "",
       password: "",
       country: "",
-      terms: false, // starts unchecked; validation enforces acceptance on submit
+      terms: false,
     },
   })
 
@@ -62,7 +61,6 @@ export function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
       const user = userCredential.user
 
-      // Send verification email
       await sendEmailVerification(user)
 
       await setDoc(doc(db, "users", user.uid), {
@@ -70,9 +68,11 @@ export function SignupForm() {
         id: user.uid,
         email: values.email,
         country: values.country,
-        role: "user",
+        role: 'user',
         profileComplete: false,
-      })
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+      });
 
       toast({
         title: "Almost there!",
@@ -97,21 +97,17 @@ export function SignupForm() {
       const result = await signInWithPopup(auth, provider)
       const user = result.user
 
-      const userDocRef = doc(db, "users", user.uid)
-      const userDoc = await getDoc(userDocRef)
+      // Ensure user document exists with the latest info (Create or Merge)
+      // This is the key change to make the flow deterministic.
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
+        lastLoginAt: serverTimestamp(),
+        role: 'user',
+        profileComplete: true,
+      }, { merge: true });
 
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          id: user.uid,
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: "user",
-          country: "US", // TODO: improve with geo/IP or post-signup profile step
-          profileComplete: true,
-        })
-      }
       toast({ title: "Success", description: "You have been logged in." })
       router.push("/")
     } catch (error: any) {
@@ -138,7 +134,7 @@ export function SignupForm() {
     <Card className="w-full max-w-md mx-auto shadow-xl">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <Logo /> {/* uses siteConfig.name by default */}
+          <Logo />
         </div>
         <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
         <CardDescription>Join our community to start exploring.</CardDescription>
@@ -229,7 +225,6 @@ export function SignupForm() {
                 <FormItem>
                   <FormLabel>Country</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
-                    {/* use value (controlled) rather than defaultValue */}
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select your country" />
@@ -254,7 +249,7 @@ export function SignupForm() {
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                   <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>

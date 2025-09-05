@@ -69,6 +69,7 @@ export default function MarketplacePage() {
       try {
         setLoading(true);
         const merchantsCollection = collection(db, 'merchants');
+        // This is the crucial fix: aligning the query with the security rules.
         const q = query(merchantsCollection, where("status", "==", "live"));
         const merchantSnapshot = await getDocs(q);
         const merchantList = merchantSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Merchant));

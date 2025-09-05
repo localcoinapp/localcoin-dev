@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -94,19 +94,16 @@ export function LoginForm() {
         });
         return;
       }
+      
+      // Ensure user document exists with the latest info (Create or Merge)
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
 
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
 
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: 'user',
-          walletBalance: 0
-        });
-      }
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
@@ -114,7 +111,7 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Sign-In Failed",
-        description: `Error: ${error.message}`,
+        description: `Error: ${error.code} - ${error.message}`,
         duration: 9000,
       });
     }
