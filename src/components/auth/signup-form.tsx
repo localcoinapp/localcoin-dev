@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -104,6 +105,7 @@ export function SignupForm() {
         name: user.displayName,
         avatar: user.photoURL,
         lastLoginAt: serverTimestamp(),
+        createdAt: serverTimestamp(), // Set createdAt on first social sign-up
         role: 'user',
         profileComplete: true,
       }, { merge: true });
