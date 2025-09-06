@@ -51,25 +51,6 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Check if blocked; ignore permission-denied and proceed.
-      try {
-        const blockedUserDocRef = doc(db, "blocked_users", user.uid);
-        const blockedDocSnap = await getDoc(blockedUserDocRef);
-        if (blockedDocSnap.exists()) {
-          await auth.signOut();
-          toast({
-            variant: "destructive",
-            title: "Account Blocked",
-            description: "Your account has been blocked. Please contact support for assistance.",
-            duration: 9000,
-          });
-          return;
-        }
-      } catch (e: any) {
-        if (!isPermissionDenied(e)) throw e;
-        // If permission-denied, treat as "not blocked" and continue.
-      }
-
       // Ensure user document has a last login timestamp
       await setDoc(doc(db, 'users', user.uid), {
         lastLoginAt: serverTimestamp(),
@@ -92,26 +73,7 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-
-      // Check if blocked; ignore permission-denied and proceed.
-      try {
-        const blockedUserDocRef = doc(db, "blocked_users", user.uid);
-        const blockedDocSnap = await getDoc(blockedUserDocRef);
-        if (blockedDocSnap.exists()) {
-          await auth.signOut();
-          toast({
-            variant: "destructive",
-            title: "Account Blocked",
-            description: "Your account has been blocked. Please contact support for assistance.",
-            duration: 9000,
-          });
-          return;
-        }
-      } catch (e: any) {
-        if (!isPermissionDenied(e)) throw e;
-        // If permission-denied, treat as "not blocked" and continue.
-      }
-
+      
       // Deterministic write: Create or merge the user document immediately.
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email ?? null,
