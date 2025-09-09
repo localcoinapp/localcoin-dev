@@ -145,7 +145,6 @@ export default function CartPage() {
     if (!user?.id) return;
   
     const userDocRef = doc(db, 'users', user.id);
-    const merchantDocRef = doc(db, 'merchants', order.merchantId);
   
     try {
       await runTransaction(db, async (transaction) => {
@@ -159,8 +158,6 @@ export default function CartPage() {
           item.orderId === order.orderId ? { ...item, status: 'ready_to_redeem' } : item
         );
         
-        // This transaction no longer writes to the merchant, as that would fail.
-        // We rely on the user showing the code to the merchant in person.
         transaction.update(userDocRef, { cart: updatedUserCart });
       });
   
@@ -243,10 +240,10 @@ export default function CartPage() {
       </div>
 
       <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
-          <TabsTrigger value="pending">Pending Approval ({pending.length})</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
+          <TabsTrigger value="pending">Pending ({pending.length})</TabsTrigger>
           <TabsTrigger value="approved">Approved ({approved.length})</TabsTrigger>
-          <TabsTrigger value="redeem">Ready to Redeem ({readyToRedeem.length})</TabsTrigger>
+          <TabsTrigger value="redeem">Redeem ({readyToRedeem.length})</TabsTrigger>
           <TabsTrigger value="history">History ({history.length})</TabsTrigger>
         </TabsList>
 
@@ -309,11 +306,11 @@ export default function CartPage() {
 
         <TabsContent value="history">
           <Card>
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <CardTitle>Order History</CardTitle>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                   <Select value={historyFilter} onValueChange={(value) => setHistoryFilter(value as any)}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                           <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -325,7 +322,7 @@ export default function CartPage() {
                       </SelectContent>
                   </Select>
                    <Select value={historySort} onValueChange={(value) => setHistorySort(value as any)}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                           <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -352,4 +349,3 @@ export default function CartPage() {
     </div>
   );
 }
-
