@@ -7,7 +7,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, serverTimestamp } from "firebase/firestore"
+import { setDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -89,19 +89,23 @@ export function SignupForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
 
-      await setDoc(doc(db, 'users', user.uid), {
+      const userData = {
         uid: user.uid,
         id: user.uid,
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        role: 'user',
-        country: 'US',
         profileComplete: true,
-        createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
-      }, { merge: true });
+        // Only set role and createdAt if the document doesn't exist
+        ...(!userDoc.exists() && { role: 'user', createdAt: serverTimestamp() })
+      };
+
+      await setDoc(userDocRef, userData, { merge: true });
       
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');

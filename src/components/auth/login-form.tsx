@@ -32,8 +32,6 @@ const formSchema = z.object({
   }),
 })
 
-const isPermissionDenied = (e: any) => e?.code === 'permission-denied';
-
 export function LoginForm() {
   const router = useRouter();
   const { toast } = useToast();
@@ -75,12 +73,11 @@ export function LoginForm() {
       const user = result.user;
       
       // Deterministic write: Create or merge the user document immediately.
+      // This will NOT overwrite the role of an existing admin/merchant.
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email ?? null,
         name: user.displayName ?? null,
         avatar: user.photoURL ?? null,
-        role: 'user',
-        profileComplete: true,
         lastLoginAt: serverTimestamp(),
       }, { merge: true });
 
