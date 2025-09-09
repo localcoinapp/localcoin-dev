@@ -14,10 +14,12 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // This function checks if a user is a verified merchant by looking for their UID in the merchant_owners collection.
     function isMerchant() {
       return isSignedIn() && exists(/databases/$(database)/documents/merchant_owners/$(request.auth.uid));
     }
     
+    // This function checks if the logged-in user is the owner of a specific merchant document.
     function isOwner(merchantId) {
       return isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
     }
@@ -57,7 +59,8 @@ service cloud.firestore {
     // Rules for the merchant owner lookup collection
     match /merchant_owners/{userId} {
         allow read: if isSignedIn(); // Any signed-in user can check this for UI logic.
-        allow write: if isSignedIn() && request.auth.uid == userId; // Only the user can create their own lookup doc.
+        // Only the user or an admin can create/delete their own lookup doc. This happens during merchant application/approval.
+        allow write, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin()); 
     }
 
     // Rules for Chat
