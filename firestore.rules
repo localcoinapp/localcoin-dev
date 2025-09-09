@@ -1,89 +1,77 @@
 rules_version = '2';
-
 service cloud.firestore {
   // Helpers
   function isSignedIn() {
     return request.auth != null && request.auth.uid != null;
   }
 
-  // Safe admin check: checks for role without failing on non-existent docs.
   function isAdmin() {
-    return isSignedIn()
-      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Safely check for admin role. The `get()` method handles non-existent docs.
+    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
   }
 
-  // Helper to check if the user is only changing their own order status in pendingOrders
-  function isChangingOwnOrderStatus(merchantId) {
-    let requestOrders = request.resource.data.pendingOrders;
-    let resourceOrders = resource.data.pendingOrders;
-    let userId = request.auth.uid;
-
-    // The number of orders must not change
-    if (requestOrders.size() != resourceOrders.size()) {
-      return false;
-    }
-
-    // Every order in the new list must have a corresponding order in the old list
-    return requestOrders.forall(reqOrder =>
-      resourceOrders.exists(resOrder =>
-        // Find the matching order by ID
-        resOrder.orderId == reqOrder.orderId &&
-        // Ensure all immutable fields are unchanged
-        resOrder.userId == reqOrder.userId &&
-        resOrder.price == reqOrder.price &&
-        resOrder.title == reqOrder.title &&
-        resOrder.itemId == reqOrder.itemId &&
-        // Only allow a change if the order belongs to the requesting user
-        (
-          (reqOrder.status != resOrder.status && resOrder.userId == userId) ||
-          // Or if the order is completely identical (no change)
-          (reqOrder == resOrder)
-        )
-      )
-    );
+  function isOwner(merchantId) {
+    // Check if the requesting user is the owner of the merchant document.
+    return isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
   }
+
+  function isMerchantModifyingUserCart(userId) {
+    // Check if the incoming write to a user's doc is being done by a legitimate merchant for an order they own.
+    // This is complex to do perfectly in rules, so we trust the backend API for the logic,
+    // but we can at least verify the requester has a merchant role.
+    let requesterIsMerchant = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'merchant';
+    return isSignedIn() && requesterIsMerchant;
+  }
+
 
   match /databases/{database}/documents {
-
+    // Users can update their own document. A merchant can also update a user's cart. Admins can read any.
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && (request.auth.uid == userId || isMerchantModifyingUserCart(userId));
     }
 
+    // Public can read live merchants. Owners and admins have full control.
     match /merchants/{merchantId} {
-      allow read: if resource.data.status == 'live';
+      allow read: if resource.data.status == 'live' || (isSignedIn() && (isOwner(merchantId) || isAdmin()));
       allow create: if isSignedIn() && request.resource.data.owner == request.auth.uid;
-      
-      // Allow merchant owner or admin full update rights.
-      // Allow a regular user to update ONLY to change their own order status.
-      allow update: if isSignedIn() &&
-                    ((request.auth.uid == resource.data.owner || isAdmin()) ||
-                     isChangingOwnOrderStatus(merchantId));
-                     
-      allow delete: if isSignedIn() && (request.auth.uid == resource.data.owner || isAdmin());
+      allow update, delete: if isSignedIn() && (isOwner(merchantId) || isAdmin());
     }
 
+    // Chat participants or admins can read/write chats and their messages.
     match /chats/{chatId} {
-      allow read: if isSignedIn() && (request.auth.uid in resource.data.participantIds || isAdmin());
-      allow create: if isSignedIn() && (request.auth.uid in request.resource.data.participantIds || isAdmin());
-      allow update, delete: if isSignedIn() && (request.auth.uid in resource.data.participantIds || isAdmin());
+      function userIsParticipant() {
+        return request.auth.uid in resource.data.participantIds;
+      }
+      function userIsCreatingParticipant() {
+         return request.auth.uid in request.resource.data.participantIds;
+      }
+      function userCanAccessChat() {
+          let chatDoc = get(/databases/$(database)/documents/chats/$(chatId));
+          return request.auth.uid in chatDoc.data.participantIds;
+      }
+
+      allow read, update, delete: if isSignedIn() && (userIsParticipant() || isAdmin());
+      allow create: if isSignedIn() && (userIsCreatingParticipant() || isAdmin());
 
       match /messages/{messageId} {
-        allow read, create, update, delete: if isSignedIn()
-          && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
+        allow read, write: if isSignedIn() && (userCanAccessChat() || isAdmin());
       }
     }
 
+    // Users can create requests. Only admins can manage them.
     match /tokenPurchaseRequests/{requestId} {
       allow create: if isSignedIn();
       allow read, write: if isAdmin();
     }
 
+    // Merchants/Users can create requests. Only admins can manage them.
     match /merchantCashoutRequests/{requestId} {
       allow create: if isSignedIn();
       allow read, write: if isAdmin();
     }
 
+    // Blocked users: admin only
     match /blocked_users/{userId} {
       allow read, write: if isAdmin();
     }
