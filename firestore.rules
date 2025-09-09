@@ -12,68 +12,53 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isSignedIn() 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isMerchant() {
-      // Checks if a user is a verified merchant by looking for their UID in the dedicated lookup collection.
-      // This is a fast and secure way to check for a role.
+      // Note: This check relies on the `merchant_owners` collection.
       return isSignedIn() && exists(/databases/$(database)/documents/merchant_owners/$(request.auth.uid));
     }
     
+    function isOwner(merchantId) {
+      return isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
+    }
+
     // =================================
     // == Collection Rules
     // =================================
 
     // Rules for User Documents
     match /users/{userId} {
-      // READ: 
-      // - A user can get their own document.
-      // - An admin can get any user's document.
-      // - A merchant can get any user's document. THIS IS THE KEY FIX. It allows merchants to see customer
-      //   information when processing orders on their dashboard.
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isMerchant());
-      
-      // LIST (queries):
-      // - Only an admin can perform a query to get a list of users.
-      allow list: if isAdmin();
-
-      // WRITE (create, update, delete):
-      // - A user can write to their own document.
-      // - An admin can write to any user's document.
-      // - A merchant can update a user's document (e.g., to change order status in the user's cart).
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isMerchant());
+      // A user can read/write their own document.
+      // An admin can read/write any user document.
+      // Other scenarios (like a merchant updating a cart) must be handled by a trusted backend.
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Rules for Merchant Documents
     match /merchants/{merchantId} {
-      // READ:
-      // - Anyone can read a merchant document if its status is 'live'.
-      // - An admin can read any merchant document, regardless of status.
-      // - The owner can read their own merchant document, regardless of status.
-      allow read: if resource.data.status == 'live' || isAdmin() || (isSignedIn() && resource.data.owner == request.auth.uid);
+      // Anyone can read a live merchant. Owner/Admin can read regardless of status.
+      allow read: if resource.data.status == 'live' || isOwner(merchantId) || isAdmin();
       
-      // CREATE:
-      // - A user can create a merchant document only if they set themselves as the owner.
+      // A user can create a merchant document if they are signed in and are the owner.
       allow create: if isSignedIn() && request.resource.data.owner == request.auth.uid;
       
-      // UPDATE:
-      // - The owner of the merchant document or an admin can update it.
-      // - IMPORTANT: All other updates (like a customer adding to cart) must be handled
-      //   by a trusted backend function using the Admin SDK, which bypasses these rules.
-      allow update: if isSignedIn() && (isAdmin() || request.resource.data.owner == request.auth.uid);
+      // A merchant can only be updated by its owner or an admin.
+      // Customer interactions (like adding to a cart) must be handled by a trusted backend.
+      allow update: if isOwner(merchantId) || isAdmin();
 
-      // DELETE:
-      // - Only the owner or an admin can delete their merchant document.
-      allow delete: if isSignedIn() && (isAdmin() || resource.data.owner == request.auth.uid);
+      // Only the owner or an admin can delete a merchant document.
+      allow delete: if isOwner(merchantId) || isAdmin();
     }
     
     // Rules for the merchant owner lookup collection
     match /merchant_owners/{userId} {
-        // READ: Allow any signed-in user to read. This is needed for the isMerchant() function to work.
-        allow read: if isSignedIn();
-        // WRITE: Only allow users to create/update their own entry. This is done in the become-merchant flow.
-        allow write: if isSignedIn() && request.auth.uid == userId;
+        allow read: if isSignedIn(); // Any signed-in user can check this for UI logic.
+        // A user can create their own lookup doc. An admin can create on their behalf (e.g. during approval).
+        allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Rules for Chat
@@ -81,9 +66,13 @@ service cloud.firestore {
       function isParticipant() {
         return request.auth.uid in resource.data.participantIds;
       }
+      
+      function isCreatingParticipant() {
+        return request.auth.uid in request.resource.data.participantIds;
+      }
 
       allow read, update, delete: if isSignedIn() && (isParticipant() || isAdmin());
-      allow create: if isSignedIn() && (request.auth.uid in request.resource.data.participantIds || isAdmin());
+      allow create: if isSignedIn() && (isCreatingParticipant() || isAdmin());
 
       match /messages/{messageId} {
         function isChatParticipant() {
@@ -92,7 +81,7 @@ service cloud.firestore {
 
         allow read: if isSignedIn() && (isChatParticipant() || isAdmin());
         allow create: if isSignedIn() && isChatParticipant();
-        allow update, delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
+        allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.senderId);
       }
     }
 
@@ -113,3 +102,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

@@ -89,21 +89,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { isWithinInterval, startOfToday, startOfWeek, startOfMonth, startOfQuarter, startOfYear, endOfToday, endOfWeek, endOfMonth, endOfQuarter, endOfYear } from 'date-fns';
 import { Separator } from "@/components/ui/separator";
 
-
-// --- Helper function to find and update inventory ---
-const updateInventory = (listings: MerchantItem[], itemId: string, quantityChange: number): MerchantItem[] => {
-    const listingIndex = listings.findIndex(item => item.id === itemId);
-
-    if (listingIndex > -1) {
-        const updatedListings = [...listings];
-        const updatedItem = { ...updatedListings[listingIndex] };
-        updatedItem.quantity = (updatedItem.quantity || 0) + quantityChange;
-        updatedListings[listingIndex] = updatedItem;
-        return updatedListings;
-    }
-    return listings;
-};
-
 export default function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -132,7 +117,8 @@ export default function DashboardPage() {
   // CSV Upload
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
-
+  
+  const [isProcessingOrder, setIsProcessingOrder] = useState<string | null>(null);
 
   // Function to fetch balance
   const fetchBalance = async () => {
@@ -263,6 +249,48 @@ export default function DashboardPage() {
     setShowSeedDialog(true);
   }
 
+  const processOrderWithApi = async (order: CartItem, action: 'approve' | 'deny') => {
+    if (!user || !user.merchantId) {
+      toast({ title: "Error", description: "You must be a logged-in merchant.", variant: "destructive" });
+      return;
+    }
+    
+    setIsProcessingOrder(order.orderId);
+    try {
+      const response = await fetch('/api/merchant/process-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchantId: user.merchantId,
+          orderId: order.orderId,
+          userId: order.userId,
+          action,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.details || 'Failed to process order.');
+      }
+
+      toast({
+        title: `Order ${action === 'approve' ? 'Approved' : 'Denied'}!`,
+        description: result.message,
+      });
+
+    } catch (error: any) {
+      console.error(`Error ${action}ing order:`, error);
+      toast({
+        title: "Processing Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingOrder(null);
+    }
+  };
+
 
   const handleListingStatusChange = async (listing: MerchantItem) => {
     if (!user || !user.merchantId || !merchantData) return;
@@ -278,92 +306,6 @@ export default function DashboardPage() {
     } catch (error) {
         console.error("Error updating listing status:", error);
         toast({ title: "Error", description: "Could not update listing status.", variant: "destructive" });
-    }
-  };
-
-  const handleApproveOrder = async (orderId: string, userId: string) => {
-    if (!user || !user.merchantId) return;
-
-    const merchantDocRef = doc(db, 'merchants', user.merchantId);
-    const userDocRef = doc(db, 'users', userId);
-
-    try {
-      await runTransaction(db, async (tx) => {
-        const [merchantDoc, userDoc] = await Promise.all([tx.get(merchantDocRef), tx.get(userDocRef)]);
-        if (!merchantDoc.exists() || !userDoc.exists()) throw new Error("Document not found.");
-
-        const currentMerchantData = merchantDoc.data();
-        const currentUserData = userDoc.data();
-        const redeemCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-
-        const updatedPendingOrders = (currentMerchantData.pendingOrders || []).map((order: CartItem) =>
-          order.orderId === orderId ? { ...order, status: 'approved', redeemCode } : order
-        );
-
-        const updatedUserCart = (currentUserData.cart || []).map((item: CartItem) => 
-            item.orderId === orderId ? { ...item, status: 'approved', redeemCode } : item
-        );
-        
-        tx.update(merchantDocRef, { pendingOrders: updatedPendingOrders });
-        tx.update(userDocRef, { cart: updatedUserCart });
-      });
-      
-      toast({ title: "Order Approved!", description: "The user has been notified." });
-    } catch (error) {
-      console.error("Error approving order:", error);
-      toast({ title: "Error", description: "Could not approve the order.", variant: "destructive"});
-    }
-  };
-
-  const handleDenyOrder = async (orderId: string, userId: string, listingId: string, quantity: number) => {
-    if (!user || !user.merchantId) return;
-  
-    const merchantDocRef = doc(db, 'merchants', user.merchantId);
-    const userDocRef = doc(db, 'users', userId);
-  
-    try {
-      await runTransaction(db, async (transaction) => {
-        const [merchantDoc, userDoc] = await Promise.all([
-          transaction.get(merchantDocRef),
-          transaction.get(userDocRef)
-        ]);
-  
-        if (!merchantDoc.exists() || !userDoc.exists()) throw new Error("User or Merchant document does not exist!");
-  
-        const merchantData = merchantDoc.data();
-        const userData = userDoc.data();
-  
-        const orderToDeny = (merchantData.pendingOrders || []).find((o: CartItem) => o.orderId === orderId);
-
-        if (!orderToDeny) throw new Error("Order not found in pending orders.");
-
-        const updatedPendingOrders = (merchantData.pendingOrders || []).filter((o: CartItem) => o.orderId !== orderId);
-        const updatedUserCart = (userData.cart || []).map((item: CartItem) =>
-            item.orderId === orderId ? { ...item, status: 'rejected' } : item
-        );
-  
-        const updatedListings = updateInventory(
-            merchantData.listings || [],
-            listingId,
-            quantity
-        );
-
-        const updatedReserved = (merchantData.reserved || []).filter((r: any) => r.orderId !== orderId);
-        const updatedRecentTransactions = arrayUnion({ ...orderToDeny, status: 'rejected' });
-
-        transaction.update(merchantDocRef, {
-          pendingOrders: updatedPendingOrders,
-          recentTransactions: updatedRecentTransactions,
-          listings: updatedListings,
-          reserved: updatedReserved
-        });
-        transaction.update(userDocRef, { cart: updatedUserCart });
-      });
-  
-      toast({ title: "Order Denied", description: "The order was rejected and stock has been returned." });
-    } catch (error) {
-      console.error("Error denying order:", error);
-      toast({ title: "Error Denying Order", description: (error as Error).message, variant: "destructive" });
     }
   };
 
@@ -869,8 +811,12 @@ export default function DashboardPage() {
                           <TableCell className="text-right">
                             {order.status === 'pending_approval' && (
                               <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => handleApproveOrder(order.orderId, order.userId)}><Check className="mr-1 h-4 w-4" /> Approve</Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDenyOrder(order.orderId, order.userId, order.listingId, order.quantity)}><X className="mr-1 h-4 w-4" /> Deny</Button>
+                                <Button size="sm" variant="outline" onClick={() => processOrderWithApi(order, 'approve')} disabled={!!isProcessingOrder}>
+                                  {isProcessingOrder === order.orderId ? <Loader2 className="mr-1 h-4 w-4 animate-spin"/> : <Check className="mr-1 h-4 w-4" />} Approve
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => processOrderWithApi(order, 'deny')} disabled={!!isProcessingOrder}>
+                                  {isProcessingOrder === order.orderId ? <Loader2 className="mr-1 h-4 w-4 animate-spin"/> : <X className="mr-1 h-4 w-4" />} Deny
+                                </Button>
                               </div>
                             )}
                             {order.status === 'approved' && <Badge variant="secondary">Awaiting User</Badge>}
@@ -960,3 +906,5 @@ export default function DashboardPage() {
     </>
   );
 }
+
+    
