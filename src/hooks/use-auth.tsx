@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -103,7 +104,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: authUser.email ?? null,
             avatar: authUser.photoURL ?? null,
             role: 'user',
-            // mark limited so UI can avoid admin-only reads
             // @ts-ignore
             __limited: true,
           };
