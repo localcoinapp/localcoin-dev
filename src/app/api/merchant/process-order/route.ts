@@ -1,6 +1,4 @@
 
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/lib/firebase-admin';
 import type { CartItem } from '@/types';
