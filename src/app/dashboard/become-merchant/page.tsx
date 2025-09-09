@@ -30,7 +30,7 @@ import { provinces } from "@/data/provinces"
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, where, query, onSnapshot } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, where, query, onSnapshot, doc, writeBatch } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { geohashForLocation } from "geofire-common";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -208,8 +208,19 @@ export default function BecomeMerchantPage() {
         listings: [],
         rating: 0,
       };
+      
+      const batch = writeBatch(db);
+      
+      const merchantsRef = collection(db, 'merchants');
+      const newMerchantRef = doc(merchantsRef); // Create a new doc with a generated ID
+      batch.set(newMerchantRef, applicationData);
 
-      await addDoc(collection(db, 'merchants'), applicationData);
+      // Create the merchant_owner lookup document
+      const ownerLookupRef = doc(db, 'merchant_owners', user.id);
+      batch.set(ownerLookupRef, { merchantId: newMerchantRef.id });
+
+      await batch.commit();
+
 
       toast({
         title: "Application Submitted!",
