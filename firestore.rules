@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -9,62 +8,58 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Correctly check the role of the requesting user.
+    // Check if the user making the request is an admin
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // Correctly check if a merchant document exists where the owner is the requesting user.
-    function isMerchant() {
-      return isSignedIn() && exists(
-        /databases/$(database)/documents/merchants/$(request.resource.data.merchantId)
-      );
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // Check if the user making the request is a listed merchant owner.
-    // This is used for rules where a merchant needs to act on another user's document.
-    function requestorIsAMerchant() {
-        return isSignedIn() && exists(/databases/$(database)/documents/merchants/$(request.auth.uid));
+    // Check if the user is the owner of a specific merchant document
+    function isOwner(merchantId) {
+      return isSignedIn() && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
     }
 
-
-    // Rules for Collections
+    // Check if a user ID corresponds to any merchant
+    function isMerchant(userId) {
+        return exists(/databases/$(database)/documents/merchants/$(userId));
+    }
+    
+    // USERS
     match /users/{userId} {
-      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow write: if isSignedIn() && (isOwner(userId) || isAdmin() || requestorIsAMerchant());
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
-    match /merchants/{merchantId} {
-      allow read: if get(/databases/$(database)/documents/merchants/$(merchantId)).data.status == 'live' || (isSignedIn() && (isOwner(get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner) || isAdmin()));
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (isOwner(resource.data.owner) || isAdmin() || request.resource.data.keys().hasAny(['pendingOrders', 'listings', 'recentTransactions']));
-      allow delete: if isSignedIn() && (isOwner(resource.data.owner) || isAdmin());
-    }
-
-    match /chats/{chatId} {
-        allow read, write: if isSignedIn() && request.auth.uid in resource.data.participantIds;
-    }
-
-    match /chats/{chatId}/messages/{messageId} {
-        allow read, write, delete: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
-    }
-
+    // BLOCKED USERS
     match /blocked_users/{userId} {
-      allow read, write: if isSignedIn() && isAdmin();
+        allow read, write: if isAdmin();
+    }
+
+    // MERCHANTS
+    match /merchants/{merchantId} {
+      allow read: if get(/databases/$(database)/documents/merchants/$(merchantId)).data.status == 'live' || (isSignedIn() && (isOwner(merchantId) || isAdmin()));
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isOwner(merchantId) || isAdmin());
+      allow delete: if isSignedIn() && (isOwner(merchantId) || isAdmin());
     }
     
+    // CHATS
+    match /chats/{chatId} {
+      allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        match /messages/{messageId} {
+            allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        }
+    }
+
+    // TOKEN PURCHASE REQUESTS
     match /tokenPurchaseRequests/{requestId} {
-        allow read: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
-        allow create: if isSignedIn();
-        allow update, delete: if isSignedIn() && isAdmin();
+      allow read, write: if isSignedIn() && (isAdmin() || get(/databases/$(database)/documents/tokenPurchaseRequests/$(requestId)).data.userId == request.auth.uid);
+      allow create: if isSignedIn();
     }
-    
+
+    // MERCHANT CASHOUT REQUESTS
     match /merchantCashoutRequests/{requestId} {
-        allow read, write: if isSignedIn() && (isOwner(get(/databases/$(database)/documents/merchants/$(resource.data.merchantId)).data.owner) || isAdmin());
+        allow read, write: if isSignedIn() && (isAdmin() || isOwner(get(/databases/$(database)/documents/merchantCashoutRequests/$(requestId)).data.merchantId));
+        allow create: if isSignedIn() && isOwner(request.resource.data.merchantId);
     }
   }
 }
