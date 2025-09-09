@@ -15,9 +15,9 @@ import {
   getAccount,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/firestore';
-import type { User, Merchant, CartItem, MerchantItem } from '@/types';
+import { firestore } from '@/lib/firebase-admin'; // Use Admin SDK
+import { doc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/firestore'; // Keep for types
+import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
 
 export const runtime = 'nodejs';
@@ -46,18 +46,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing critical order data (userId, merchantId, or orderId)' }, { status: 400 });
     }
 
-    // --- Core Transaction Logic ---
-    const signature = await runTransaction(db, async (transaction) => {
-      const userDocRef = doc(db, 'users', userId);
-      const merchantDocRef = doc(db, 'merchants', merchantId);
+    // --- Core Transaction Logic using Admin SDK ---
+    const signature = await firestore.runTransaction(async (transaction) => {
+      const userDocRef = firestore.collection('users').doc(userId);
+      const merchantDocRef = firestore.collection('merchants').doc(merchantId);
 
       const [userSnap, merchantSnap] = await Promise.all([
         transaction.get(userDocRef),
         transaction.get(merchantDocRef),
       ]);
 
-      if (!userSnap.exists()) throw new Error('User not found');
-      if (!merchantSnap.exists()) throw new Error('Merchant not found');
+      if (!userSnap.exists) throw new Error('User not found');
+      if (!merchantSnap.exists) throw new Error('Merchant not found');
 
       const userData = userSnap.data() as User;
       const merchantData = merchantSnap.data() as Merchant;
@@ -127,9 +127,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in redeem-order API:', error);
-    // Note: Since the core logic is now inside a Firestore transaction,
-    // we don't need a complex manual rollback mechanism. If any part fails,
-    // Firestore aborts the entire transaction automatically.
     return NextResponse.json(
       { error: 'Failed to redeem order.', details: String(error?.message || 'An unknown error occurred.') },
       { status: 500 }
