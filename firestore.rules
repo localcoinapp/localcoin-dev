@@ -1,10 +1,9 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,79 +12,55 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    function getRole(uid) {
+        return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
     function isAdmin() {
-      return get(/databases/{database}/documents/users/{request.auth.uid}).data.role == 'admin';
+      return isSignedIn() && getRole(request.auth.uid) == 'admin';
     }
 
     function isMerchant() {
-      // Check if a merchant document exists where the owner field matches the user's ID.
-      // This requires a Firestore index on the 'owner' field in the 'merchants' collection.
-      return exists(/databases/{database}/documents/merchants/{request.resource.data.merchantId}) &&
-             get(/databases/{database}/documents/merchants/{request.resource.data.merchantId}).data.owner == request.auth.uid;
+        return isSignedIn() && getRole(request.auth.uid) == 'merchant';
+    }
+
+    // Collections
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      // A merchant can update a user's doc to update order status
+      allow write: if isOwner(userId) || isMerchant() || isAdmin();
     }
     
-    function isTheMerchantOwner(merchantId) {
-        return get(/databases/{database}/documents/merchants/{merchantId}).data.owner == request.auth.uid;
-    }
-
-
-    // Collection: users
-    match /users/{userId} {
-      // A user can read/write their own document.
-      // An admin can read/write any user document.
-      // A merchant can read/write a user's document (required for updating cart status).
-      allow read, write: if isOwner(userId) || isAdmin() || isTheMerchantOwner(request.resource.data.merchantId);
-    }
-
-    // Collection: blocked_users
     match /blocked_users/{userId} {
-        // Only admins can manage the blocked list.
         allow read, write: if isAdmin();
     }
 
-    // Collection: merchants
     match /merchants/{merchantId} {
-      // Anyone can read a merchant if their status is 'live'.
-      // The owner or an admin can read it regardless of status.
-      allow read: if resource.data.status == 'live' || isTheMerchantOwner(merchantId) || isAdmin();
-      
-      // Any signed-in user can create a merchant application.
+      // Allow public read for live merchants, but owner/admin can read anytime
+      allow read: if resource.data.status == 'live' || (isSignedIn() && (resource.data.owner == request.auth.uid || isAdmin()));
+      // Any signed-in user can apply to become a merchant
       allow create: if isSignedIn();
+      // Only the owner or an admin can update/delete the merchant document
+      allow update, delete: if isSignedIn() && (resource.data.owner == request.auth.uid || isAdmin());
+    }
 
-      // The owner or an admin can update the document.
-      // Any signed-in user can also update it, but not sensitive fields.
-      // This allows users to add to cart, which modifies a merchant's pending orders.
-      allow update: if (isTheMerchantOwner(merchantId) || isAdmin()) || 
-                     (isSignedIn() && !('owner' in request.resource.data) && !('walletAddress' in request.resource.data));
-      
-      // Only the owner or an admin can delete their merchant document.
-      allow delete: if isTheMerchantOwner(merchantId) || isAdmin();
+    match /chats/{chatId} {
+      allow read, write: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+        
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        allow update, delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
+      }
     }
     
-    // Collection: chats
-    match /chats/{chatId} {
-        // Users can only read/write chats they are a part of.
-        allow read, write: if request.auth.uid in resource.data.participantIds;
-    }
-
-    // Collection: tokenPurchaseRequests
     match /tokenPurchaseRequests/{requestId} {
-        // A user can create their own purchase request.
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-        // Only the user who created it or an admin can read it.
-        allow read: if isOwner(resource.data.userId) || isAdmin();
-        // Only an admin can process (update) or delete requests.
-        allow update, delete: if isAdmin();
+        allow create: if isSignedIn();
+        allow read, update, delete: if isAdmin();
     }
-
-    // Collection: merchantCashoutRequests
+    
     match /merchantCashoutRequests/{requestId} {
-        // The owner of the merchant document can create a request.
-        allow create: if isTheMerchantOwner(request.resource.data.merchantId);
-        // The merchant owner or an admin can read the request.
-        allow read: if isTheMerchantOwner(resource.data.merchantId) || isAdmin();
-        // Only an admin can process (update) or delete requests.
-        allow update, delete: if isAdmin();
+        allow create: if isMerchant();
+        allow read, update, delete: if isAdmin();
     }
   }
 }
