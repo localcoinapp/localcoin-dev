@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/lib/firebase-admin';
 import type { CartItem, MerchantItem, User } from '@/types';
-import { Timestamp, arrayUnion } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 export const runtime = 'nodejs';
 
@@ -65,11 +65,11 @@ export async function POST(req: NextRequest) {
       // 3. Update documents
       transaction.update(merchantDocRef, { 
         listings: currentListings,
-        pendingOrders: arrayUnion(newOrderItem),
+        pendingOrders: FieldValue.arrayUnion(newOrderItem),
       });
 
       transaction.update(userDocRef, {
-        cart: arrayUnion(newOrderItem)
+        cart: FieldValue.arrayUnion(newOrderItem)
       });
     });
 
