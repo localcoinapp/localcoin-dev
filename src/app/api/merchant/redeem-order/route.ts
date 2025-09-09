@@ -1,4 +1,6 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -16,7 +18,7 @@ import {
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { firestore } from '@/lib/firebase-admin'; // Use Admin SDK
-import { doc, getDoc, runTransaction, arrayUnion, Timestamp } from 'firebase/firestore'; // Keep for types
+import { arrayUnion, Timestamp } from 'firebase-admin/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
 
@@ -35,12 +37,9 @@ function getRpcUrl() {
 
 export async function POST(req: NextRequest) {
   console.log('--- Received POST /api/merchant/redeem-order ---');
-  let body: { userId?: string, merchantId?: string, orderId?: string };
 
   try {
-    body = await req.json();
-    const { userId, merchantId, orderId } = body;
-    console.log('Received request body:', body);
+    const { userId, merchantId, orderId } = await req.json();
 
     if (!userId || !merchantId || !orderId) {
       return NextResponse.json({ error: 'Missing critical order data (userId, merchantId, or orderId)' }, { status: 400 });
@@ -62,9 +61,14 @@ export async function POST(req: NextRequest) {
       const userData = userSnap.data() as User;
       const merchantData = merchantSnap.data() as Merchant;
 
-      // Find the specific order in the merchant's pending list
-      const order = (merchantData.pendingOrders || []).find(o => o.orderId === orderId);
-      if (!order || order.userId !== userId) throw new Error('Order not found or user mismatch.');
+      // Find the specific order in the user's cart this time
+      const userCart = userData.cart || [];
+      const orderIndex = userCart.findIndex(o => o.orderId === orderId);
+
+      if (orderIndex === -1) throw new Error('Order not found in user cart.');
+      
+      const order = userCart[orderIndex];
+
       if (order.status !== 'ready_to_redeem') throw new Error(`Order not ready for redemption. Status is: ${order.status}`);
       if (!order.price || order.price <= 0) throw new Error('Invalid order price. Price must be greater than zero.');
 
