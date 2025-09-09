@@ -17,8 +17,6 @@ import { Label } from "@/components/ui/label"
 import { siteConfig } from "@/config/site"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import { db } from "@/lib/firebase"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import type { Merchant } from "@/types"
 
 interface CashoutDialogProps {
@@ -39,22 +37,27 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     
     const handleSubmit = async () => {
         setIsLoading(true);
-        if (!merchant || !merchant.id || !merchant.walletAddress) {
-            toast({ title: "Error", description: "Merchant details not found. Please ensure the merchant is fully set up.", variant: "destructive" });
+        if (!merchant || !merchant.id) {
+            toast({ title: "Error", description: "Merchant ID not found.", variant: "destructive" });
             setIsLoading(false);
             return;
         }
 
         try {
-            const requestsCollection = collection(db, 'merchantCashoutRequests');
-            await addDoc(requestsCollection, {
+            const response = await fetch('/api/merchant/request-cashout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
                 merchantId: merchant.id,
-                merchantName: merchant.companyName,
-                merchantWalletAddress: merchant.walletAddress,
-                amount: parseFloat(amount),
-                status: 'pending',
-                createdAt: serverTimestamp(),
+                amount: parseFloat(amount)
+              }),
             });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              throw new Error(result.details || 'Failed to submit cash-out request.');
+            }
 
             toast({
                 title: "Request Submitted!",
@@ -115,5 +118,3 @@ export function CashoutDialog({ children, merchant }: CashoutDialogProps) {
     </Dialog>
   )
 }
-
-    
