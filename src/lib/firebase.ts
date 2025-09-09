@@ -23,7 +23,6 @@ const auth = getAuth(app);
 // Initialize Firestore with long-polling fallback
 const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-  useFetchStreams: false,
 });
 
 
