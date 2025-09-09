@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, updateProfile } from 'firebase/auth';
-import { getFirestore, getDoc } from 'firebase/firestore';
+import { getFirestore, getDoc, initializeFirestore } from 'firebase/firestore';
 
 // ==================================================================
 // == PASTE YOUR NEW FIREBASE CONFIGURATION OBJECT FROM STEP 1 HERE ==
@@ -19,7 +19,13 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Initialize Firestore with long-polling fallback
+const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  useFetchStreams: false,
+});
+
 
 // Set persistence to local. This is the crucial part for this environment.
 setPersistence(auth, browserLocalPersistence);
