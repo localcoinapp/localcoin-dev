@@ -1,4 +1,6 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -16,7 +18,7 @@ import {
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { firestore } from '@/lib/firebase-admin'; // Use Admin SDK
-import { arrayUnion, Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
 
@@ -118,7 +120,7 @@ export async function POST(req: NextRequest) {
       const updatedPendingOrders = (merchantData.pendingOrders ?? []).filter(o => o.orderId !== orderId);
       transaction.update(merchantDocRef, {
         pendingOrders: updatedPendingOrders,
-        recentTransactions: arrayUnion(completedOrder),
+        recentTransactions: FieldValue.arrayUnion(completedOrder),
         walletBalance: (merchantData.walletBalance || 0) + order.price,
       });
 
