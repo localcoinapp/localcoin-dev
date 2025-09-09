@@ -5,7 +5,6 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { User } from '@/types';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, usePathname } from 'next/navigation';
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -32,25 +31,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
+            // Correctly construct the User object by picking properties
             setUser({
               id: firebaseUser.uid,
-              ...firebaseUser,
-              ...data,
-            } as User);
-          } else {
-            // New user, create the doc
-            const newUser: Omit<User, 'id'> = {
               uid: firebaseUser.uid,
-              name: firebaseUser.displayName,
               email: firebaseUser.email,
-              avatar: firebaseUser.photoURL,
-              role: 'user',
-              profileComplete: false,
-            };
-            setDoc(userDocRef, newUser, { merge: true });
-            setUser({ id: firebaseUser.uid, ...newUser } as User);
+              name: data.name || firebaseUser.displayName,
+              avatar: data.avatar || firebaseUser.photoURL,
+              role: data.role || 'user',
+              ...data,
+            });
           }
+          // The creation of the doc is handled deterministically in the login/signup forms,
+          // so we don't need an 'else' block here anymore.
           setLoading(false);
+        }, (error) => {
+            console.error("Error on user snapshot:", error);
+            setUser(null);
+            setLoading(false);
         });
         return () => unsubscribeDoc();
       } else {
