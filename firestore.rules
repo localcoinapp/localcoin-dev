@@ -1,79 +1,72 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions to make rules more readable
+
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isUser(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
-    function getUserData(userId) {
-        return get(/databases/$(database)/documents/users/$(userId)).data;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      return isSignedIn() && getUserData(request.auth.uid).role == 'admin';
+      return isSignedIn() && getUserData().role == 'admin';
     }
     
     function isMerchant() {
-      return isSignedIn() && getUserData(request.auth.uid).role == 'merchant';
+      return isSignedIn() && getUserData().role == 'merchant';
     }
 
-    function isOwner(merchantId) {
-        return isSignedIn() && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
-    }
-
-    // Rules for the 'users' collection
+    // Collection: users
     match /users/{userId} {
-      allow read: if isUser(userId) || isAdmin();
-      allow create: if isSignedIn();
-      allow update, delete: if isUser(userId) || isAdmin() || isMerchant();
-    }
-    
-    // Rules for the 'merchants' collection
-    match /merchants/{merchantId} {
-      allow read: if resource.data.status == 'live' || isOwner(merchantId) || isAdmin();
-      allow create: if isSignedIn();
-      // Allow owner/admin to change anything. 
-      // Allow signed-in users to update if they are not maliciously changing ownership or wallet details.
-      // This is necessary for cart/order transactions initiated by customers.
-      allow update: if (isOwner(merchantId) || isAdmin()) || 
-                    (isSignedIn() && request.resource.data.owner == resource.data.owner && request.resource.data.walletAddress == resource.data.walletAddress);
-      allow delete: if isOwner(merchantId) || isAdmin();
-    }
-    
-    // Rules for the 'blocked_users' collection
-    match /blocked_users/{userId} {
-        allow read, write: if isAdmin();
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      // Allow user to write to their own doc, or an admin to write to any user doc,
+      // or a merchant to update a user's doc (e.g. for order status).
+      allow write: if isSignedIn() && (isOwner(userId) || isAdmin() || isMerchant());
     }
 
-    // Rules for chat functionality
+    // Collection: merchants
+    match /merchants/{merchantId} {
+      allow read: if resource.data.status == 'live' || (isSignedIn() && (isOwner(resource.data.owner) || isAdmin()));
+      allow create: if isSignedIn();
+      // Allow owner or admin to update.
+      // Also allow any signed-in user for specific cart operations (inventory decrement).
+      // The backend API is trusted to handle the logic securely.
+      allow update: if isSignedIn() && (isOwner(resource.data.owner) || isAdmin() || request.resource.data.owner == resource.data.owner);
+      allow delete: if isSignedIn() && (isOwner(resource.data.owner) || isAdmin());
+    }
+
+    // Collection: chats
     match /chats/{chatId} {
       allow read, write: if isSignedIn() && request.auth.uid in resource.data.participantIds;
-      
-      // Messages subcollection
+
+      // Subcollection: messages
       match /messages/{messageId} {
         allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
         allow update, delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
     }
-    
-    // Rules for token purchase requests
+
+    // Admin-only Collections
     match /tokenPurchaseRequests/{requestId} {
-        allow read, write: if isAdmin();
-        allow create: if isSignedIn();
+      allow create: if isSignedIn();
+      allow read, write, delete: if isAdmin();
     }
     
-    // Rules for merchant cash-out requests
     match /merchantCashoutRequests/{requestId} {
-        allow read, write: if isAdmin();
-        allow create: if isMerchant();
+      allow create: if isMerchant();
+      allow read, write, delete: if isAdmin();
+    }
+    
+    match /blocked_users/{userId} {
+      allow read, write: if isAdmin();
     }
   }
 }
