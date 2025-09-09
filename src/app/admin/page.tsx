@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -186,6 +186,10 @@ export default function AdminPage() {
 
     const userRef = doc(db, 'users', merchant.owner);
     batch.update(userRef, { role: 'merchant', merchantId: merchant.id });
+    
+    // Fallback: Ensure the merchant_owners lookup exists
+    const ownerLookupRef = doc(db, 'merchant_owners', merchant.owner);
+    batch.set(ownerLookupRef, { merchantId: merchant.id });
 
     try {
         await batch.commit();

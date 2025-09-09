@@ -1,3 +1,4 @@
+
 // This script has been intentionally disabled to prevent automatic data seeding.
 // All user and merchant creation should be handled through the application's
 // sign-up and administrative approval flows.

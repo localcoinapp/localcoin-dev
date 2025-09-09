@@ -1,3 +1,4 @@
+
 // This script runs the seedDatabase function from your src directory.
 // It should only be run once, or when you need to reset your merchant data.
 import { seedDatabase, seedMerchantOwners } from '../src/lib/seed.js';
