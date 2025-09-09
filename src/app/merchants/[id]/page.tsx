@@ -100,57 +100,23 @@ export default function MerchantPage() {
 
     setAddingToCart(item.id);
 
-    const userDocRef = doc(db, 'users', user.id);
-    const merchantDocRef = doc(db, 'merchants', merchantId);
-
     try {
-        await runTransaction(db, async (transaction) => {
-            const userSnap = await transaction.get(userDocRef);
-            const merchantSnap = await transaction.get(merchantDocRef);
-
-            if (!userSnap.exists()) throw new Error("User not found");
-            if (!merchantSnap.exists()) throw new Error("Merchant not found");
-            
-            const merchantData = merchantSnap.data() as Merchant;
-            const currentListings = merchantData.listings || [];
-            const listingIndex = currentListings.findIndex(l => l.id === item.id);
-
-            if (listingIndex === -1) throw new Error("Item not found");
-            if (currentListings[listingIndex].quantity < quantity) throw new Error("Not enough items in stock");
-
-            // Decrement quantity
-            currentListings[listingIndex].quantity -= quantity;
-            
-            const orderId = `order_${user.id}_${item.id}_${Date.now()}`;
-            
-            // Create new cart item
-            const newCartItem: CartItem = {
-              orderId,
-              title: item.name,
-              itemId: item.id,
-              listingId: item.id,
-              price: item.price * quantity,
-              quantity: quantity,
-              merchantId: merchant!.id,
-              merchantName: merchant!.companyName,
-              redeemCode: null,
-              status: 'pending_approval',
-              timestamp: Timestamp.now(),
-              userId: user.id,
-              userName: user.name || 'Anonymous',
-              category: item.category,
-            };
-
-            const newPendingOrder = { ...newCartItem }; 
-            
-            transaction.update(merchantDocRef, { 
-                listings: currentListings,
-                pendingOrders: arrayUnion(newPendingOrder),
-            });
-            transaction.update(userDocRef, {
-                cart: arrayUnion(newCartItem)
-            });
+        const response = await fetch('/api/cart/add-item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.id,
+                merchantId,
+                item,
+                quantity,
+            }),
         });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.details || 'Failed to add item to cart.');
+        }
 
         toast({
             title: "Added to Cart!",
