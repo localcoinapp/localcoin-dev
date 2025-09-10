@@ -346,7 +346,7 @@ export default function DashboardPage() {
       const response = await fetch('/api/merchant/redeem-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: order.userId,
           merchantId: order.merchantId,
           orderId: order.orderId,
