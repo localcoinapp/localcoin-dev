@@ -9,6 +9,19 @@
 # 3. Run the script: `./grant_permissions.sh`
 # -----------------------------------------------------------------------------
 
+echo "Detecting App Hosting backend..."
+
+# Get the backend ID. This command will output JSON that we can parse.
+# We assume there is only one backend.
+BACKEND_ID=$(firebase apphosting:backends:list --json | grep -o '"id": "[^"]*' | cut -d'"' -f4)
+
+if [ -z "$BACKEND_ID" ]; then
+  echo "ERROR: Could not automatically detect the App Hosting backend ID."
+  echo "Please try running 'firebase apphosting:backends:list' to ensure you have a backend."
+  exit 1
+fi
+
+echo "Found backend ID: $BACKEND_ID"
 echo "Granting access to production secrets..."
 
 # List of all secrets used in apphosting.yaml
@@ -34,7 +47,8 @@ SECRETS=(
 # Loop through the array and grant access to each secret
 for secret in "${SECRETS[@]}"; do
   echo "Granting access to $secret..."
-  firebase apphosting:secrets:grantaccess "$secret"
+  # Explicitly use the --backend flag
+  firebase apphosting:secrets:grantaccess "$secret" --backend "$BACKEND_ID"
   if [ $? -ne 0 ]; then
     echo "ERROR: Failed to grant access to $secret. Please check if the secret exists."
     exit 1
