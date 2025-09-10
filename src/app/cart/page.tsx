@@ -125,7 +125,7 @@ export default function CartPage() {
         }
         
         toast({ title: "Success", description: "The merchant has been notified. Show them your code to complete the transaction." });
-        setOpenRedeemDialogId(order.orderId); // Open the dialog on success
+        setOpenRedeemDialogId(order.orderId); // This logic might need review depending on desired UX
 
     } catch(error) {
         toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
@@ -147,14 +147,13 @@ export default function CartPage() {
             const timestampField = item.redeemedAt || item.timestamp;
             if (!timestampField) return null;
             
-            if (timestampField instanceof Timestamp) {
+            // Handle Firestore Timestamp objects
+            if (timestampField.toDate && typeof timestampField.toDate === 'function') {
                 return timestampField.toDate();
             }
-            if (timestampField instanceof Date) {
-                return timestampField;
-            }
-            // Handle cases where it might be a string or number
+            // Handle ISO strings or other Date-parsable formats
             const date = new Date(timestampField);
+            // Check if the date is valid
             return isNaN(date.getTime()) ? null : date;
         };
 
