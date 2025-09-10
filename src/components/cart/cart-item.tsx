@@ -50,7 +50,6 @@ export function CartItemCard({ cartItem, onCancel, onAction, actionLabel, isRede
                     isOpen={isRedeemDialogOpen ?? false}
                     onOpenChange={onOpenChange}
                     cartItem={cartItem} 
-                    onRedeem={onAction}
                  >
                     <Button size="sm">
                         <QrCode className="mr-2 h-4 w-4" />
