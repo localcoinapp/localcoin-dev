@@ -14,8 +14,10 @@ runConfig:
       secret: LOCALCOIN_MNEMONIC
     STRIPE_SECRET_KEY_EUR:
       secret: STRIPE_SECRET_KEY_EUR
+      availability: ["RUNTIME"]
     STRIPE_SECRET_KEY_USD:
       secret: STRIPE_SECRET_KEY_USD
+      availability: ["RUNTIME"]
     SMTP_HOST:
       secret: SMTP_HOST
     SMTP_PORT:
