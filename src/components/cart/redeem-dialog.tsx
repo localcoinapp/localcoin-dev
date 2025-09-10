@@ -20,9 +20,6 @@ interface RedeemDialogProps {
     merchantName: string;
     redeemCode: string | null;
   };
-  // The user no longer triggers the redeem action directly.
-  // The merchant does this from their dashboard.
-  // onRedeem: () => void;
   children: ReactNode;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;

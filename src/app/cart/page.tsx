@@ -99,15 +99,15 @@ export default function CartPage() {
       }
   };
   
-  // This function is now only for showing the dialog, not performing the action.
+  // This function is now only for showing the dialog.
   const showRedeemDialog = (order: CartItem) => {
     setOpenRedeemDialogId(order.orderId);
   }
 
   // Buckets
   const pending = cartItems.filter((item) => item.status === 'pending_approval');
-  // Combine approved and ready_to_redeem into one "Approved" tab for the user.
-  const approved = cartItems.filter((item) => item.status === 'approved' || item.status === 'ready_to_redeem');
+  // The user should see items that are 'ready_to_redeem' in their "Approved" tab.
+  const approved = cartItems.filter((item) => item.status === 'ready_to_redeem');
   
   const history = cartItems
     .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded', 'failed'].includes(item.status))
@@ -197,7 +197,7 @@ export default function CartPage() {
                   <CartItemCard 
                     key={item.orderId} 
                     cartItem={item} 
-                    onAction={() => showRedeemDialog(item)} // This now just opens the modal
+                    onAction={() => showRedeemDialog(item)}
                     actionLabel="Redeem"
                     isRedeemMode={true}
                     isRedeemDialogOpen={openRedeemDialogId === item.orderId}
