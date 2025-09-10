@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { QrCode, Loader2 } from 'lucide-react';
 import { siteConfig } from '@/config/site';
 import { RedeemDialog } from './redeem-dialog';
+import { Timestamp } from 'firebase/firestore';
 
 interface CartItemCardProps {
     cartItem: CartItem;
@@ -34,12 +35,27 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 export function CartItemCard({ cartItem, onCancel, onAction, actionLabel, isRedeemMode, isProcessing, isRedeemDialogOpen, onOpenChange }: CartItemCardProps) {
     const config = statusConfig[cartItem.status];
     
+    // A robust function to get a valid Date object or null, preventing crashes
+    const getSafeDate = (timestamp: any): Date | null => {
+        if (!timestamp) return null;
+        if (timestamp instanceof Timestamp) {
+            return timestamp.toDate();
+        }
+        // Check for a toDate method for Firestore Timestamps that might not be instances of the imported class
+        if (typeof timestamp.toDate === 'function') {
+            return timestamp.toDate();
+        }
+        // Final check if it's already a Date object
+        if (timestamp instanceof Date && !isNaN(timestamp.getTime())) {
+            return timestamp;
+        }
+        return null;
+    };
+
     const getRelativeDate = (timestamp: any) => {
-      if (!timestamp) return 'some time ago';
-      if (typeof timestamp.toDate === 'function') {
-        return formatDistanceToNow(timestamp.toDate(), { addSuffix: true });
-      }
-      return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+        const safeDate = getSafeDate(timestamp);
+        if (!safeDate) return 'a few moments ago';
+        return formatDistanceToNow(safeDate, { addSuffix: true });
     };
 
     const requestedAt = getRelativeDate(cartItem.timestamp);
@@ -109,3 +125,5 @@ export function CartItemCard({ cartItem, onCancel, onAction, actionLabel, isRede
         </Card>
     );
 }
+
+    

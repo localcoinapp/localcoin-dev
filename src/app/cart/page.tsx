@@ -143,22 +143,25 @@ export default function CartPage() {
     .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded', 'failed'].includes(item.status))
     .filter(item => historyFilter === 'all' || item.status === historyFilter)
     .sort((a, b) => {
-        const getDate = (item: CartItem): Date | null => {
-            const timestampField = item.redeemedAt || item.timestamp;
-            if (!timestampField) return null;
-            
-            // Handle Firestore Timestamp objects
-            if (timestampField.toDate && typeof timestampField.toDate === 'function') {
-                return timestampField.toDate();
+        // A robust function to get a valid Date object or null
+        const getSafeDate = (timestamp: any): Date | null => {
+            if (!timestamp) return null;
+            if (timestamp instanceof Timestamp) {
+                return timestamp.toDate();
             }
-            // Handle ISO strings or other Date-parsable formats
-            const date = new Date(timestampField);
-            // Check if the date is valid
-            return isNaN(date.getTime()) ? null : date;
+            // Check for a toDate method for Firestore Timestamps that might not be instances of the imported class
+            if (typeof timestamp.toDate === 'function') {
+                return timestamp.toDate();
+            }
+            // Final check if it's already a Date object
+            if (timestamp instanceof Date && !isNaN(timestamp.getTime())) {
+                return timestamp;
+            }
+            return null;
         };
 
-        const timeA = getDate(a)?.getTime() || 0;
-        const timeB = getDate(b)?.getTime() || 0;
+        const timeA = getSafeDate(a.redeemedAt || a.timestamp)?.getTime() || 0;
+        const timeB = getSafeDate(b.redeemedAt || b.timestamp)?.getTime() || 0;
 
         switch (historySort) {
             case 'date-desc': return timeB - timeA;
@@ -286,3 +289,5 @@ export default function CartPage() {
     </div>
   );
 }
+
+    
