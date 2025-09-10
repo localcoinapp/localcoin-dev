@@ -1,8 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase-admin';
+import { collection, addDoc, serverTimestamp } from 'firebase-admin/firestore';
 
 export const runtime = 'nodejs';
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
         // --- Create a pending purchase request in Firestore ---
         // This allows us to track the request before the payment is confirmed by Stripe.
-        const requestsCollection = collection(db, 'tokenPurchaseRequests');
+        const requestsCollection = collection(firestore, 'tokenPurchaseRequests');
         const pendingRequestRef = await addDoc(requestsCollection, {
             userId,
             userName,
