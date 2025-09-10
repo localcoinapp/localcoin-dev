@@ -61,12 +61,3 @@ env:
   - variable: NEXT_PUBLIC_EURUSD_RATE
     secret: NEXT_PUBLIC_EURUSD_RATE
     availability: [BUILD, RUNTIME]
-
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    availability: [BUILD, RUNTIME]
-
-  # server-only (use a separate secret if you have one; otherwise reuse the same secret name)
-  - variable: FIREBASE_STORAGE_BUCKET
-    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    availability: [RUNTIME]
