@@ -1,10 +1,10 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { firestore } from '@/lib/firebase-admin';
 import type { CartItem } from '@/types';
-import { Timestamp, arrayUnion } from 'firebase/firestore/lite';
-
-export const runtime = 'nodejs';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 // --- Helper function to find and update inventory ---
 const updateInventory = (listings: any[], listingId: string, quantityChange: number): any[] => {
@@ -59,13 +59,13 @@ export async function POST(req: NextRequest) {
         if (action === 'approve') {
             const redeemCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-            // Update order status in merchant's pending orders
-            order.status = 'approved';
+            // Update order status to 'ready_to_redeem' in merchant's pending orders
+            order.status = 'ready_to_redeem';
             order.redeemCode = redeemCode;
 
             // Update user's cart
             const updatedUserCart = userCart.map(item =>
-                item.orderId === orderId ? { ...item, status: 'approved', redeemCode } : item
+                item.orderId === orderId ? { ...item, status: 'ready_to_redeem', redeemCode } : item
             );
             
             transaction.update(merchantDocRef, { pendingOrders: pendingOrders });
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
             transaction.update(merchantDocRef, { 
                 pendingOrders: updatedPendingOrders,
                 listings: updatedListings,
-                recentTransactions: arrayUnion(rejectedTransaction)
+                recentTransactions: FieldValue.arrayUnion(rejectedTransaction)
             });
             transaction.update(userDocRef, { cart: updatedUserCart });
         }
@@ -107,5 +107,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to process order.', details: errorMessage }, { status: 500 });
   }
 }
-
-    

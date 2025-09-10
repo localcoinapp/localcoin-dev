@@ -1,4 +1,6 @@
 
+'use client';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -59,13 +61,13 @@ export async function POST(req: NextRequest) {
       const userData = userSnap.data() as User;
       const merchantData = merchantSnap.data() as Merchant;
 
-      // Find the specific order in the user's cart this time
-      const userCart = userData.cart || [];
-      const orderIndex = userCart.findIndex(o => o.orderId === orderId);
+      // The order now lives on the merchant's pending orders until redeemed
+      const pendingOrders = merchantData.pendingOrders || [];
+      const orderIndex = pendingOrders.findIndex(o => o.orderId === orderId);
 
-      if (orderIndex === -1) throw new Error('Order not found in user cart.');
+      if (orderIndex === -1) throw new Error('Order not found in merchant pending orders.');
       
-      const order = userCart[orderIndex];
+      const order = pendingOrders[orderIndex];
 
       if (order.status !== 'ready_to_redeem') throw new Error(`Order not ready for redemption. Status is: ${order.status}`);
       if (!order.price || order.price <= 0) throw new Error('Invalid order price. Price must be greater than zero.');
@@ -107,15 +109,16 @@ export async function POST(req: NextRequest) {
         redeemedAt: Timestamp.now(),
         transactionSignature: txSignature,
       };
-
-      // 1. Update user's cart
+      
+      // 1. Update user's walletBalance and cart status
       const updatedUserCart = (userData.cart ?? []).map((cartItem: CartItem) =>
         cartItem.orderId === orderId ? completedOrder : cartItem
       );
-      transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: (userData.walletBalance || 0) - order.price });
+      const newBalance = (userData.walletBalance || 0) - order.price;
+      transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newBalance > 0 ? newBalance : 0 });
 
-      // 2. Update merchant's records
-      const updatedPendingOrders = (merchantData.pendingOrders ?? []).filter(o => o.orderId !== orderId);
+      // 2. Remove from merchant's pending orders and add to recent transactions
+      const updatedPendingOrders = pendingOrders.filter(o => o.orderId !== orderId);
       transaction.update(merchantDocRef, {
         pendingOrders: updatedPendingOrders,
         recentTransactions: FieldValue.arrayUnion(completedOrder),

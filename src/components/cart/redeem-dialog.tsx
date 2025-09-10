@@ -20,27 +20,19 @@ interface RedeemDialogProps {
     merchantName: string;
     redeemCode: string | null;
   };
-  onRedeem: () => void;
+  // The user no longer triggers the redeem action directly.
+  // The merchant does this from their dashboard.
+  // onRedeem: () => void;
   children: ReactNode;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChange }: RedeemDialogProps) {
+export function RedeemDialog({ cartItem, children, isOpen, onOpenChange }: RedeemDialogProps) {
 
   if (!cartItem.redeemCode) {
-    // This case should ideally not be hit if the dialog is only shown for 'approved' items
+    // Fallback if dialog is somehow triggered for an item without a code.
     return <>{children}</>;
-  }
-
-  const handleApproveClick = () => {
-    onRedeem();
-    toast({
-        title: "Ready to Go!",
-        description: "The merchant has been notified. They will complete the transaction on their end."
-    })
-    // NOTE: We do not close the modal here. The user must do it manually by clicking close.
-    // The parent component `cart/page.tsx` controls the state.
   }
 
   return (
@@ -53,11 +45,11 @@ export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChang
             <AlertDialogHeader>
               <AlertDialogTitle className="text-center text-2xl font-headline">Redeem Your Item</AlertDialogTitle>
               <AlertDialogDescription className="text-center">
-                Show this code to the merchant. The merchant must confirm they see this screen to approve the redemption.
+                Show this code to the merchant. The merchant will complete the transaction on their side.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex flex-col items-center justify-center p-6 bg-muted rounded-lg">
-                <p className="text-sm font-semibold text-muted-foreground">CONFIRMATION CODE</p>
+                <p className="text-sm font-semibold text-muted-foreground">REDEMPTION CODE</p>
                 <p className="text-5xl font-bold font-mono tracking-widest text-primary my-4">
                     {cartItem.redeemCode}
                 </p>
@@ -66,13 +58,8 @@ export function RedeemDialog({ cartItem, onRedeem, children, isOpen, onOpenChang
                     <p className="text-muted-foreground">{cartItem.merchantName}</p>
                 </div>
             </div>
-            <AlertDialogFooter className="sm:justify-between sm:flex-row-reverse w-full mt-2">
-                {/* 
-                  Using a standard Button instead of AlertDialogAction prevents the dialog
-                  from closing automatically on click. This is the key to the fix.
-                */}
-                <Button onClick={handleApproveClick}>I've shown the merchant, approve for redemption</Button>
-                <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+            <AlertDialogFooter className="w-full mt-2">
+                <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">Close</Button>
             </AlertDialogFooter>
           </>
       </AlertDialogContent>
