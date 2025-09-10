@@ -1,46 +1,72 @@
-# Settings to manage and configure a Firebase App Hosting backend.
-# https://firebase.google.com/docs/app-hosting/configure
-
+# apphosting.yaml
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
   maxInstances: 1
-  # This tells App Hosting to look for these secrets in Google Secret Manager
-  # and make them available as environment variables to your app.
-  environment:
-    GEMINI_API_KEY:
-      secret: GEMINI_API_KEY
-    LOCALCOIN_MNEMONIC:
-      secret: LOCALCOIN_MNEMONIC
-    STRIPE_SECRET_KEY_EUR:
-      secret: STRIPE_SECRET_KEY_EUR
-    STRIPE_SECRET_KEY_USD:
-      secret: STRIPE_SECRET_KEY_USD
-    SMTP_HOST:
-      secret: SMTP_HOST
-    SMTP_PORT:
-      secret: SMTP_PORT
-    SMTP_USER:
-      secret: SMTP_USER
-    SMTP_PASS:
-      secret: SMTP_PASS
-    SMTP_FROM:
-      secret: SMTP_FROM
-    NEXT_PUBLIC_CONTACT_EMAIL:
-      secret: NEXT_PUBLIC_CONTACT_EMAIL
-    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR:
-      secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR
-    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD:
-      secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD
-    ENCRYPTION_SECRET:
-      secret: ENCRYPTION_SECRET
-    NEXT_PUBLIC_EURUSD_RATE:
-      secret: NEXT_PUBLIC_EURUSD_RATE
-    FIREBASE_ADMIN_SERVICE_ACCOUNT:
-      secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
-    # This variable is required by the backend to know where to upload files.
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:
-      secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    # Add a server-only variable for the bucket name
-    FIREBASE_STORAGE_BUCKET:
-      secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+
+# Environment variables & secrets
+env:
+  # server-only secrets (runtime)
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+    availability: [RUNTIME]
+
+  - variable: LOCALCOIN_MNEMONIC
+    secret: LOCALCOIN_MNEMONIC
+    availability: [RUNTIME]
+
+  - variable: STRIPE_SECRET_KEY_EUR
+    secret: STRIPE_SECRET_KEY_EUR
+    availability: [RUNTIME]
+
+  - variable: STRIPE_SECRET_KEY_USD
+    secret: STRIPE_SECRET_KEY_USD
+    availability: [RUNTIME]
+
+  - variable: SMTP_HOST
+    secret: SMTP_HOST
+    availability: [RUNTIME]
+  - variable: SMTP_PORT
+    secret: SMTP_PORT
+    availability: [RUNTIME]
+  - variable: SMTP_USER
+    secret: SMTP_USER
+    availability: [RUNTIME]
+  - variable: SMTP_PASS
+    secret: SMTP_PASS
+    availability: [RUNTIME]
+  - variable: SMTP_FROM
+    secret: SMTP_FROM
+    availability: [RUNTIME]
+
+  - variable: ENCRYPTION_SECRET
+    secret: ENCRYPTION_SECRET
+    availability: [RUNTIME]
+
+  - variable: FIREBASE_ADMIN_SERVICE_ACCOUNT
+    secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
+    availability: [RUNTIME]
+
+  # safe to expose (public) – needed at build + runtime
+  - variable: NEXT_PUBLIC_CONTACT_EMAIL
+    secret: NEXT_PUBLIC_CONTACT_EMAIL
+    availability: [BUILD, RUNTIME]
+
+  - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR
+    secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_EUR
+    availability: [BUILD, RUNTIME]
+
+  - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD
+    secret: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_USD
+    availability: [BUILD, RUNTIME]
+
+  - variable: NEXT_PUBLIC_EURUSD_RATE
+    secret: NEXT_PUBLIC_EURUSD_RATE
+    availability: [BUILD, RUNTIME]
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    availability: [BUILD, RUNTIME]
+
+  # server-only (use a separate secret if you have one; otherwise reuse the same secret name)
+  - variable: FIREBASE_STORAGE_BUCKET
+    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    availability: [RUNTIME]
