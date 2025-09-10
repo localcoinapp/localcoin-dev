@@ -11,9 +11,8 @@
 
 echo "Detecting App Hosting backend..."
 
-# Get the backend ID. This command will output JSON that we can parse.
-# We assume there is only one backend.
-BACKEND_ID=$(firebase apphosting:backends:list --json | grep -o '"id": "[^"]*' | cut -d'"' -f4)
+# Get the backend ID from the table output, skipping the header lines.
+BACKEND_ID=$(firebase apphosting:backends:list | tail -n +4 | head -n -1 | awk '{print $2}')
 
 if [ -z "$BACKEND_ID" ]; then
   echo "ERROR: Could not automatically detect the App Hosting backend ID."
