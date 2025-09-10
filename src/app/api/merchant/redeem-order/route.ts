@@ -1,5 +1,5 @@
 
-'use client';
+'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -38,97 +38,96 @@ function getRpcUrl() {
 export async function POST(req: NextRequest) {
   console.log('--- Received POST /api/merchant/redeem-order ---');
 
-  try {
-    const { userId, merchantId, orderId } = await req.json();
+  const { userId, merchantId, orderId } = await req.json();
 
-    if (!userId || !merchantId || !orderId) {
-      return NextResponse.json({ error: 'Missing critical order data (userId, merchantId, or orderId)' }, { status: 400 });
+  if (!userId || !merchantId || !orderId) {
+    return NextResponse.json({ error: 'Missing critical order data (userId, merchantId, or orderId)' }, { status: 400 });
+  }
+
+  try {
+    // --- Phase 1: Data Validation (outside transaction) ---
+    const userDocRef = firestore.collection('users').doc(userId);
+    const merchantDocRef = firestore.collection('merchants').doc(merchantId);
+
+    const userSnap = await userDocRef.get();
+    const merchantSnap = await merchantDocRef.get();
+
+    if (!userSnap.exists) throw new Error('User not found');
+    if (!merchantSnap.exists) throw new Error('Merchant not found');
+
+    const userData = userSnap.data() as User;
+    const merchantData = merchantSnap.data() as Merchant;
+
+    const pendingOrders = merchantData.pendingOrders || [];
+    const orderIndex = pendingOrders.findIndex(o => o.orderId === orderId);
+
+    if (orderIndex === -1) throw new Error('Order not found in merchant pending orders.');
+    
+    const order = pendingOrders[orderIndex];
+
+    if (order.status !== 'ready_to_redeem') throw new Error(`Order not ready for redemption. Status is: ${order.status}`);
+    if (!order.price || order.price <= 0) throw new Error('Invalid order price. Price must be greater than zero.');
+    if (!userData.seedPhrase) throw new Error('User seed phrase not found. Cannot authorize transfer.');
+    if (!merchantData.walletAddress) throw new Error('Merchant wallet address not found. Cannot receive funds.');
+
+    // --- Phase 2: Solana Blockchain Transfer ---
+    const connection = new Connection(getRpcUrl(), 'confirmed');
+    const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
+    const userKeypair = keypairFromMnemonic(userData.seedPhrase);
+    const merchantPublicKey = new PublicKey(merchantData.walletAddress);
+
+    const mintInfo = await getMint(connection, tokenMintPublicKey);
+    const decimals = mintInfo.decimals;
+    const rawAmount = BigInt(Math.round(order.price * Math.pow(10, decimals)));
+
+    const userSolBalance = await connection.getBalance(userKeypair.publicKey);
+    if (userSolBalance < 5000) throw new Error('Insufficient SOL balance for transaction fees.');
+
+    const fromAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey);
+    const fromAtaInfo = await getAccount(connection, fromAta.address);
+    if (fromAtaInfo.amount < rawAmount) {
+      throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / Math.pow(10, decimals)}, but requires ${order.price}.`);
     }
 
-    // --- Core Transaction Logic using Admin SDK ---
-    const signature = await firestore.runTransaction(async (transaction) => {
-      const userDocRef = firestore.collection('users').doc(userId);
-      const merchantDocRef = firestore.collection('merchants').doc(merchantId);
+    const toAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, merchantPublicKey);
+    const ix = createTransferCheckedInstruction(fromAta.address, tokenMintPublicKey, toAta.address, userKeypair.publicKey, rawAmount, decimals);
 
-      const [userSnap, merchantSnap] = await Promise.all([
-        transaction.get(userDocRef),
-        transaction.get(merchantDocRef),
-      ]);
+    const tx = new Transaction().add(ix);
+    const txSignature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
+    console.log('Redemption Transfer Signature:', txSignature);
 
-      if (!userSnap.exists) throw new Error('User not found');
-      if (!merchantSnap.exists) throw new Error('Merchant not found');
+    // --- Phase 3: Firestore Atomic Updates (inside transaction) ---
+    await firestore.runTransaction(async (transaction) => {
+        // Re-fetch docs inside transaction for consistency
+        const userDoc = await transaction.get(userDocRef);
+        const merchantDoc = await transaction.get(merchantDocRef);
+        const freshUserData = userDoc.data() as User;
+        const freshMerchantData = merchantDoc.data() as Merchant;
 
-      const userData = userSnap.data() as User;
-      const merchantData = merchantSnap.data() as Merchant;
+        const completedOrder: CartItem = {
+            ...order,
+            status: 'completed',
+            redeemedAt: Timestamp.now(),
+            transactionSignature: txSignature,
+        };
 
-      // The order now lives on the merchant's pending orders until redeemed
-      const pendingOrders = merchantData.pendingOrders || [];
-      const orderIndex = pendingOrders.findIndex(o => o.orderId === orderId);
+        // 1. Update user's walletBalance and cart status
+        const updatedUserCart = (freshUserData.cart ?? []).map((cartItem: CartItem) =>
+            cartItem.orderId === orderId ? completedOrder : cartItem
+        );
+        const newBalance = (freshUserData.walletBalance || 0) - order.price;
+        transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newBalance > 0 ? newBalance : 0 });
 
-      if (orderIndex === -1) throw new Error('Order not found in merchant pending orders.');
-      
-      const order = pendingOrders[orderIndex];
-
-      if (order.status !== 'ready_to_redeem') throw new Error(`Order not ready for redemption. Status is: ${order.status}`);
-      if (!order.price || order.price <= 0) throw new Error('Invalid order price. Price must be greater than zero.');
-
-      // --- Solana Blockchain Transfer ---
-      if (!userData.seedPhrase) throw new Error('User seed phrase not found. Cannot authorize transfer.');
-      if (!merchantData.walletAddress) throw new Error('Merchant wallet address not found. Cannot receive funds.');
-
-      const connection = new Connection(getRpcUrl(), 'confirmed');
-      const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
-      const userKeypair = keypairFromMnemonic(userData.seedPhrase);
-      const merchantPublicKey = new PublicKey(merchantData.walletAddress);
-
-      const mintInfo = await getMint(connection, tokenMintPublicKey);
-      const decimals = mintInfo.decimals;
-      const rawAmount = BigInt(Math.round(order.price * Math.pow(10, decimals)));
-
-      const userSolBalance = await connection.getBalance(userKeypair.publicKey);
-      if (userSolBalance < 5000) throw new Error('Insufficient SOL balance for transaction fees.');
-
-      const fromAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey);
-      const fromAtaInfo = await getAccount(connection, fromAta.address);
-      if (fromAtaInfo.amount < rawAmount) {
-        throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / Math.pow(10, decimals)}, but requires ${order.price}.`);
-      }
-
-      const toAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, merchantPublicKey);
-      const ix = createTransferCheckedInstruction(fromAta.address, tokenMintPublicKey, toAta.address, userKeypair.publicKey, rawAmount, decimals);
-
-      const tx = new Transaction().add(ix);
-      const txSignature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
-      console.log('Redemption Transfer Signature:', txSignature);
-      // --- End Solana Transfer ---
-
-      // --- Firestore Atomic Updates ---
-      const completedOrder: CartItem = {
-        ...order,
-        status: 'completed',
-        redeemedAt: Timestamp.now(),
-        transactionSignature: txSignature,
-      };
-      
-      // 1. Update user's walletBalance and cart status
-      const updatedUserCart = (userData.cart ?? []).map((cartItem: CartItem) =>
-        cartItem.orderId === orderId ? completedOrder : cartItem
-      );
-      const newBalance = (userData.walletBalance || 0) - order.price;
-      transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newBalance > 0 ? newBalance : 0 });
-
-      // 2. Remove from merchant's pending orders and add to recent transactions
-      const updatedPendingOrders = pendingOrders.filter(o => o.orderId !== orderId);
-      transaction.update(merchantDocRef, {
-        pendingOrders: updatedPendingOrders,
-        recentTransactions: FieldValue.arrayUnion(completedOrder),
-        walletBalance: (merchantData.walletBalance || 0) + order.price,
-      });
-
-      return txSignature; // Return signature on success
+        // 2. Remove from merchant's pending orders and add to recent transactions
+        const updatedPendingOrders = (freshMerchantData.pendingOrders || []).filter(o => o.orderId !== orderId);
+        transaction.update(merchantDocRef, {
+            pendingOrders: updatedPendingOrders,
+            recentTransactions: FieldValue.arrayUnion(completedOrder),
+            walletBalance: (freshMerchantData.walletBalance || 0) + order.price,
+        });
     });
 
-    return NextResponse.json({ signature });
+    return NextResponse.json({ signature: txSignature });
 
   } catch (error: any) {
     console.error('Error in redeem-order API:', error);
