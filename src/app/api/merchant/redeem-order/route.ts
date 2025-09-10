@@ -1,4 +1,6 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import {
   Connection,
@@ -117,7 +119,7 @@ export async function POST(req: NextRequest) {
         transaction.update(userDocRef, { cart: updatedUserCart, walletBalance: newBalance > 0 ? newBalance : 0 });
 
         // 2. Remove from merchant's pending orders and add to recent transactions
-        const updatedPendingOrders = (freshMerchantData.pendingOrders || []).filter(o => o.orderId !== orderId);
+        const updatedPendingOrders = (freshMerchantData.pendingOrders || []).filter((o: CartItem) => o.orderId !== orderId);
         transaction.update(merchantDocRef, {
             pendingOrders: updatedPendingOrders,
             recentTransactions: FieldValue.arrayUnion(completedOrder),
