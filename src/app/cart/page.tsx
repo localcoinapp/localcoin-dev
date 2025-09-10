@@ -28,6 +28,7 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, runTransaction, Timestamp } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import type { CartItem, OrderStatus } from '@/types';
+import { Loader2 } from 'lucide-react';
 
 type SortOption = 'date-desc' | 'date-asc' | 'price-asc' | 'price-desc';
 
@@ -37,6 +38,7 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openRedeemDialogId, setOpenRedeemDialogId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   // State for history filtering and sorting
   const [historyFilter, setHistoryFilter] = useState<OrderStatus | 'all'>('all');
@@ -98,16 +100,44 @@ export default function CartPage() {
         setOpenRedeemDialogId(null);
       }
   };
-  
-  // This function is now only for showing the dialog.
-  const showRedeemDialog = (order: CartItem) => {
-    setOpenRedeemDialogId(order.orderId);
-  }
+
+  const handleRequestRedemption = async (order: CartItem) => {
+    if (!user?.id || !order.merchantId) {
+        toast({ title: "Error", description: "Missing user or merchant information.", variant: "destructive" });
+        return;
+    }
+    
+    setIsProcessing(order.orderId);
+    try {
+        const response = await fetch('/api/user/request-redemption', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.id,
+                merchantId: order.merchantId,
+                orderId: order.orderId,
+            }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.details || 'Failed to request redemption.');
+        }
+        
+        toast({ title: "Success", description: "The merchant has been notified. Show them your code to complete the transaction." });
+        setOpenRedeemDialogId(order.orderId); // Open the dialog on success
+
+    } catch(error) {
+        toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
+    } finally {
+        setIsProcessing(null);
+    }
+  };
 
   // Buckets
   const pending = cartItems.filter((item) => item.status === 'pending_approval');
-  // The user should see items that are 'ready_to_redeem' in their "Approved" tab.
-  const approved = cartItems.filter((item) => item.status === 'ready_to_redeem');
+  // User should see items they can act on in their "Approved" tab
+  const approved = cartItems.filter((item) => item.status === 'approved' || item.status === 'ready_to_redeem');
   
   const history = cartItems
     .filter((item) => ['rejected', 'cancelled', 'completed', 'refunded', 'failed'].includes(item.status))
@@ -152,7 +182,7 @@ export default function CartPage() {
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 text-center">
-        <p>Loading cart...</p>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -197,9 +227,10 @@ export default function CartPage() {
                   <CartItemCard 
                     key={item.orderId} 
                     cartItem={item} 
-                    onAction={() => showRedeemDialog(item)}
+                    onAction={() => handleRequestRedemption(item)}
                     actionLabel="Redeem"
                     isRedeemMode={true}
+                    isProcessing={isProcessing === item.orderId}
                     isRedeemDialogOpen={openRedeemDialogId === item.orderId}
                     onOpenChange={(isOpen) => handleRedeemDialogOpenChange(isOpen, item.orderId)}
                   />

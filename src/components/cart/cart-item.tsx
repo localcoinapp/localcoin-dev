@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { QrCode } from 'lucide-react';
+import { QrCode, Loader2 } from 'lucide-react';
 import { siteConfig } from '@/config/site';
 import { RedeemDialog } from './redeem-dialog';
 
@@ -17,6 +17,7 @@ interface CartItemCardProps {
     onAction?: () => void; // Generic action handler
     actionLabel?: string;
     isRedeemMode?: boolean;
+    isProcessing?: boolean;
     isRedeemDialogOpen?: boolean;
     onOpenChange?: (isOpen: boolean) => void;
 }
@@ -30,7 +31,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
     'cancelled': { label: "Canceled", color: "bg-gray-500" },
 };
 
-export function CartItemCard({ cartItem, onCancel, onAction, actionLabel, isRedeemMode, isRedeemDialogOpen, onOpenChange }: CartItemCardProps) {
+export function CartItemCard({ cartItem, onCancel, onAction, actionLabel, isRedeemMode, isProcessing, isRedeemDialogOpen, onOpenChange }: CartItemCardProps) {
     const config = statusConfig[cartItem.status];
     
     const getRelativeDate = (timestamp: any) => {
@@ -44,23 +45,35 @@ export function CartItemCard({ cartItem, onCancel, onAction, actionLabel, isRede
     const requestedAt = getRelativeDate(cartItem.timestamp);
 
     const renderAction = () => {
+        if (isProcessing) {
+             return <Button size="sm" disabled><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Processing...</Button>
+        }
+
         if (isRedeemMode && onAction && onOpenChange) {
-            return (
-                 <RedeemDialog 
-                    isOpen={isRedeemDialogOpen ?? false}
-                    onOpenChange={onOpenChange}
-                    cartItem={cartItem} 
-                 >
+            // The action for the user is to request redemption, which shows the dialog.
+            // If the item is already 'ready_to_redeem', we just show the dialog without another action.
+            if (cartItem.status === 'ready_to_redeem') {
+                return (
+                     <RedeemDialog 
+                        isOpen={isRedeemDialogOpen ?? false}
+                        onOpenChange={onOpenChange}
+                        cartItem={cartItem} 
+                     >
+                        <Button size="sm">
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Show Code
+                        </Button>
+                    </RedeemDialog>
+                )
+            }
+             if (cartItem.status === 'approved') {
+                 return (
                     <Button size="sm" onClick={onAction}>
                         <QrCode className="mr-2 h-4 w-4" />
                         {actionLabel || 'Redeem'}
                     </Button>
-                </RedeemDialog>
-            );
-        }
-
-        if (onAction && actionLabel) {
-            return <Button size="sm" onClick={onAction}>{actionLabel}</Button>
+                );
+            }
         }
         
         if (cartItem.status === 'pending_approval' && onCancel) {
