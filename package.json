@@ -82,6 +82,7 @@
     "@types/nodemailer": "^6.4.15",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "latest",
     "autoprefixer": "^10.4.19",
     "axe-core": "latest",
     "eslint": "^8.57.0",
