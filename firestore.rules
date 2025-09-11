@@ -1,107 +1,145 @@
-
 rules_version = '2';
-
 service cloud.firestore {
+
+  ////////////////////////////////////////
+  // Helpers
+  ////////////////////////////////////////
+  function isSignedIn() {
+    return request.auth != null && request.auth.uid != null;
+  }
+
+  function isAdmin() {
+    return isSignedIn()
+      && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+  }
+
+  function isMerchantOwner(merchantId) {
+    return isSignedIn()
+      && exists(/databases/$(database)/documents/merchants/$(merchantId))
+      && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
+  }
+
+  // Owner may launch store: approved -> live (and only set these fields)
+  function ownerCanLaunchStore() {
+    return resource.data.status == 'approved'
+      && request.resource.data.status == 'live'
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','walletAddress','seedPhrase']);
+  }
+
+  // Owner may toggle live <-> paused, optionally touching a few metadata fields
+  function ownerCanToggleStatus() {
+    // Only these fields may change during a toggle:
+    // - status (must change)
+    // - updatedAt / updatedBy / statusNote (optional metadata)
+    return resource.data.status in ['live','paused']
+      && request.resource.data.status in ['live','paused']
+      && request.resource.data.status != resource.data.status
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','updatedBy','statusNote'])
+      && request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']);
+  }
+
+  // Owner may update general settings (not status/owner)
+  function ownerCanUpdateSettings() {
+    return request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        'companyName','category','logo','banner','aiHint','position','geohash',
+        'description','listings','street','houseNumber','city','zipCode',
+        'website','instagram','userEmail','contactEmail','phone','state','taxNumber','country',
+        'updatedAt'
+      ]);
+  }
+
   match /databases/{database}/documents {
 
-    // Helper functions for common checks
-    function isSignedIn() {
-      return request.auth != null && request.auth.uid != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    function isMerchantOwner(merchantId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/merchants/$(merchantId))
-        && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
-    }
-
-    // ---------------- Merchants ----------------
+    ////////////////////////////////////////
+    // Merchants
+    ////////////////////////////////////////
     match /merchants/{merchantId} {
-      // Public can read LIVE merchants. Owners and Admins can read their own/any.
+
+      // Public can read LIVE merchants; owners/admins can read their own/any merchant
       allow read: if resource.data.status == 'live' || isAdmin() || isMerchantOwner(merchantId);
-      
-      // Only Admins can create new merchant documents.
+
+      // Create only by admin (adjust if you want owners to create their own)
       allow create: if isAdmin();
-      
-      // Complex update logic for owners and admins.
+
+      // Update by admin OR by owner within allowed change sets
       allow update: if isAdmin() || (
         isMerchantOwner(merchantId) && (
-          // Use Case 1: Launching a store (approved -> live + wallet info)
-          (request.resource.data.status == 'live' && resource.data.status == 'approved' &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'walletAddress', 'seedPhrase'])) ||
-          
-          // Use Case 2: Toggling status between live and paused (allows metadata fields)
-          (request.resource.data.status in ['live', 'paused'] && resource.data.status in ['live', 'paused'] &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-
-          // Use Case 3: General settings updates (cannot change status or owner)
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'companyName', 'category', 'logo', 'banner', 'aiHint', 'position', 'geohash',
-            'description', 'listings', 'street', 'houseNumber', 'city', 'zipCode',
-            'website', 'instagram', 'userEmail', 'contactEmail', 'phone', 'state', 'taxNumber', 'country'
-          ]))
+          ownerCanLaunchStore() ||
+          ownerCanToggleStatus() ||
+          ownerCanUpdateSettings()
         )
       );
-      
-      // Only Admins can delete.
+
+      // Delete only by admin
       allow delete: if isAdmin();
     }
 
-    // --------------- Merchant Owner Lookup ---------------
+    ////////////////////////////////////////
+    // Merchant owner lookup
+    ////////////////////////////////////////
     match /merchant_owners/{userId} {
-      // Allows a logged-in user to read their OWN merchant owner entry.
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      // Allows a new merchant to create their own lookup entry.
       allow create: if isSignedIn() && request.auth.uid == userId;
-      // Admins can manage all entries.
-      allow update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin();
     }
 
-    // ---------------- Users ----------------
+    ////////////////////////////////////////
+    // Users
+    ////////////////////////////////////////
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      // New users can create their own document.
+      allow read:   if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
 
-    // --------------- Blocked Users ---------------
+    ////////////////////////////////////////
+    // Blocked users (admin only)
+    ////////////////////////////////////////
     match /blocked_users/{userId} {
       allow read, write: if isAdmin();
     }
 
-    // --------------- Token Purchase Requests ---------------
+    ////////////////////////////////////////
+    // Token purchase requests
+    ////////////////////////////////////////
     match /tokenPurchaseRequests/{requestId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Users see only their own docs; admins see/manage all
+      allow read:   if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
-    // --------------- Merchant Cash-out Requests ---------------
+    ////////////////////////////////////////
+    // Merchant cashout requests
+    ////////////////////////////////////////
     match /merchantCashoutRequests/{requestId} {
-      allow read: if isAdmin() || (isSignedIn() && isMerchantOwner(resource.data.merchantId));
+      allow read:   if isAdmin() || (isSignedIn() && isMerchantOwner(resource.data.merchantId));
       allow create: if isSignedIn() && isMerchantOwner(request.resource.data.merchantId);
       allow update, delete: if isAdmin();
     }
 
-    // ---------------- Chats & Messages ----------------
+    ////////////////////////////////////////
+    // Chats & messages
+    ////////////////////////////////////////
     match /chats/{chatId} {
-      // Must be a participant or an admin to interact with chats.
-      allow read, update, delete: if isSignedIn() && (request.auth.uid in resource.data.participantIds || isAdmin());
-      allow create: if isSignedIn() && (request.auth.uid in request.resource.data.participantIds || isAdmin());
+      allow read, update, delete: if isSignedIn()
+        && (request.auth.uid in resource.data.participantIds || isAdmin());
+      allow create: if isSignedIn()
+        && (request.auth.uid in request.resource.data.participantIds || isAdmin());
 
       match /messages/{messageId} {
-        // Must be a participant or an admin to interact with messages.
-        allow read, create, update, delete: if isSignedIn() && 
-          (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
+        allow read, create, update, delete: if isSignedIn()
+          && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
       }
+    }
+
+    // Default deny everything else
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
