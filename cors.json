@@ -2,6 +2,7 @@
 [
   {
     "origin": [
+      "https://studio--localcoin-marketplace.us-central1.hosted.app",
       "https://9000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
       "https://6000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
       "https://3000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
@@ -12,8 +13,7 @@
       "https://app.discoverberlin.live",
       "https://app.discovercuba.live",
       "https://app.discoverbolivia.live",
-      "https://app.discoverflorida.live",
-      "https://studio--localcoin-marketplace.us-central1.hosted.app"
+      "https://app.discoverflorida.live"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "responseHeader": ["Content-Type", "Authorization", "x-goog-resumable"],
