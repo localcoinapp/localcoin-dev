@@ -4,7 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // Helper functions for common checks
     function isSignedIn() {
       return request.auth != null && request.auth.uid != null;
     }
@@ -16,96 +16,91 @@ service cloud.firestore {
     }
 
     function isMerchantOwner(merchantId) {
-      // Ensure the merchant document exists before trying to access its data
       return isSignedIn()
         && exists(/databases/$(database)/documents/merchants/$(merchantId))
         && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
     }
-    
-    function ownerCanLaunchStore() {
-      return request.resource.data.status == 'live' 
-        && resource.data.status == 'approved' 
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'walletAddress', 'seedPhrase']);
-    }
 
-    function ownerCanToggleStatus() {
-        let allowedToggleKeys = ['status', 'updatedAt']; // Add any other safe metadata fields here
-        return request.resource.data.status in ['live', 'paused']
-          && resource.data.status in ['live', 'paused']
-          && request.resource.data.diff(resource.data).affectedKeys().hasAll(allowedToggleKeys)
-          && request.resource.data.diff(resource.data).affectedKeys().size() == allowedToggleKeys.size();
-    }
-    
-    function ownerCanUpdateSettings() {
-        return request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'companyName', 'category', 'logo', 'banner', 'aiHint', 'position', 'geohash',
-            'description', 'listings', 'street', 'houseNumber', 'city', 'zipCode', 'state', 'country',
-            'website', 'instagram', 'userEmail', 'contactEmail', 'phone', 'taxNumber', 'updatedAt'
-          ]);
-    }
-
-    // ----------------- Merchants -----------------
+    // ---------------- Merchants ----------------
     match /merchants/{merchantId} {
-      // Allow public read for live merchants.
-      // Allow merchant owners and admins to read their own/any document.
+      // Public can read LIVE merchants. Owners and Admins can read their own/any.
       allow read: if resource.data.status == 'live' || isAdmin() || isMerchantOwner(merchantId);
       
-      // Admins are the only ones who can create merchant documents initially.
+      // Only Admins can create new merchant documents.
       allow create: if isAdmin();
       
-      // Allow updates by Admins or by Merchant Owners under specific conditions.
-      allow update: if isAdmin() || (isMerchantOwner(merchantId) && (
-          ownerCanLaunchStore() || ownerCanToggleStatus() || ownerCanUpdateSettings()
+      // Complex update logic for owners and admins.
+      allow update: if isAdmin() || (
+        isMerchantOwner(merchantId) && (
+          // Use Case 1: Launching a store (approved -> live + wallet info)
+          (request.resource.data.status == 'live' && resource.data.status == 'approved' &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'walletAddress', 'seedPhrase'])) ||
+          
+          // Use Case 2: Toggling status between live and paused (allows metadata fields)
+          (request.resource.data.status in ['live', 'paused'] && resource.data.status in ['live', 'paused'] &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+
+          // Use Case 3: General settings updates (cannot change status or owner)
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'companyName', 'category', 'logo', 'banner', 'aiHint', 'position', 'geohash',
+            'description', 'listings', 'street', 'houseNumber', 'city', 'zipCode',
+            'website', 'instagram', 'userEmail', 'contactEmail', 'phone', 'state', 'taxNumber', 'country'
+          ]))
         )
       );
-
-      // Only admins can delete merchants.
+      
+      // Only Admins can delete.
       allow delete: if isAdmin();
     }
 
-    // ----------------- Merchant Owner Lookup -----------------
+    // --------------- Merchant Owner Lookup ---------------
     match /merchant_owners/{userId} {
+      // Allows a logged-in user to read their OWN merchant owner entry.
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      // Allows a new merchant to create their own lookup entry.
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read, update, delete: if isAdmin();
+      // Admins can manage all entries.
+      allow update, delete: if isAdmin();
     }
 
-    // ----------------- Users -----------------
+    // ---------------- Users ----------------
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // New users can create their own document.
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
-    
-    // ----------------- Blocked Users -----------------
+
+    // --------------- Blocked Users ---------------
     match /blocked_users/{userId} {
-        allow read, write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
-    // ----------------- Token Purchase Requests -----------------
+    // --------------- Token Purchase Requests ---------------
     match /tokenPurchaseRequests/{requestId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
-    
-    // ----------------- Merchant Cashout Requests -----------------
-     match /merchantCashoutRequests/{requestId} {
+
+    // --------------- Merchant Cash-out Requests ---------------
+    match /merchantCashoutRequests/{requestId} {
       allow read: if isAdmin() || (isSignedIn() && isMerchantOwner(resource.data.merchantId));
       allow create: if isSignedIn() && isMerchantOwner(request.resource.data.merchantId);
       allow update, delete: if isAdmin();
     }
 
-    // ----------------- Chats & Messages -----------------
+    // ---------------- Chats & Messages ----------------
     match /chats/{chatId} {
+      // Must be a participant or an admin to interact with chats.
       allow read, update, delete: if isSignedIn() && (request.auth.uid in resource.data.participantIds || isAdmin());
       allow create: if isSignedIn() && (request.auth.uid in request.resource.data.participantIds || isAdmin());
 
       match /messages/{messageId} {
-        allow read, create, update, delete: if isSignedIn() && (
-          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin()
-        );
+        // Must be a participant or an admin to interact with messages.
+        allow read, create, update, delete: if isSignedIn() && 
+          (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
       }
     }
   }
