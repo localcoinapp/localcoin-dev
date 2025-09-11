@@ -4,6 +4,7 @@
 import { useEffect, useRef } from 'react';
 import type { Merchant } from '@/types';
 import 'leaflet/dist/leaflet.css';
+import type * as L from 'leaflet';
 
 interface MapViewProps {
   merchants: Merchant[];
