@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     
     const userDocRef = adb.collection('users').doc(requestData.userId);
     const userSnap = await userDocRef.get();
-    if (!userSnap.exists()) {
+    if (!userSnap.exists) {
         throw new Error('User document not found, cannot send email notification.');
     }
     const userData = userSnap.data() as User;

@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
           </tbody>
           <tfoot>
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Net Payout:</strong></td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>Total Payout:</strong></td>
               <td style="border: 1px solid #ddd; padding: 8px; text-align: right;"><strong>${netPayout.toFixed(2)} ${siteConfig.fiatCurrency.symbol}</strong></td>
             </tr>
           </tfoot>
