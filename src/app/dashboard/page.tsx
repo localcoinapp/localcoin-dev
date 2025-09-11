@@ -74,7 +74,8 @@ import {
   query,
   where,
   Timestamp,
-  arrayUnion
+  arrayUnion,
+  serverTimestamp
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -204,7 +205,10 @@ export default function DashboardPage() {
     const newStatus = isLive ? 'live' : 'paused';
     const merchantDocRef = doc(db, 'merchants', user.merchantId);
     try {
-      await updateDoc(merchantDocRef, { status: newStatus });
+      await updateDoc(merchantDocRef, { 
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+      });
       toast({ title: `Store is now ${newStatus}`, description: `Your store is now ${newStatus === 'live' ? 'visible in the marketplace' : 'hidden from the marketplace'}.` });
     } catch (error) {
       console.error("Error updating store status:", error);
@@ -906,4 +910,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
