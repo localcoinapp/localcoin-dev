@@ -22,7 +22,6 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // More robust Firestore initialization to avoid network issues
 const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-  useFetchStreams: false,
 });
 
 const auth = getAuth(app);
