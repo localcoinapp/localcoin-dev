@@ -24,14 +24,16 @@ service cloud.firestore {
   function ownerCanLaunchStore() {
     return resource.data.status == 'approved'
       && request.resource.data.status == 'live'
-      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','walletAddress','seedPhrase', 'updatedAt']);
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','walletAddress','seedPhrase']);
   }
 
   // Owner may toggle live <-> paused, optionally touching a few metadata fields
   function ownerCanToggleStatus() {
     return resource.data.status in ['live','paused']
       && request.resource.data.status in ['live','paused']
-      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      && request.resource.data.status != resource.data.status
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','updatedBy','statusNote'])
+      && request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']);
   }
 
   // Owner may update general settings (not status/owner)
@@ -55,10 +57,11 @@ service cloud.firestore {
     match /merchants/{merchantId} {
 
       // Public can read LIVE merchants; owners/admins can read their own/any merchant
-      allow read: if resource.data.status == 'live' || isAdmin() || isMerchantOwner(merchantId);
+      allow get: if resource.data.status == 'live' || isAdmin() || isMerchantOwner(merchantId);
+      allow list: if isAdmin() || request.query.where.status == 'live';
 
-      // Logged-in user can create their own application; Admin can create any
-      allow create: if (isSignedIn() && request.resource.data.owner == request.auth.uid) || isAdmin();
+      // Users can apply to become a merchant
+      allow create: if isSignedIn() && request.resource.data.owner == request.auth.uid;
 
       // Update by admin OR by owner within allowed change sets
       allow update: if isAdmin() || (
@@ -78,15 +81,15 @@ service cloud.firestore {
     ////////////////////////////////////////
     match /merchant_owners/{userId} {
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      allow update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin();
     }
 
     ////////////////////////////////////////
     // Users
     ////////////////////////////////////////
     match /users/{userId} {
-      allow read:   if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow get:   if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
@@ -103,8 +106,8 @@ service cloud.firestore {
     // Token purchase requests
     ////////////////////////////////////////
     match /tokenPurchaseRequests/{requestId} {
-      // Users see only their own docs; admins see/manage all
-      allow read:   if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow get:   if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin();
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
@@ -113,7 +116,8 @@ service cloud.firestore {
     // Merchant cashout requests
     ////////////////////////////////////////
     match /merchantCashoutRequests/{requestId} {
-      allow read:   if isAdmin() || (isSignedIn() && isMerchantOwner(resource.data.merchantId));
+      allow get:   if isAdmin() || (isSignedIn() && isMerchantOwner(resource.data.merchantId));
+      allow list: if isAdmin();
       allow create: if isSignedIn() && isMerchantOwner(request.resource.data.merchantId);
       allow update, delete: if isAdmin();
     }
@@ -131,6 +135,11 @@ service cloud.firestore {
         allow read, create, update, delete: if isSignedIn()
           && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
       }
+    }
+
+    // Default deny everything else
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
