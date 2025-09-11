@@ -11,7 +11,8 @@
     "lint": "next lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "reinstall": "rm -rf .next node_modules && npm install",
-    "seed": "node scripts/seed-db.js"
+    "seed": "node scripts/seed-db.js",
+    "test": "vitest"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.11.0",
@@ -70,6 +71,11 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "latest",
+    "@playwright/test": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
     "@types/leaflet": "^1.9.12",
     "@types/mime-types": "^2.1.4",
     "@types/node": "^20",
@@ -77,15 +83,20 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.19",
+    "axe-core": "latest",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-tailwindcss": "^3.17.0",
+    "firebase": "latest",
+    "msw": "latest",
     "postcss": "^8.4.38",
     "prettier": "^3.2.5",
     "react": "^18",
     "react-dom": "^18",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "latest",
+    "whatwg-fetch": "latest"
   }
 }
