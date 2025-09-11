@@ -24,19 +24,14 @@ service cloud.firestore {
   function ownerCanLaunchStore() {
     return resource.data.status == 'approved'
       && request.resource.data.status == 'live'
-      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','walletAddress','seedPhrase']);
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','walletAddress','seedPhrase', 'updatedAt']);
   }
 
   // Owner may toggle live <-> paused, optionally touching a few metadata fields
   function ownerCanToggleStatus() {
-    // Only these fields may change during a toggle:
-    // - status (must change)
-    // - updatedAt / updatedBy / statusNote (optional metadata)
     return resource.data.status in ['live','paused']
       && request.resource.data.status in ['live','paused']
-      && request.resource.data.status != resource.data.status
-      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','updatedBy','statusNote'])
-      && request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']);
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
   }
 
   // Owner may update general settings (not status/owner)
@@ -62,8 +57,8 @@ service cloud.firestore {
       // Public can read LIVE merchants; owners/admins can read their own/any merchant
       allow read: if resource.data.status == 'live' || isAdmin() || isMerchantOwner(merchantId);
 
-      // Create only by admin (adjust if you want owners to create their own)
-      allow create: if isAdmin();
+      // Logged-in user can create their own application; Admin can create any
+      allow create: if (isSignedIn() && request.resource.data.owner == request.auth.uid) || isAdmin();
 
       // Update by admin OR by owner within allowed change sets
       allow update: if isAdmin() || (
@@ -83,7 +78,8 @@ service cloud.firestore {
     ////////////////////////////////////////
     match /merchant_owners/{userId} {
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read, update, delete: if isAdmin();
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow update, delete: if isAdmin();
     }
 
     ////////////////////////////////////////
@@ -135,11 +131,6 @@ service cloud.firestore {
         allow read, create, update, delete: if isSignedIn()
           && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
       }
-    }
-
-    // Default deny everything else
-    match /{document=**} {
-      allow read, write: if false;
     }
   }
 }
