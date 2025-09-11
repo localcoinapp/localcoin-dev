@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -91,26 +90,40 @@ export default function AdminPage() {
     }
 
     const unsubscribes = [
-      onSnapshot(collection(db, 'users'), (snapshot) => {
-        setUsers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User)));
-      }),
-      onSnapshot(collection(db, 'blocked_users'), (snapshot) => {
-        setBlockedUsers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User)));
-      }),
-      onSnapshot(collection(db, 'merchants'), (snapshot) => {
-        setMerchants(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Merchant)));
-      }),
-      onSnapshot(collection(db, 'tokenPurchaseRequests'), (snapshot) => {
-        const allRequests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as TokenPurchaseRequest));
-        setAllTokenRequests(allRequests);
-        setTokenRequests(allRequests.filter(req => req.status === 'pending'));
-      }),
-      onSnapshot(collection(db, 'merchantCashoutRequests'), (snapshot) => {
-        const allRequests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MerchantCashoutRequest));
-        setAllCashoutRequests(allRequests);
-        setPendingCashoutRequests(allRequests.filter(req => req.status === 'pending'));
-        setHistoricalCashoutRequests(allRequests.filter(req => req.status !== 'pending'));
-      })
+      onSnapshot(
+        collection(db, 'users'),
+        (snap) => setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
+        (err) => console.error('[admin] users listener error:', err)
+      ),
+      onSnapshot(
+        collection(db, 'blocked_users'),
+        (snap) => setBlockedUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
+        (err) => console.error('[admin] blocked_users listener error:', err)
+      ),
+      onSnapshot(
+        collection(db, 'merchants'),
+        (snap) => setMerchants(snap.docs.map(d => ({ ...d.data(), id: d.id } as Merchant))),
+        (err) => console.error('[admin] merchants listener error:', err)
+      ),
+      onSnapshot(
+        collection(db, 'tokenPurchaseRequests'),
+        (snap) => {
+          const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as TokenPurchaseRequest));
+          setAllTokenRequests(all);
+          setTokenRequests(all.filter(r => r.status === 'pending'));
+        },
+        (err) => console.error('[admin] tokenPurchaseRequests listener error:', err)
+      ),
+      onSnapshot(
+        collection(db, 'merchantCashoutRequests'),
+        (snap) => {
+          const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as MerchantCashoutRequest));
+          setAllCashoutRequests(all);
+          setPendingCashoutRequests(all.filter(r => r.status === 'pending'));
+          setHistoricalCashoutRequests(all.filter(r => r.status !== 'pending'));
+        },
+        (err) => console.error('[admin] merchantCashoutRequests listener error:', err)
+      )
     ];
 
     setLoading(false);
