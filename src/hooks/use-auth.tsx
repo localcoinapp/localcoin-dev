@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -41,9 +40,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               role: data.role || 'user',
               ...data,
             });
+          } else {
+            // This case handles a rare edge case where a user is authenticated
+            // with Firebase Auth but doesn't have a Firestore document.
+            // This can happen if the signup process was interrupted.
+            // We set the user to null and let the protected route logic handle it.
+            setUser(null);
           }
-          // The creation of the doc is handled deterministically in the login/signup forms,
-          // so we don't need an 'else' block here anymore.
           setLoading(false);
         }, (error) => {
             console.error("Error on user snapshot:", error);

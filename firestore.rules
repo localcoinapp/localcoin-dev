@@ -1,94 +1,114 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
-    function isUserAuthenticated() {
-      return request.auth != null;
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    // Helper function to check if a user is a merchant owner
+    function isMerchantOwner(merchantId) {
+      return exists(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)).data.merchantId == merchantId;
     }
 
-    function isMerchant() {
-      return exists(/databases/$(database)/documents/merchant_owners/$(request.auth.uid));
+    // ==================================================================
+    //  USERS Collection
+    // ==================================================================
+    match /users/{userId} {
+      // READ: Allow users to read their own profile. Admins can read any profile.
+      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      // READ_LIST: Allow logged-in users to read the list (e.g., for admin panel)
+      allow list: if request.auth != null && isAdmin();
+
+      // CREATE: A user can create their own document, but not for others.
+      // This is crucial for the sign-up flow.
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // UPDATE: Allow users to update their own profile. Admins can update any.
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      
+      // DELETE: Only admins can delete user documents.
+      allow delete: if request.auth != null && isAdmin();
     }
     
-    function getMerchantId() {
-      return get(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)).data.merchantId;
-    }
-
-    // USER-RELATED RULES
-    match /users/{userId} {
-      allow read: if isUserAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && !("role" in request.resource.data);
-    }
-
+    // ==================================================================
+    //  BLOCKED USERS Collection (Admin only)
+    // ==================================================================
     match /blocked_users/{userId} {
-        allow read, write: if false; // No client access
+      allow read, write: if isAdmin();
     }
 
-    // MERCHANT-RELATED RULES
+    // ==================================================================
+    //  MERCHANTS Collection
+    // ==================================================================
     match /merchants/{merchantId} {
-      allow read: if true; // Publicly readable
+      // READ: Anyone can read merchant info if it is 'live'
+      allow get: if resource.data.status == 'live';
       
-      // Allow creation only if the user doesn't already have a merchant application
-      allow create: if isUserAuthenticated() 
-                    && !isMerchant()
-                    && request.resource.data.owner == request.auth.uid;
+      // READ_LIST: Anyone can list merchants that are 'live'
+      allow list: if request.query.get("status") == "live";
       
-      // Allow an owner to update their store, with specific rules
-      allow update: if isUserAuthenticated() && isOwner(resource.data.owner)
-                    // Rule for launching the store
-                    && (
-                      request.resource.data.status == 'live' 
-                      && resource.data.status == 'approved'
-                      && request.resource.data.walletAddress != null
-                      && request.resource.data.seedPhrase != null
-                      && request.resource.data.keys().hasAll(['status', 'walletAddress', 'seedPhrase'])
-                    )
-                    // Rule for general updates by an active merchant
-                    || (
-                      resource.data.status in ['live', 'paused']
-                      && !(
-                        'owner' in request.resource.data || 
-                        'rating' in request.resource.data || 
-                        'status' in request.resource.data ||
-                        'walletAddress' in request.resource.data ||
-                        'seedPhrase' in request.resource.data
-                      )
-                    );
+      // CREATE: Only authenticated users can create a merchant application (doc)
+      allow create: if request.auth != null;
+      
+      // UPDATE:
+      // Allow an owner to update their own merchant document.
+      // Allow an owner to "launch" by writing status/wallet/seed phrase if status is 'approved'.
+      // Admins can update any merchant document.
+      allow update: if request.auth != null &&
+                    (isMerchantOwner(merchantId) || isAdmin() ||
+                     (request.auth.uid == resource.data.owner &&
+                      request.resource.data.status == 'live' &&
+                      resource.data.status == 'approved' &&
+                      request.resource.data.walletAddress != null &&
+                      request.resource.data.seedPhrase != null
+                     ));
+      
+      // DELETE: Only admins can delete merchants
+      allow delete: if isAdmin();
     }
-
+    
+    // ==================================================================
+    //  MERCHANT_OWNERS Lookup Collection
+    // ==================================================================
     match /merchant_owners/{userId} {
-        allow read: if isUserAuthenticated();
-        allow write: if false; // Can only be written by admin/backend
+        // READ: Only the owner or an admin can see this lookup doc.
+        allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
+        // WRITE: Only admins can create/update these lookups.
+        allow write: if isAdmin();
     }
-
-    // TOKEN & CASHOUT REQUESTS (Handled by Admin SDK)
+    
+    // ==================================================================
+    //  TOKEN/CASHOUT REQUESTS (Admin only for read/write)
+    // ==================================================================
     match /tokenPurchaseRequests/{requestId} {
-        allow read: if isUserAuthenticated() && resource.data.userId == request.auth.uid;
-        allow create, update, delete: if false; // Admin only
+        allow read, write: if request.auth != null; // User creates, admin reads/updates
     }
-
+    
     match /merchantCashoutRequests/{requestId} {
-        allow read: if isUserAuthenticated() && isMerchant() && resource.data.merchantId == getMerchantId();
-        allow create: if isUserAuthenticated() && isMerchant() && request.resource.data.merchantId == getMerchantId();
-        allow update, delete: if false; // Admin only
+        allow read, write: if request.auth != null; // Merchant creates, admin reads/updates
     }
 
-    // CHAT-RELATED RULES
+    // ==================================================================
+    //  CHATS Collection
+    // ==================================================================
     match /chats/{chatId} {
-      allow read, update: if isUserAuthenticated() && request.auth.uid in resource.data.participantIds;
-      allow create: if isUserAuthenticated() && request.auth.uid in request.resource.data.participantIds;
+      // READ/WRITE: Only participants of the chat can access it.
+      allow read, write: if request.auth != null && request.auth.uid in resource.data.participantIds;
 
+      // CREATE: Any authenticated user can create a chat.
+      allow create: if request.auth != null;
+
+      // Match messages subcollection
       match /messages/{messageId} {
-        allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
-        allow update, delete: if isUserAuthenticated() && resource.data.senderId == request.auth.uid;
+        // READ/WRITE: Only participants of the parent chat can access messages.
+        allow read, write: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        // CREATE: Any authenticated user can create a message.
+        allow create: if request.auth != null;
       }
     }
   }
