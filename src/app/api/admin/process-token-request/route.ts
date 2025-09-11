@@ -16,8 +16,7 @@ import {
   getAccount,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { adminDB } from '@/lib/firebaseAdmin';
 import type { TokenPurchaseRequest, User } from '@/types';
 import * as bip39 from 'bip39';
 import { sendEmail } from '@/lib/mail';
@@ -51,9 +50,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
     }
 
-    const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
-    const requestSnap = await getDoc(requestRef);
-    if (!requestSnap.exists()) {
+    const adb = adminDB();
+    const requestRef = adb.collection('tokenPurchaseRequests').doc(requestId);
+    const requestSnap = await requestRef.get();
+    if (!requestSnap.exists) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const userDocRef = doc(db, 'users', requestData.userId);
-    const userSnap = await getDoc(userDocRef);
+    const userDocRef = adb.collection('users').doc(requestData.userId);
+    const userSnap = await userDocRef.get();
     if (!userSnap.exists()) {
         throw new Error('User document not found, cannot send email notification.');
     }
@@ -140,9 +140,9 @@ export async function POST(req: NextRequest) {
     console.log('Transfer signature:', signature);
 
     // Database update and email now happen *after* successful transaction.
-    await updateDoc(requestRef, {
+    await requestRef.update({
       status: 'approved',
-      processedAt: serverTimestamp(),
+      processedAt: new Date(),
       transactionSignature: signature,
       toAta: toAta.address.toBase58(),
     });
@@ -190,10 +190,9 @@ export async function POST(req: NextRequest) {
     console.error('Error in process-token-request API:', error);
     if (requestId) {
         try {
-            const requestRef = doc(db, 'tokenPurchaseRequests', requestId);
-            await updateDoc(requestRef, {
+            await adminDB().collection('tokenPurchaseRequests').doc(requestId).update({
                 status: 'denied',
-                processedAt: serverTimestamp(),
+                processedAt: new Date(),
                 error: String(error?.message || error),
             });
         } catch (e) {

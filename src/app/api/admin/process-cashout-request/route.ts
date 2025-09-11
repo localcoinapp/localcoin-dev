@@ -14,8 +14,7 @@ import {
   getMint,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { adminDB } from '@/lib/firebaseAdmin';
 import type { MerchantCashoutRequest, Merchant } from '@/types';
 import * as bip39 from 'bip39';
 import { sendEmail } from '@/lib/mail';
@@ -50,11 +49,13 @@ export async function POST(req: NextRequest) {
     if (!requestId) {
       return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
     }
+    
+    const adb = adminDB();
 
     // Get the request document
-    const requestRef = doc(db, 'merchantCashoutRequests', requestId);
-    const requestSnap = await getDoc(requestRef);
-    if (!requestSnap.exists()) {
+    const requestRef = adb.collection('merchantCashoutRequests').doc(requestId);
+    const requestSnap = await requestRef.get();
+    if (!requestSnap.exists) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
@@ -66,10 +67,10 @@ export async function POST(req: NextRequest) {
     const { merchantId, amount: amountWhole } = requestData;
 
     // Get the merchant document to retrieve their seed phrase
-    const merchantRef = doc(db, 'merchants', merchantId);
-    const merchantSnap = await getDoc(merchantRef);
-    if (!merchantSnap.exists()) {
-      throw new Error('Merchant document not found');
+    const merchantRef = adb.collection('merchants').doc(merchantId);
+    const merchantSnap = await merchantRef.get();
+    if (!merchantSnap.exists) {
+        return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
     }
     const merchantData = merchantSnap.data() as Merchant;
     const merchantMnemonic = merchantData.seedPhrase;
@@ -123,9 +124,9 @@ export async function POST(req: NextRequest) {
     console.log('Cashout transfer signature:', signature);
 
     // Database update and email now happen *after* successful transaction.
-    await updateDoc(requestRef, {
+    await requestRef.update({
       status: 'approved',
-      processedAt: serverTimestamp(),
+      processedAt: new Date(),
       transactionSignature: signature,
     });
     
@@ -179,9 +180,9 @@ export async function POST(req: NextRequest) {
     console.error('Error in process-cashout-request API:', error);
     if (requestId) {
         try {
-            await updateDoc(doc(db, 'merchantCashoutRequests', requestId), {
+            await adminDB().collection('merchantCashoutRequests').doc(requestId).update({
                 status: 'denied',
-                processedAt: serverTimestamp(),
+                processedAt: new Date(),
                 error: String(error?.message || error),
             });
         } catch (e) {

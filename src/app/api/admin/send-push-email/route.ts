@@ -1,7 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { adminDB } from '@/lib/firebaseAdmin';
 import type { User, Merchant } from '@/types';
 import { sendEmail } from '@/lib/mail';
 
@@ -17,16 +16,18 @@ export async function POST(req: NextRequest) {
     
     let userEmails: string[] = [];
     let merchantEmails: string[] = [];
+    
+    const adb = adminDB();
 
     if (recipientGroup === 'all_users' || recipientGroup === 'both') {
-      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const usersSnapshot = await adb.collection('users').get();
       userEmails = usersSnapshot.docs
           .map(doc => (doc.data() as User).email)
           .filter((email): email is string => !!email);
     }
 
     if (recipientGroup === 'all_merchants' || recipientGroup === 'both') {
-      const merchantsSnapshot = await getDocs(collection(db, 'merchants'));
+      const merchantsSnapshot = await adb.collection('merchants').get();
       merchantEmails = merchantsSnapshot.docs
           .map(doc => (doc.data() as Merchant).contactEmail)
           .filter((email): email is string => !!email);
