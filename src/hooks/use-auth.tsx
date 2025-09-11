@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -30,15 +31,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
-            // Correctly construct the User object by picking properties
+            // Create the user object by merging Firestore data with Auth data.
+            // Firestore data (especially the role) is the source of truth.
             setUser({
+              ...data, // Spread Firestore data first
               id: firebaseUser.uid,
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: data.name || firebaseUser.displayName,
               avatar: data.avatar || firebaseUser.photoURL,
-              role: data.role || 'user',
-              ...data,
+              role: data.role || 'user', // This is the critical line.
             });
           } else {
             // This case handles a rare edge case where a user is authenticated
