@@ -6,17 +6,12 @@ service cloud.firestore {
     return request.auth != null && request.auth.uid != null;
   }
 
-  // Admin via custom claim OR user doc role = 'admin'
+  // Admin = custom auth claim only (no Firestore reads here)
   function isAdmin() {
-    return isSignedIn() && (
-      (request.auth.token.admin == true) || (
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      )
-    );
+    return isSignedIn() && request.auth.token.admin == true;
   }
 
-  // Cross-collection owner check (don’t call this inside /merchants/{id})
+  // Cross-collection owner check (safe)
   function ownsMerchant(merchantId) {
     return isSignedIn()
       && exists(/databases/$(database)/documents/merchants/$(merchantId))
@@ -27,8 +22,6 @@ service cloud.firestore {
 
     // ---------- Merchants ----------
     match /merchants/{merchantId} {
-
-      // Local owner check without extra get()
       function isOwner() {
         return isSignedIn() && resource.data.owner == request.auth.uid;
       }
@@ -36,7 +29,7 @@ service cloud.firestore {
       // Public read of LIVE docs; owners/admins can read any
       allow read: if resource.data.status == 'live' || isAdmin() || isOwner();
 
-      // Create policy (admin only; switch to self-create if desired)
+      // Create: admin only (adjust if needed)
       allow create: if isAdmin();
 
       // Owner launch: approved -> live (only these keys)
@@ -47,7 +40,7 @@ service cloud.firestore {
                .hasOnly(['status','walletAddress','seedPhrase']);
       }
 
-      // Owner toggle: live <-> paused (status must change; allow optional metadata)
+      // Owner toggle: live <-> paused (+ optional metadata)
       function ownerCanToggleStatus() {
         let diff = request.resource.data.diff(resource.data).affectedKeys();
         return resource.data.status in ['live','paused']
@@ -67,36 +60,26 @@ service cloud.firestore {
         ]);
       }
 
-      // Updates allowed for admin, or owner within the allowed change sets
       allow update: if isAdmin() || (
-        isOwner() && (
-          ownerCanLaunchStore() ||
-          ownerCanToggleStatus() ||
-          ownerCanUpdateSettings()
-        )
+        isOwner() && (ownerCanLaunchStore() || ownerCanToggleStatus() || ownerCanUpdateSettings())
       );
 
-      // Delete only by admin
       allow delete: if isAdmin();
     }
 
     // ---------- Merchant owner lookup ----------
     match /merchant_owners/{userId} {
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read:   if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow read:   if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow update, delete: if isAdmin();
     }
 
     // ---------- Users ----------
     match /users/{userId} {
-      // **Break the cycle**: owner-only read here (do NOT call isAdmin())
-      allow read:   if isSignedIn() && request.auth.uid == userId;
-
+      // Admin can read any; users can read themselves
+      allow read:   if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow create: if isSignedIn() && request.auth.uid == userId;
-
-      // Admins may still update; owners can update themselves
-      allow update: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-
+      allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow delete: if isAdmin();
     }
 
@@ -107,7 +90,6 @@ service cloud.firestore {
 
     // ---------- Token purchase requests ----------
     match /tokenPurchaseRequests/{requestId} {
-      // Admin can read all; users can read only their own docs
       allow read:   if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
@@ -133,11 +115,8 @@ service cloud.firestore {
       }
     }
 
-    // ---------- Single final catch-all ----------
-    // Admin can read everything (covers both get + queries).
-    // Everything else is denied by default.
+    // Default: deny writes; reads allowed only if some block above grants them
     match /{document=**} {
-      allow read: if isAdmin();
       allow write: if false;
     }
   }
