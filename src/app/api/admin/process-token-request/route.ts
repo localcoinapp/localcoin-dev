@@ -41,15 +41,15 @@ export async function POST(req: NextRequest) {
   }
   // ---------------------------------
 
-  let requestId: string | null = null;
+  // Read the body ONCE and get the requestId
+  const body = await req.json();
+  const requestId: string | null = body.requestId;
+
+  if (!requestId) {
+    return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
+  }
+
   try {
-    const body = await req.json();
-    requestId = body.requestId;
-
-    if (!requestId) {
-      return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
-    }
-
     const adb = adminDB();
     const requestRef = adb.collection('tokenPurchaseRequests').doc(requestId);
     const requestSnap = await requestRef.get();
@@ -188,16 +188,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ signature });
   } catch (error: any) {
     console.error('Error in process-token-request API:', error);
-    if (requestId) {
-        try {
-            await adminDB().collection('tokenPurchaseRequests').doc(requestId).update({
-                status: 'denied',
-                processedAt: new Date(),
-                error: String(error?.message || error),
-            });
-        } catch (e) {
-            console.error('Failed to update request status after error:', e);
-        }
+    // Now the catch block can safely use the requestId
+    try {
+      await adminDB().collection('tokenPurchaseRequests').doc(requestId).update({
+          status: 'denied',
+          processedAt: new Date(),
+          error: String(error?.message || error),
+      });
+    } catch (e) {
+        console.error('Failed to update request status after error:', e);
     }
     return NextResponse.json(
       { error: 'Failed to process token purchase.', details: String(error?.message || error) },

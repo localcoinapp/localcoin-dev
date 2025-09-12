@@ -41,15 +41,15 @@ export async function POST(req: NextRequest) {
 
   console.log('--- Received POST /api/admin/process-cashout-request ---');
 
-  let requestId: string | null = null;
-  try {
-    const body = await req.json();
-    requestId = body.requestId;
+  // Read the body ONCE and get the requestId
+  const body = await req.json();
+  const requestId: string | null = body.requestId;
 
-    if (!requestId) {
-      return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
-    }
-    
+  if (!requestId) {
+    return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
+  }
+
+  try {
     const adb = adminDB();
 
     // Get the request document
@@ -178,16 +178,15 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in process-cashout-request API:', error);
-    if (requestId) {
-        try {
-            await adminDB().collection('merchantCashoutRequests').doc(requestId).update({
-                status: 'denied',
-                processedAt: new Date(),
-                error: String(error?.message || error),
-            });
-        } catch (e) {
-            console.error('Failed to update request status after error:', e);
-        }
+    // Now the catch block can safely use the requestId
+    try {
+      await adminDB().collection('merchantCashoutRequests').doc(requestId).update({
+        status: 'denied',
+        processedAt: new Date(),
+        error: String(error?.message || error),
+      });
+    } catch (e) {
+      console.error('Failed to update request status after error:', e);
     }
     return NextResponse.json(
       { error: 'Failed to process cashout request.', details: String(error?.message || error) },
