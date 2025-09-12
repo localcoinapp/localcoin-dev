@@ -1,4 +1,3 @@
-
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -8,7 +7,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -64,6 +63,12 @@ export function LoginForm() {
         return;
       }
 
+      // Ensure user document has a last login timestamp
+      await setDoc(doc(db, 'users', user.uid), {
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
+
+
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
@@ -98,15 +103,23 @@ export function LoginForm() {
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
+      // This will NOT overwrite the role of an existing admin/merchant.
       if (!userDoc.exists()) {
         await setDoc(userDocRef, {
           email: user.email,
           name: user.displayName,
           avatar: user.photoURL,
           role: 'user',
-          walletBalance: 0
+          walletBalance: 0,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
         });
+      } else {
+         await setDoc(userDocRef, {
+            lastLoginAt: serverTimestamp(),
+         }, { merge: true });
       }
+
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
@@ -134,7 +147,7 @@ export function LoginForm() {
     <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <Logo name="LocalCoin" />
+          <Logo />
         </div>
         <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
         <CardDescription>Sign in to access your wallet and the marketplace.</CardDescription>

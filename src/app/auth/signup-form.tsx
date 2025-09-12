@@ -5,9 +5,9 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, getDoc } from "firebase/firestore"
+import { setDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -26,12 +26,12 @@ import { Logo } from "@/components/logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import { siteConfig } from "@/config/site"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   country: z.string().min(1, { message: "Please select a country." }),
-  // Allow boolean, but require it to be true at submit
   terms: z.boolean().refine(v => v === true, {
     message: "You must accept the terms and conditions to continue.",
   }),
@@ -47,33 +47,39 @@ export function SignupForm() {
       email: "",
       password: "",
       country: "",
-      terms: false, // starts unchecked; schema enforces true on submit
+      terms: false,
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
+      const { user } = await createUserWithEmailAndPassword(auth, values.email, values.password);
 
-      await sendEmailVerification(user);
+      // Check if the signing up user is the designated admin
+      const role = values.email === siteConfig.adminEmail ? 'admin' : 'user';
 
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         id: user.uid,
         email: values.email,
         country: values.country,
-        role: 'user',
+        role: role,
         profileComplete: false,
-      });
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
+
+      await sendEmailVerification(user);
+      
+      // Sign the user out to force them to verify their email and log in properly
+      await signOut(auth);
 
       toast({
         title: "Almost there!",
-        description: "Your account has been created. Please check your email to verify your account and then log in.",
+        description: "Check your inbox and verify your email, then sign in.",
         duration: 9000,
       });
-
-      router.push('/login');
+      router.push("/login");
     } catch (error: any) {
       console.error("Signup Error:", error);
       toast({
@@ -88,22 +94,28 @@ export function SignupForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-
-      const userDocRef = doc(db, "users", user.uid);
+      
+      const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          id: user.uid,
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: 'user',
-          country: 'US',
-          profileComplete: true,
-        });
-      }
+      const isNewUser = !userDoc.exists();
+      // Assign admin role if the email matches and it's a new user
+      const role = isNewUser && user.email === siteConfig.adminEmail ? 'admin' : userDoc.data()?.role || 'user';
+
+      const userData = {
+        uid: user.uid,
+        id: user.uid,
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
+        profileComplete: true,
+        lastLoginAt: serverTimestamp(),
+        role: role,
+        ...(isNewUser && { createdAt: serverTimestamp() })
+      };
+
+      await setDoc(userDocRef, userData, { merge: true });
+      
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
@@ -130,7 +142,7 @@ export function SignupForm() {
     <Card className="w-full max-w-md mx-auto shadow-xl">
       <CardHeader className="text-center">
         <div className="flex justify-center mb-4">
-          <Logo name="LocalCoin" />
+          <Logo />
         </div>
         <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
         <CardDescription>Join our community to start exploring.</CardDescription>
