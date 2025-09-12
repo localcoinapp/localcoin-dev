@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -26,6 +27,7 @@ import { Logo } from "../logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import { siteConfig } from "@/config/site"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -54,12 +56,15 @@ export function SignupForm() {
     try {
       const { user } = await createUserWithEmailAndPassword(auth, values.email, values.password);
 
+      // Check if the signing up user is the designated admin
+      const role = values.email === siteConfig.adminEmail ? 'admin' : 'user';
+
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         id: user.uid,
         email: values.email,
         country: values.country,
-        role: 'user',
+        role: role,
         profileComplete: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
@@ -93,6 +98,10 @@ export function SignupForm() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
+      const isNewUser = !userDoc.exists();
+      // Assign admin role if the email matches and it's a new user
+      const role = isNewUser && user.email === siteConfig.adminEmail ? 'admin' : userDoc.data()?.role || 'user';
+
       const userData = {
         uid: user.uid,
         id: user.uid,
@@ -101,8 +110,8 @@ export function SignupForm() {
         avatar: user.photoURL,
         profileComplete: true,
         lastLoginAt: serverTimestamp(),
-        // Only set role and createdAt if the document doesn't exist
-        ...(!userDoc.exists() && { role: 'user', createdAt: serverTimestamp() })
+        role: role,
+        ...(isNewUser && { createdAt: serverTimestamp() })
       };
 
       await setDoc(userDocRef, userData, { merge: true });

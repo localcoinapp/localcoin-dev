@@ -13,6 +13,7 @@ export const siteConfig = {
   links: {
     // Add any external links here
   },
+  adminEmail: "admin@localcoin.com", // The email for the default admin user
   token: {
     name: "LocalCoin",
     symbol: "LCL",
