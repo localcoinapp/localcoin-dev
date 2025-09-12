@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, updateProfile } from 'firebase/auth';
-import { getFirestore, initializeFirestore, getDoc } from 'firebase/firestore';
+import { initializeFirestore, getDoc } from 'firebase/firestore';
 
 // ==================================================================
 // == PASTE YOUR NEW FIREBASE CONFIGURATION OBJECT FROM STEP 1 HERE ==
@@ -22,6 +22,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // More robust Firestore initialization to avoid network issues
 const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
+  useFetchStreams: false,
 });
 
 const auth = getAuth(app);
