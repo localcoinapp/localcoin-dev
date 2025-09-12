@@ -27,11 +27,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      let unsubscribeDoc: (() => void) | undefined;
-
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
+        const unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
             setUser({
@@ -44,27 +42,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               role: data.role || 'user',
             });
           } else {
-            // User authenticated in Auth, but no Firestore doc. This is an invalid state.
             setUser(null);
           }
-          setLoading(false);
+          setLoading(false); // Only stop loading after Firestore data is fetched/confirmed
         }, (error) => {
           console.error("Error on user snapshot:", error);
           setUser(null);
           setLoading(false);
         });
+        return () => unsubscribeDoc(); // Cleanup Firestore listener
       } else {
         // No Firebase user, so set user to null and finish loading.
         setUser(null);
         setLoading(false);
       }
-
-      // Cleanup function for the document listener
-      return () => {
-        if (unsubscribeDoc) {
-          unsubscribeDoc();
-        }
-      };
     });
 
     // Cleanup function for the auth state listener
