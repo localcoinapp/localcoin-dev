@@ -6,7 +6,7 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import type { User } from '@/types';
 import { useRouter, usePathname } from 'next/navigation';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -17,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 
 const protectedRoutes = ['/wallet', '/dashboard', '/profile', '/settings', '/cart'];
 const adminRoutes = ['/admin'];
+const chatRoute = '/chat/';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -25,49 +26,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      let unsubscribeDoc: (() => void) | undefined;
+
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
+        unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
-            // Create the user object by merging Firestore data with Auth data.
-            // Firestore data (especially the role) is the source of truth.
             setUser({
-              ...data, // Spread Firestore data first
+              ...data,
               id: firebaseUser.uid,
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               name: data.name || firebaseUser.displayName,
               avatar: data.avatar || firebaseUser.photoURL,
-              role: data.role || 'user', // This is the critical line.
+              role: data.role || 'user',
             });
           } else {
-            // This case handles a rare edge case where a user is authenticated
-            // with Firebase Auth but doesn't have a Firestore document.
-            // This can happen if the signup process was interrupted.
-            // We set the user to null and let the protected route logic handle it.
+            // User authenticated in Auth, but no Firestore doc. This is an invalid state.
             setUser(null);
           }
           setLoading(false);
         }, (error) => {
-            console.error("Error on user snapshot:", error);
-            setUser(null);
-            setLoading(false);
+          console.error("Error on user snapshot:", error);
+          setUser(null);
+          setLoading(false);
         });
-        return () => unsubscribeDoc();
       } else {
+        // No Firebase user, so set user to null and finish loading.
         setUser(null);
         setLoading(false);
-        const isProtected = protectedRoutes.some(p => pathname.startsWith(p)) || adminRoutes.some(p => pathname.startsWith(p)) || pathname.startsWith('/chat/');
-        if (isProtected) {
-          router.push('/login');
-        }
       }
-    });
-    return () => unsubscribe();
-  }, [router, pathname]);
 
+      // Cleanup function for the document listener
+      return () => {
+        if (unsubscribeDoc) {
+          unsubscribeDoc();
+        }
+      };
+    });
+
+    // Cleanup function for the auth state listener
+    return () => unsubscribeAuth();
+  }, []); // Run only once on mount
+
+
+  // Effect for handling redirects based on auth state
+  useEffect(() => {
+    if (loading) {
+      return; // Don't redirect until auth state is resolved
+    }
+
+    const isProtectedRoute = protectedRoutes.some(p => pathname.startsWith(p));
+    const isAdminRoute = adminRoutes.some(p => pathname.startsWith(p));
+    const isChatRoute = pathname.startsWith(chatRoute);
+
+    if (!user) {
+      // If user is not logged in, redirect from any protected route to login
+      if (isProtectedRoute || isAdminRoute || isChatRoute) {
+        router.push('/login');
+      }
+    } else if (user.role !== 'admin' && isAdminRoute) {
+      // If a non-admin user tries to access an admin route, redirect to home
+      router.push('/');
+    }
+  }, [user, loading, pathname, router]);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>
