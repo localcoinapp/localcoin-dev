@@ -12,6 +12,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "reinstall": "rm -rf .next node_modules && npm install",
     "seed": "node scripts/seed-db.js",
+    "set-admin": "node scripts/set-admin-claim.js",
     "test": "vitest"
   },
   "dependencies": {
