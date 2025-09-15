@@ -1,3 +1,4 @@
+
 // This is a one-time use script to set a custom admin claim on your Firebase user account.
 // It uses the Firebase Admin SDK and requires your environment to be authenticated.
 // HOW TO RUN:
@@ -9,7 +10,7 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
-const USER_ID = '<YOUR_ADMIN_UID_HERE>'; // <--- IMPORTANT: REPLACE THIS
+const USER_ID = 'Wmn0LfuyA9PHymwgdk37Zi2jhEy2'; // <--- IMPORTANT: REPLACE THIS
 
 // --- SDK Initialization ---
 // The script will attempt to use the service account JSON from your environment variables.
