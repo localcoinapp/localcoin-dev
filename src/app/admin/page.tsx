@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs, setDoc, setLogLevel } from 'firebase/firestore';
+import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
@@ -73,9 +73,6 @@ export default function AdminPage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<HistoryStatusFilter>('all');
   const isAdmin = user?.role === 'admin';
   
-  // temporary: make Firestore log why a listener fails (remove once stable)
-  useEffect(() => { setLogLevel('debug'); }, []);
-
 
   const pushEmailForm = useForm<PushEmailFormValues>({
     resolver: zodResolver(pushEmailSchema),
