@@ -1,52 +1,39 @@
 rules_version = '2';
 service cloud.firestore {
+
+  // ---------- Helpers ----------
+  function isSignedIn() {
+    return request.auth != null && request.auth.uid != null;
+  }
+
+  function isAdmin() {
+    return isSignedIn() && (
+      exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+    );
+  }
+
+  function ownsMerchant(merchantId) {
+    return isSignedIn()
+      && exists(/databases/$(database)/documents/merchants/$(merchantId))
+      && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
+  }
+
   match /databases/{database}/documents {
-
-    // ---------- Helpers ----------
-    function isSignedIn() {
-      return request.auth != null && request.auth.uid != null;
-    }
-
-    // isAdmin check based on the user's document in Firestore.
-    function isAdmin() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // Cross-collection owner check
-    function ownsMerchant(merchantId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/merchants/$(merchantId))
-        && get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner == request.auth.uid;
-    }
-
-    // ---------- Global Admin Read-All Rule ----------
-    // This is the key rule. It allows any user who passes the isAdmin() check
-    // to read any document in any collection, which is required for the admin dashboard queries.
-    match /{path=**} {
-      allow read: if isAdmin();
-    }
 
     // ---------- Merchants ----------
     match /merchants/{merchantId} {
       function isOwner() {
         return isSignedIn() && resource.data.owner == request.auth.uid;
       }
-
-      // Public can read live merchants. Owners can read their own merchant doc regardless of status.
-      // Admins are covered by the global read rule above.
-      allow read: if resource.data.status == 'live' || isOwner();
-
+      allow read: if resource.data.status == 'live' || isAdmin() || isOwner();
       allow create: if isAdmin();
-
       function ownerCanLaunchStore() {
         return resource.data.status == 'approved'
           && request.resource.data.status == 'live'
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['status','walletAddress','seedPhrase']);
       }
-
       function ownerCanToggleStatus() {
         let diff = request.resource.data.diff(resource.data).affectedKeys();
         return resource.data.status in ['live','paused']
@@ -55,7 +42,6 @@ service cloud.firestore {
           && diff.hasOnly(['status','updatedAt','updatedBy','statusNote'])
           && diff.hasAny(['status']);
       }
-
       function ownerCanUpdateSettings() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'companyName','category','logo','banner','aiHint','position','geohash',
@@ -64,61 +50,70 @@ service cloud.firestore {
           'updatedAt'
         ]);
       }
-
       allow update: if isAdmin() || (
-        isOwner() && (ownerCanLaunchStore() || ownerCanToggleStatus() || ownerCanUpdateSettings())
+        isOwner() && (
+          ownerCanLaunchStore() ||
+          ownerCanToggleStatus() ||
+          ownerCanUpdateSettings()
+        )
       );
-
       allow delete: if isAdmin();
     }
 
     // ---------- Merchant owner lookup ----------
     match /merchant_owners/{userId} {
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow read:   if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       allow update, delete: if isAdmin();
     }
 
     // ---------- Users ----------
     match /users/{userId} {
-      // A user can read and write to their own document. Admins can write to any user doc.
-      // Admin reads are covered by the global read rule.
-      allow read, update: if isSignedIn() && request.auth.uid == userId;
+      // Admins and owners can GET their own doc.
+      allow get: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      // ONLY admins can LIST all users.
+      allow list: if isAdmin();
+
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow delete: if isAdmin();
     }
 
-    // ---------- Blocked users (admin only) ----------
+    // ---------- Blocked users ----------
     match /blocked_users/{userId} {
       allow read, write: if isAdmin();
     }
 
     // ---------- Token purchase requests ----------
     match /tokenPurchaseRequests/{requestId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow read:   if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
     // ---------- Merchant cashout requests ----------
     match /merchantCashoutRequests/{requestId} {
-      allow read: if (isSignedIn() && ownsMerchant(resource.data.merchantId)) || isAdmin();
+      allow read:   if isAdmin() || (isSignedIn() && ownsMerchant(resource.data.merchantId));
       allow create: if isSignedIn() && ownsMerchant(request.resource.data.merchantId);
       allow update, delete: if isAdmin();
     }
 
     // ---------- Chats ----------
     match /chats/{chatId} {
-      function isParticipant() {
-        return isSignedIn() && request.auth.uid in resource.data.participantIds;
-      }
-
-      allow read, update, delete: if isParticipant() || isAdmin();
-      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participantIds;
+      allow read, update, delete: if isSignedIn()
+        && (request.auth.uid in resource.data.participantIds || isAdmin());
+      allow create: if isSignedIn()
+        && (request.auth.uid in request.resource.data.participantIds || isAdmin());
 
       match /messages/{messageId} {
-        allow read, create, update, delete: if get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid]) || isAdmin();
+        allow read, create, update, delete: if isSignedIn()
+          && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds || isAdmin());
       }
+    }
+    
+    // Default deny all writes to prevent accidental access
+    match /{document=**} {
+      allow write: if false;
     }
   }
 }
