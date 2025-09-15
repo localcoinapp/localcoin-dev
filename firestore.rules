@@ -6,10 +6,12 @@ service cloud.firestore {
     return request.auth != null && request.auth.uid != null;
   }
 
-  // Admin status is determined SOLELY by a custom auth token claim.
-  // This is secure, fast, and avoids all circular rule dependency issues.
+  // Admin via user doc role = 'admin'
   function isAdmin() {
-    return isSignedIn() && request.auth.token.admin == true;
+    return isSignedIn() && (
+      exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+    );
   }
 
   // Cross-collection owner check (safe)
@@ -23,16 +25,15 @@ service cloud.firestore {
 
     // ---------- Merchants ----------
     match /merchants/{merchantId} {
-
       function isOwner() {
         return isSignedIn() && resource.data.owner == request.auth.uid;
       }
 
-      // Read rules are unchanged
+      // Public read of LIVE docs; owners/admins can read any
       allow read: if resource.data.status == 'live' || isAdmin() || isOwner();
-      allow list: if isAdmin(); // List is required for admin dashboard
 
-      allow create: if isAdmin(); // Or allow self-create if desired
+      // Create: admin only
+      allow create: if isAdmin();
 
       function ownerCanLaunchStore() {
         return resource.data.status == 'approved'
@@ -75,21 +76,20 @@ service cloud.firestore {
 
     // ---------- Users ----------
     match /users/{userId} {
-      allow list: if isAdmin();
-      allow read:   if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      // User can read their own doc. Admin can read all (covered by global rule below)
+      allow read:   if isSignedIn() && request.auth.uid == userId;
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow delete: if isAdmin();
     }
 
-    // ---------- Blocked users ----------
+    // ---------- Blocked users (admin only) ----------
     match /blocked_users/{userId} {
-      allow list, read, write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // ---------- Token purchase requests ----------
     match /tokenPurchaseRequests/{requestId} {
-      allow list: if isAdmin();
       allow read:   if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
@@ -97,7 +97,6 @@ service cloud.firestore {
 
     // ---------- Merchant cashout requests ----------
     match /merchantCashoutRequests/{requestId} {
-      allow list: if isAdmin();
       allow read:   if isAdmin() || (isSignedIn() && ownsMerchant(resource.data.merchantId));
       allow create: if isSignedIn() && ownsMerchant(request.resource.data.merchantId);
       allow update, delete: if isAdmin();
@@ -116,7 +115,15 @@ service cloud.firestore {
       }
     }
 
-    // Default deny
-    match /{document=**} { allow read, write: if false; }
+    // --- Global admin read bypass (covers both get + list) ---
+    // This ensures all admin collection queries succeed everywhere.
+    match /{docPath=**} {
+      allow read: if isAdmin();
+    }
+
+    // Default deny all other writes
+    match /{document=**} {
+       allow write: if false;
+    }
   }
 }
