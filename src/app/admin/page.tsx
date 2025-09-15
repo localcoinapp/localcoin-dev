@@ -84,8 +84,6 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    // Wait until we definitively know the user and that they are an admin,
-    // otherwise onSnapshot fires unauthenticated and rules will deny.
     if (authLoading) return;
     if (!isAdmin) {
         if (!authLoading) router.push('/');

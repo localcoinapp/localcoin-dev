@@ -1,4 +1,3 @@
-
 // This is a one-time use script to set a custom admin claim on your Firebase user account.
 // It uses the Firebase Admin SDK and requires your environment to be authenticated.
 // HOW TO RUN:
