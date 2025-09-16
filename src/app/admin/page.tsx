@@ -85,7 +85,6 @@ export default function AdminPage() {
     },
   });
   
-  // This is the crucial fix for the recurring permissions issue.
   const handleForceRefresh = async () => {
     if (auth.currentUser) {
         setIsForcingRefresh(true);
@@ -116,8 +115,6 @@ export default function AdminPage() {
     const handleListenerError = (collectionName: string) => (error: Error) => {
         if (listenersActive) {
             console.error(`[admin] ${collectionName} listener error:`, error);
-            // This is the key change: if we get a permissions error, it's likely a stale token.
-            // We trigger a force refresh to get the latest custom claims.
             if ((error as any).code === 'permission-denied' || (error as any).code === 'unauthenticated') {
                 handleForceRefresh();
             }
@@ -971,3 +968,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
