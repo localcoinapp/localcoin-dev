@@ -726,7 +726,7 @@ export default function AdminPage() {
                                             <TableCell><Badge variant={ u.role === 'admin' ? 'destructive' : u.role === 'merchant' ? 'default' : 'secondary'} className={u.role === 'merchant' ? 'bg-green-600 text-white' : ''}>{u.role}</Badge></TableCell>
                                             <TableCell className="text-right space-x-2">
                                                 <Link href={`/admin/users/${u.id}`} passHref><Button size="sm" variant="outline"><Users className="mr-2 h-4 w-4" /> View</Button></Link>
-                                                <Button size="sm" variant="destructive" onClick={() => handleBlockUser(u)} disabled={u.id === user.id}><ShieldX className="mr-2 h-4 w-4"/> Block</Button>
+                                                <Button size="sm" variant="destructive" onClick={() => handleBlockUser(u)} disabled={u.id === user?.id}><ShieldX className="mr-2 h-4 w-4"/> Block</Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -956,5 +956,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
