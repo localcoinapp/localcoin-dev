@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +62,7 @@ export default function AdminPage() {
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+  const [isForcingRefresh, setIsForcingRefresh] = useState(false);
 
   // Email state
   const [testEmail, setTestEmail] = useState('');
@@ -82,6 +84,24 @@ export default function AdminPage() {
       body: '',
     },
   });
+  
+  // This is the crucial fix for the recurring permissions issue.
+  const handleForceRefresh = async () => {
+    if (auth.currentUser) {
+        setIsForcingRefresh(true);
+        try {
+            // Force refresh the token to get the latest custom claims.
+            await auth.currentUser.getIdToken(true);
+            // Reload the page to re-initialize all state and listeners with the new token.
+            window.location.reload();
+        } catch (error) {
+            console.error("Failed to force refresh token:", error);
+            toast({ title: "Error", description: "Could not refresh session. Please try logging out and back in.", variant: "destructive" });
+            setIsForcingRefresh(false);
+        }
+    }
+  };
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -90,46 +110,61 @@ export default function AdminPage() {
         return;
     }
 
-    const unsubscribes = [
-      onSnapshot(
-        collection(db, 'users'),
-        (snap) => setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
-        (err) => console.error('[admin] users listener error:', err)
-      ),
-      onSnapshot(
-        collection(db, 'blocked_users'),
-        (snap) => setBlockedUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
-        (err) => console.error('[admin] blocked_users listener error:', err)
-      ),
-      onSnapshot(
-        collection(db, 'merchants'),
-        (snap) => setMerchants(snap.docs.map(d => ({ ...d.data(), id: d.id } as Merchant))),
-        (err) => console.error('[admin] merchants listener error:', err)
-      ),
-      onSnapshot(
-        collection(db, 'tokenPurchaseRequests'),
-        (snap) => {
-          const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as TokenPurchaseRequest));
-          setAllTokenRequests(all);
-          setTokenRequests(all.filter(r => r.status === 'pending'));
-        },
-        (err) => console.error('[admin] tokenPurchaseRequests listener error:', err)
-      ),
-      onSnapshot(
-        collection(db, 'merchantCashoutRequests'),
-        (snap) => {
-          const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as MerchantCashoutRequest));
-          setAllCashoutRequests(all);
-          setPendingCashoutRequests(all.filter(r => r.status === 'pending'));
-          setHistoricalCashoutRequests(all.filter(r => r.status !== 'pending'));
-        },
-        (err) => console.error('[admin] merchantCashoutRequests listener error:', err)
-      )
-    ];
+    let listenersActive = true;
+    const unsubscribes: (() => void)[] = [];
+
+    const handleListenerError = (collectionName: string) => (error: Error) => {
+        if (listenersActive) {
+            console.error(`[admin] ${collectionName} listener error:`, error);
+            // This is the key change: if we get a permissions error, it's likely a stale token.
+            // We trigger a force refresh to get the latest custom claims.
+            if ((error as any).code === 'permission-denied' || (error as any).code === 'unauthenticated') {
+                handleForceRefresh();
+            }
+        }
+    };
+    
+    unsubscribes.push(onSnapshot(
+      collection(db, 'users'),
+      (snap) => setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
+      handleListenerError('users')
+    ));
+    unsubscribes.push(onSnapshot(
+      collection(db, 'blocked_users'),
+      (snap) => setBlockedUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
+      handleListenerError('blocked_users')
+    ));
+    unsubscribes.push(onSnapshot(
+      collection(db, 'merchants'),
+      (snap) => setMerchants(snap.docs.map(d => ({ ...d.data(), id: d.id } as Merchant))),
+      handleListenerError('merchants')
+    ));
+    unsubscribes.push(onSnapshot(
+      collection(db, 'tokenPurchaseRequests'),
+      (snap) => {
+        const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as TokenPurchaseRequest));
+        setAllTokenRequests(all);
+        setTokenRequests(all.filter(r => r.status === 'pending'));
+      },
+      handleListenerError('tokenPurchaseRequests')
+    ));
+    unsubscribes.push(onSnapshot(
+      collection(db, 'merchantCashoutRequests'),
+      (snap) => {
+        const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as MerchantCashoutRequest));
+        setAllCashoutRequests(all);
+        setPendingCashoutRequests(all.filter(r => r.status === 'pending'));
+        setHistoricalCashoutRequests(all.filter(r => r.status !== 'pending'));
+      },
+      handleListenerError('merchantCashoutRequests')
+    ));
 
     setLoading(false);
 
-    return () => unsubscribes.forEach(unsub => unsub());
+    return () => {
+      listenersActive = false;
+      unsubscribes.forEach(unsub => unsub());
+    };
   }, [authLoading, isAdmin, router]);
   
   const handleProcessTokenRequest = async (requestId: string, action: 'approve' | 'deny') => {
@@ -407,6 +442,15 @@ export default function AdminPage() {
 
   if (authLoading || loading) {
     return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
+  }
+  
+  if (isForcingRefresh) {
+    return (
+        <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] gap-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-muted-foreground">Your session has expired. Refreshing admin privileges...</p>
+        </div>
+    );
   }
 
   if (!user || user.role !== 'admin') {
