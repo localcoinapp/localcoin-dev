@@ -2,88 +2,89 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // --- Functions ---
     function isAdmin() {
-      // Admin status is based on a custom token claim, set by a server-side script.
+      // Securely identifies an admin based on their auth token custom claim.
       return request.auth.token.admin == true;
     }
 
     function isOwner(merchantId) {
-      // A user is the owner if their UID matches the merchant's owner field.
+      // Checks if the requesting user is the owner of a specific merchant document.
       return request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
     }
 
     // --- Collections ---
-    
-    // USERS
+
+    // USERS & BLOCKED_USERS
     match /users/{userId} {
-      // Admins can get any user doc. Authenticated users can get their own doc.
-      allow get: if request.auth.uid == userId || isAdmin();
-      // Only admins can list all users.
-      allow list: if isAdmin();
-      // Users can write to their own doc. Admins can write to any.
-      allow write: if request.auth.uid == userId || isAdmin();
+      // A user can read and write to their own document.
+      // An admin can read and write to any user document.
+      allow read, write: if request.auth.uid == userId || isAdmin();
     }
-
-    // BLOCKED USERS
+    
     match /blocked_users/{userId} {
-      // Only admins can read, list, or write to the blocked users collection.
-      allow read, write, list: if isAdmin();
+      // Only admins can read or write to the blocked_users collection.
+      allow read, write: if isAdmin();
+    }
+    
+    // Admins can list all users and all blocked users.
+    match /users/{document=**} {
+      allow list: if isAdmin();
+    }
+    match /blocked_users/{document=**} {
+        allow list: if isAdmin();
     }
 
-    // MERCHANTS
+
+    // MERCHANTS & MERCHANT_OWNERS
     match /merchants/{merchantId} {
-      // Public can GET a merchant if they are live. Admins can GET any.
+      // ANYONE can read a single merchant document, but only if it is 'live'.
+      // Admins can read any merchant document regardless of status.
       allow get: if resource.data.status == 'live' || isAdmin();
       
-      // PUBLIC can LIST merchants ONLY if the query filters for live status.
-      // ADMINS can list all merchants without any filter.
-      allow list: if (request.query.where.size() > 0 && request.query.where[0][0] == 'status' && request.query.where[0][1] == '==' && request.query.where[0][2] == 'live') || isAdmin();
-      
-      // Owners and admins can update their merchants.
+      // ANYONE can perform a LIST query, but only if that query is exactly `where('status', '==', 'live')`.
+      // Admins can perform any list query.
+      allow list: if (request.query.filters.size() == 1 &&
+                      request.query.filters[0].field.stringValue() == 'status' &&
+                      request.query.filters[0].value.stringValue() == 'live') || isAdmin();
+
+      // Only the verified owner of a merchant document or an admin can update it.
       allow update: if isOwner(merchantId) || isAdmin();
       
-      // Any authenticated user can CREATE a merchant application for themselves.
-      allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
-      
-      // Admins can delete merchants.
+      // Any authenticated user can create a new merchant document (submit an application).
+      allow create: if request.auth != null;
+
+      // Only admins can delete merchant documents.
       allow delete: if isAdmin();
     }
-    
-    // MERCHANT OWNERS (for security rule lookups)
+
     match /merchant_owners/{userId} {
-      // A user can read their own merchant owner entry. Admins can read any.
+      // A user can read their own lookup document, and admins can read any.
       allow read: if request.auth.uid == userId || isAdmin();
     }
 
-    // TOKEN PURCHASE REQUESTS
+    // REQUESTS (TOKENS & CASHOUTS)
     match /tokenPurchaseRequests/{requestId} {
-      // Admins can manage all requests. Users can only access their own.
-      allow get, write: if request.auth.uid == resource.data.userId || isAdmin();
+      // A user can manage their own request. Admins can manage any.
+      allow read, write: if request.auth.uid == resource.data.userId || isAdmin();
       // Only admins can list all requests.
       allow list: if isAdmin();
-      // Users can create their own requests.
-      allow create: if request.resource.data.userId == request.auth.uid;
     }
 
-    // MERCHANT CASHOUT REQUESTS
     match /merchantCashoutRequests/{requestId} {
-      // Admins can manage all requests. Merchant owners can access their own.
-      allow get: if isOwner(resource.data.merchantId) || isAdmin();
-      allow create: if isOwner(request.resource.data.merchantId);
-      allow write: if isAdmin(); // Only Admin can update status (approve/deny)
-      allow list: if isAdmin();
+       // Only admins can manage cashout requests.
+      allow read, write, list: if isAdmin();
     }
 
     // CHATS
     match /chats/{chatId} {
-      // Participants of a chat can read/write to it.
+      // Users can only access chats they are a part of.
       allow read, write: if request.auth.uid in resource.data.participantIds;
-      
+
       match /messages/{messageId} {
-        // Participants can read/write/delete messages in their chat.
-        allow read, write, delete: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        // Users can only access messages within chats they are a part of.
+        allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
       }
     }
   }
