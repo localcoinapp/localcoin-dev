@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -6,11 +5,12 @@ service cloud.firestore {
     
     // --- Functions ---
     function isAdmin() {
+      // Admin status is based on a custom token claim, set by a server-side script.
       return request.auth.token.admin == true;
     }
 
     function isOwner(merchantId) {
-      // Check if the user is the owner of the merchant document.
+      // A user is the owner if their UID matches the merchant's owner field.
       return request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
     }
 
@@ -18,7 +18,7 @@ service cloud.firestore {
     
     // USERS
     match /users/{userId} {
-      // Admins can get any user doc, users can only get their own.
+      // Admins can get any user doc. Authenticated users can get their own doc.
       allow get: if request.auth.uid == userId || isAdmin();
       // Only admins can list all users.
       allow list: if isAdmin();
@@ -28,21 +28,26 @@ service cloud.firestore {
 
     // BLOCKED USERS
     match /blocked_users/{userId} {
-      // Only admins can read or list blocked users.
-      allow read, list: if isAdmin();
+      // Only admins can read, list, or write to the blocked users collection.
+      allow read, write, list: if isAdmin();
     }
 
     // MERCHANTS
     match /merchants/{merchantId} {
-      // Public can read single live merchants, admins can read any.
+      // Public can GET a merchant if they are live. Admins can GET any.
       allow get: if resource.data.status == 'live' || isAdmin();
-      // Public can query for live merchants, admins can list all.
-      allow list: if request.query.where[0][2] == "live" || isAdmin();
-      // Owners and admins can update.
+      
+      // PUBLIC can LIST merchants ONLY if the query filters for live status.
+      // ADMINS can list all merchants without any filter.
+      allow list: if (request.query.where.size() > 0 && request.query.where[0][0] == 'status' && request.query.where[0][1] == '==' && request.query.where[0][2] == 'live') || isAdmin();
+      
+      // Owners and admins can update their merchants.
       allow update: if isOwner(merchantId) || isAdmin();
-      // Authenticated users can create merchant applications.
+      
+      // Any authenticated user can CREATE a merchant application for themselves.
       allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
-      // Admins can delete.
+      
+      // Admins can delete merchants.
       allow delete: if isAdmin();
     }
     
@@ -54,15 +59,21 @@ service cloud.firestore {
 
     // TOKEN PURCHASE REQUESTS
     match /tokenPurchaseRequests/{requestId} {
-      // Admins can read/write/list. Users can read/write their own requests.
-      allow read, write: if request.auth.uid == resource.data.userId || isAdmin();
+      // Admins can manage all requests. Users can only access their own.
+      allow get, write: if request.auth.uid == resource.data.userId || isAdmin();
+      // Only admins can list all requests.
       allow list: if isAdmin();
+      // Users can create their own requests.
+      allow create: if request.resource.data.userId == request.auth.uid;
     }
 
     // MERCHANT CASHOUT REQUESTS
     match /merchantCashoutRequests/{requestId} {
-      // Admins can read/write/list.
-      allow read, write, list: if isAdmin();
+      // Admins can manage all requests. Merchant owners can access their own.
+      allow get: if isOwner(resource.data.merchantId) || isAdmin();
+      allow create: if isOwner(request.resource.data.merchantId);
+      allow write: if isAdmin(); // Only Admin can update status (approve/deny)
+      allow list: if isAdmin();
     }
 
     // CHATS
@@ -71,8 +82,8 @@ service cloud.firestore {
       allow read, write: if request.auth.uid in resource.data.participantIds;
       
       match /messages/{messageId} {
-        // Participants can read/write messages.
-        allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        // Participants can read/write/delete messages in their chat.
+        allow read, write, delete: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
       }
     }
   }
