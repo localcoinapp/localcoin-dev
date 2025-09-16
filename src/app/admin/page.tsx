@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { enhanceEmailBody } from '@/ai/flows/enhance-email-body';
+import { onAuthStateChanged } from 'firebase/auth';
 
 type HistorySortOption = 'date-desc' | 'date-asc' | 'user-asc' | 'user-desc' | 'amount-asc' | 'amount-desc' | 'status-asc' | 'status-desc';
 type HistoryStatusFilter = 'all' | 'approved' | 'denied';
@@ -58,7 +59,10 @@ export default function AdminPage() {
   const [historicalCashoutRequests, setHistoricalCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
   const [allTokenRequests, setAllTokenRequests] = useState<TokenPurchaseRequest[]>([]);
   const [allCashoutRequests, setAllCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
+  
   const [loading, setLoading] = useState(true);
+  const [isAllowed, setIsAllowed] = useState(false);
+  
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
@@ -72,9 +76,7 @@ export default function AdminPage() {
   // History table state
   const [historySort, setHistorySort] = useState<HistorySortOption>('date-desc');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<HistoryStatusFilter>('all');
-  const isAdmin = user?.role === 'admin';
   
-
   const pushEmailForm = useForm<PushEmailFormValues>({
     resolver: zodResolver(pushEmailSchema),
     defaultValues: {
@@ -85,63 +87,76 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth state to be resolved
-    
-    // Only proceed if the user is confirmed to be an admin.
-    if (!isAdmin) {
-        // If not loading and not admin, just stay on this page which will render "Access Denied"
+    // Use onAuthStateChanged to get the most up-to-date user object and claims
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Force refresh the token to get the latest custom claims
+          const idTokenResult = await firebaseUser.getIdTokenResult(true);
+          
+          // Check for the admin claim
+          if (idTokenResult.claims.admin === true) {
+            setIsAllowed(true);
+            
+            // --- Only set up listeners if the user is confirmed as admin ---
+            const listeners: (() => void)[] = [];
+            const collectionsToListen = [
+                { name: 'users', setter: setUsers },
+                { name: 'blocked_users', setter: setBlockedUsers },
+                { name: 'merchants', setter: setMerchants },
+                { name: 'tokenPurchaseRequests', setter: (data: TokenPurchaseRequest[]) => {
+                    setAllTokenRequests(data);
+                    setTokenRequests(data.filter(r => r.status === 'pending'));
+                }},
+                { name: 'merchantCashoutRequests', setter: (data: MerchantCashoutRequest[]) => {
+                    setAllCashoutRequests(data);
+                    setPendingCashoutRequests(data.filter(r => r.status === 'pending'));
+                    setHistoricalCashoutRequests(data.filter(r => r.status !== 'pending'));
+                }}
+            ];
+
+            collectionsToListen.forEach(c => {
+                const unsubscribe = onSnapshot(
+                    collection(db, c.name),
+                    (snapshot) => {
+                        const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as any));
+                        c.setter(data);
+                    },
+                    (error) => {
+                        console.error(`[admin] ${c.name} listener error:`, error);
+                        toast({
+                          title: `Error fetching ${c.name}`,
+                          description: error.message,
+                          variant: 'destructive',
+                        });
+                    }
+                );
+                listeners.push(unsubscribe);
+            });
+            setLoading(false); // Done loading data
+            return () => listeners.forEach(unsub => unsub());
+
+          } else {
+            // User is authenticated but not an admin
+            setIsAllowed(false);
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error("Error verifying admin status:", error);
+          setIsAllowed(false);
+          setLoading(false);
+        }
+      } else {
+        // No user is logged in
+        setIsAllowed(false);
         setLoading(false);
-        return;
-    }
-
-    const listeners: (() => void)[] = [];
-    const collectionsToListen = [
-        { name: 'users', setter: setUsers },
-        { name: 'blocked_users', setter: setBlockedUsers },
-        { name: 'merchants', setter: setMerchants },
-        { name: 'tokenPurchaseRequests', setter: (data: TokenPurchaseRequest[]) => {
-            setAllTokenRequests(data);
-            setTokenRequests(data.filter(r => r.status === 'pending'));
-        }},
-        { name: 'merchantCashoutRequests', setter: (data: MerchantCashoutRequest[]) => {
-            setAllCashoutRequests(data);
-            setPendingCashoutRequests(data.filter(r => r.status === 'pending'));
-            setHistoricalCashoutRequests(data.filter(r => r.status !== 'pending'));
-        }}
-    ];
-
-    let activeListeners = true;
-
-    collectionsToListen.forEach(c => {
-        const unsubscribe = onSnapshot(
-            collection(db, c.name),
-            (snapshot) => {
-                if (activeListeners) {
-                    const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as any));
-                    c.setter(data);
-                }
-            },
-            (error) => {
-                if (activeListeners) {
-                    console.error(`[admin] ${c.name} listener error:`, error);
-                    toast({
-                      title: `Error fetching ${c.name}`,
-                      description: error.message,
-                      variant: 'destructive',
-                    })
-                }
-            }
-        );
-        listeners.push(unsubscribe);
+        router.push('/login');
+      }
     });
 
-    setLoading(false);
-
-    return () => {
-      activeListeners = false;
-      listeners.forEach(unsub => unsub());
-    };
-  }, [authLoading, isAdmin, toast]);
+    // Cleanup the auth state listener on component unmount
+    return () => unsubscribe();
+  }, [router, toast]);
   
   const handleProcessTokenRequest = async (requestId: string, action: 'approve' | 'deny') => {
     setProcessingRequest(requestId);
@@ -416,11 +431,11 @@ export default function AdminPage() {
   };
 
 
-  if (authLoading || loading) {
+  if (loading) {
     return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
   }
   
-  if (!isAdmin) {
+  if (!isAllowed) {
     return (
       <div className="container text-center p-8">
         <Card className="max-w-md mx-auto">
@@ -941,3 +956,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
