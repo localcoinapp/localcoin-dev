@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, doc, writeBatch, getDoc, serverTimestamp, Timestamp, updateDoc, getDocs, setDoc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,8 +62,7 @@ export default function AdminPage() {
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
-  const [isForcingRefresh, setIsForcingRefresh] = useState(false);
-
+  
   // Email state
   const [testEmail, setTestEmail] = useState('');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
@@ -84,85 +83,65 @@ export default function AdminPage() {
       body: '',
     },
   });
-  
-  const handleForceRefresh = async () => {
-    if (auth.currentUser) {
-        setIsForcingRefresh(true);
-        try {
-            // Force refresh the token to get the latest custom claims.
-            await auth.currentUser.getIdToken(true);
-            // Reload the page to re-initialize all state and listeners with the new token.
-            window.location.reload();
-        } catch (error) {
-            console.error("Failed to force refresh token:", error);
-            toast({ title: "Error", description: "Could not refresh session. Please try logging out and back in.", variant: "destructive" });
-            setIsForcingRefresh(false);
-        }
-    }
-  };
-
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading) return; // Wait for auth state to be resolved
+    
+    // Only proceed if the user is confirmed to be an admin.
     if (!isAdmin) {
-        if (!authLoading) router.push('/');
+        // If not loading and not admin, just stay on this page which will render "Access Denied"
+        setLoading(false);
         return;
     }
 
-    let listenersActive = true;
-    const unsubscribes: (() => void)[] = [];
+    const listeners: (() => void)[] = [];
+    const collectionsToListen = [
+        { name: 'users', setter: setUsers },
+        { name: 'blocked_users', setter: setBlockedUsers },
+        { name: 'merchants', setter: setMerchants },
+        { name: 'tokenPurchaseRequests', setter: (data: TokenPurchaseRequest[]) => {
+            setAllTokenRequests(data);
+            setTokenRequests(data.filter(r => r.status === 'pending'));
+        }},
+        { name: 'merchantCashoutRequests', setter: (data: MerchantCashoutRequest[]) => {
+            setAllCashoutRequests(data);
+            setPendingCashoutRequests(data.filter(r => r.status === 'pending'));
+            setHistoricalCashoutRequests(data.filter(r => r.status !== 'pending'));
+        }}
+    ];
 
-    const handleListenerError = (collectionName: string) => (error: Error) => {
-        if (listenersActive) {
-            console.error(`[admin] ${collectionName} listener error:`, error);
-            if ((error as any).code === 'permission-denied' || (error as any).code === 'unauthenticated') {
-                handleForceRefresh();
+    let activeListeners = true;
+
+    collectionsToListen.forEach(c => {
+        const unsubscribe = onSnapshot(
+            collection(db, c.name),
+            (snapshot) => {
+                if (activeListeners) {
+                    const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as any));
+                    c.setter(data);
+                }
+            },
+            (error) => {
+                if (activeListeners) {
+                    console.error(`[admin] ${c.name} listener error:`, error);
+                    toast({
+                      title: `Error fetching ${c.name}`,
+                      description: error.message,
+                      variant: 'destructive',
+                    })
+                }
             }
-        }
-    };
-    
-    unsubscribes.push(onSnapshot(
-      collection(db, 'users'),
-      (snap) => setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
-      handleListenerError('users')
-    ));
-    unsubscribes.push(onSnapshot(
-      collection(db, 'blocked_users'),
-      (snap) => setBlockedUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User))),
-      handleListenerError('blocked_users')
-    ));
-    unsubscribes.push(onSnapshot(
-      collection(db, 'merchants'),
-      (snap) => setMerchants(snap.docs.map(d => ({ ...d.data(), id: d.id } as Merchant))),
-      handleListenerError('merchants')
-    ));
-    unsubscribes.push(onSnapshot(
-      collection(db, 'tokenPurchaseRequests'),
-      (snap) => {
-        const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as TokenPurchaseRequest));
-        setAllTokenRequests(all);
-        setTokenRequests(all.filter(r => r.status === 'pending'));
-      },
-      handleListenerError('tokenPurchaseRequests')
-    ));
-    unsubscribes.push(onSnapshot(
-      collection(db, 'merchantCashoutRequests'),
-      (snap) => {
-        const all = snap.docs.map(d => ({ ...d.data(), id: d.id } as MerchantCashoutRequest));
-        setAllCashoutRequests(all);
-        setPendingCashoutRequests(all.filter(r => r.status === 'pending'));
-        setHistoricalCashoutRequests(all.filter(r => r.status !== 'pending'));
-      },
-      handleListenerError('merchantCashoutRequests')
-    ));
+        );
+        listeners.push(unsubscribe);
+    });
 
     setLoading(false);
 
     return () => {
-      listenersActive = false;
-      unsubscribes.forEach(unsub => unsub());
+      activeListeners = false;
+      listeners.forEach(unsub => unsub());
     };
-  }, [authLoading, isAdmin, router]);
+  }, [authLoading, isAdmin, toast]);
   
   const handleProcessTokenRequest = async (requestId: string, action: 'approve' | 'deny') => {
     setProcessingRequest(requestId);
@@ -441,16 +420,7 @@ export default function AdminPage() {
     return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
   }
   
-  if (isForcingRefresh) {
-    return (
-        <div className="container flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Your session has expired. Refreshing admin privileges...</p>
-        </div>
-    );
-  }
-
-  if (!user || user.role !== 'admin') {
+  if (!isAdmin) {
     return (
       <div className="container text-center p-8">
         <Card className="max-w-md mx-auto">
@@ -459,6 +429,9 @@ export default function AdminPage() {
                 <CardTitle>Access Denied</CardTitle>
                 <CardDescription>You do not have permission to view this page.</CardDescription>
             </CardHeader>
+             <CardContent>
+                <Button variant="outline" asChild><Link href="/">Go to Homepage</Link></Button>
+             </CardContent>
         </Card>
       </div>
     );
@@ -968,5 +941,3 @@ export default function AdminPage() {
     </>
   );
 }
-
-    
