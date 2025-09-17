@@ -1,6 +1,5 @@
 
 import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 const asBool = (v?: string) =>
@@ -8,7 +7,7 @@ const asBool = (v?: string) =>
 
 const trim1 = (v?: string) => v?.replace(/\r?\n$/, ''); // drop one trailing newline
 
-function createMailTransport(): Transporter {
+function createMailTransport() {
   const host = process.env.SMTP_HOST!;
   const port = parseInt(process.env.SMTP_PORT || '465', 10);
 
