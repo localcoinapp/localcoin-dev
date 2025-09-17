@@ -9,7 +9,7 @@ interface SendEmailOptions {
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   // --- Environment Variable Check ---
-  const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
+  const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM'];
   const missingVars = requiredVars.filter(v => !process.env[v]);
   if (missingVars.length > 0) {
     const errorMsg = `Server is not configured for sending emails. Missing: ${missingVars.join(', ')}`;
@@ -18,19 +18,21 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   }
   // ---------------------------------
 
-  const transporter = nodemailer.createTransport({
-    pool: true,
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: Number(process.env.SMTP_PORT) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  });
+  const transportOptions: nodemailer.TransportOptions = {
+    host: process.env.SMTP_HOST!,
+    port: Number(process.env.SMTP_PORT!),
+    secure: Number(process.env.SMTP_PORT!) === 465,
+  };
+
+  // Only add auth if not connecting to localhost and credentials are provided
+  if (process.env.SMTP_HOST !== 'localhost' && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      transportOptions.auth = {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+      };
+  }
+
+  const transporter = nodemailer.createTransport(transportOptions);
 
   transporter.verify((error) => {
     if (error) {
