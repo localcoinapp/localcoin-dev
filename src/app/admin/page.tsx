@@ -87,74 +87,89 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    // Use onAuthStateChanged to get the most up-to-date user object and claims
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          // Force refresh the token to get the latest custom claims
-          const idTokenResult = await firebaseUser.getIdTokenResult(true);
-          
-          // Check for the admin claim
-          if (idTokenResult.claims.admin === true) {
-            setIsAllowed(true);
-            
-            // --- Only set up listeners if the user is confirmed as admin ---
-            const listeners: (() => void)[] = [];
-            const collectionsToListen = [
-                { name: 'users', setter: setUsers },
-                { name: 'blocked_users', setter: setBlockedUsers },
-                { name: 'merchants', setter: setMerchants },
-                { name: 'tokenPurchaseRequests', setter: (data: TokenPurchaseRequest[]) => {
-                    setAllTokenRequests(data);
-                    setTokenRequests(data.filter(r => r.status === 'pending'));
-                }},
-                { name: 'merchantCashoutRequests', setter: (data: MerchantCashoutRequest[]) => {
-                    setAllCashoutRequests(data);
-                    setPendingCashoutRequests(data.filter(r => r.status === 'pending'));
-                    setHistoricalCashoutRequests(data.filter(r => r.status !== 'pending'));
-                }}
-            ];
-
-            collectionsToListen.forEach(c => {
-                const unsubscribe = onSnapshot(
-                    collection(db, c.name),
-                    (snapshot) => {
-                        const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as any));
-                        c.setter(data);
-                    },
-                    (error) => {
-                        console.error(`[admin] ${c.name} listener error:`, error);
-                        toast({
-                          title: `Error fetching ${c.name}`,
-                          description: error.message,
-                          variant: 'destructive',
-                        });
-                    }
-                );
-                listeners.push(unsubscribe);
-            });
-            setLoading(false); // Done loading data
-            return () => listeners.forEach(unsub => unsub());
-
-          } else {
-            // User is authenticated but not an admin
-            setIsAllowed(false);
-            setLoading(false);
-          }
-        } catch (error) {
-          console.error("Error verifying admin status:", error);
-          setIsAllowed(false);
-          setLoading(false);
-        }
-      } else {
-        // No user is logged in
+      if (!firebaseUser) {
         setIsAllowed(false);
         setLoading(false);
         router.push('/login');
+        return;
+      }
+  
+      try {
+        // Force a fresh token so we get the latest custom claims
+        await firebaseUser.getIdToken(true);
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+  
+        const claim = idTokenResult?.claims?.admin;
+        const hasAdminClaim = claim === true || claim === 'true';
+  
+        let allowed = hasAdminClaim;
+  
+        // Fallback: check your own user doc's role
+        if (!allowed) {
+          const meSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const role = meSnap.exists() ? (meSnap.data() as any).role : undefined;
+          if (role === 'admin') allowed = true;
+        }
+  
+        setIsAllowed(allowed);
+  
+        if (allowed) {
+          // --- set up listeners only for admins ---
+          const listeners: Array<() => void> = [];
+  
+          const collectionsToListen = [
+            { name: 'users', setter: setUsers },
+            { name: 'blocked_users', setter: setBlockedUsers },
+            { name: 'merchants', setter: setMerchants },
+            {
+              name: 'tokenPurchaseRequests',
+              setter: (data: TokenPurchaseRequest[]) => {
+                setAllTokenRequests(data);
+                setTokenRequests(data.filter((r) => r.status === 'pending'));
+              },
+            },
+            {
+              name: 'merchantCashoutRequests',
+              setter: (data: MerchantCashoutRequest[]) => {
+                setAllCashoutRequests(data);
+                setPendingCashoutRequests(data.filter((r) => r.status === 'pending'));
+                setHistoricalCashoutRequests(data.filter((r) => r.status !== 'pending'));
+              },
+            },
+          ];
+  
+          collectionsToListen.forEach((c) => {
+            const stop = onSnapshot(
+              collection(db, c.name),
+              (snapshot) => {
+                const data = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as any));
+                c.setter(data);
+              },
+              (error) => {
+                console.error(`[admin] ${c.name} listener error:`, error);
+                toast({
+                  title: `Error fetching ${c.name}`,
+                  description: error.message,
+                  variant: 'destructive',
+                });
+              }
+            );
+            listeners.push(stop);
+          });
+  
+          setLoading(false);
+          return () => listeners.forEach((u) => u());
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error verifying admin status:', err);
+        setIsAllowed(false);
+        setLoading(false);
       }
     });
-
-    // Cleanup the auth state listener on component unmount
+  
     return () => unsubscribe();
   }, [router, toast]);
   
@@ -956,3 +971,5 @@ export default function AdminPage() {
     </>
   );
 }
+
+    
