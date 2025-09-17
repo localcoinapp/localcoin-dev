@@ -1,17 +1,18 @@
 
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 /**
  * Creates a Nodemailer transport based on environment variables.
  * Uses a concrete SMTPTransport.Options type to ensure `auth` is a valid property.
  */
-function createMailTransport() {
+function createMailTransport(): Transporter {
   // Use the concrete SMTP options type so `auth` is valid
   const transportOptions: SMTPTransport.Options = {
     host: process.env.SMTP_HOST || 'localhost',
     port: Number(process.env.SMTP_PORT || 587),
-    secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for 587 (STARTTLS)
+    secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for others (STARTTLS)
   };
 
   // Add auth block only if credentials are provided
