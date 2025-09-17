@@ -1,5 +1,35 @@
 
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+
+/**
+ * Creates a Nodemailer transport based on environment variables.
+ * Uses a concrete SMTPTransport.Options type to ensure `auth` is a valid property.
+ */
+function createMailTransport() {
+  // Use the concrete SMTP options type so `auth` is valid
+  const transportOptions: SMTPTransport.Options = {
+    host: process.env.SMTP_HOST || 'localhost',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for 587 (STARTTLS)
+  };
+
+  // Add auth block only if credentials are provided
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    transportOptions.auth = {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    };
+  }
+
+  // Fallback for local development if no host is set, to prevent network errors
+  if (!process.env.SMTP_HOST && process.env.NODE_ENV !== 'production') {
+    return nodemailer.createTransport({ jsonTransport: true });
+  }
+
+  return nodemailer.createTransport(transportOptions);
+}
+
 
 interface SendEmailOptions {
   to: string;
@@ -17,32 +47,19 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
     throw new Error(errorMsg);
   }
   // ---------------------------------
+  
+  const transporter = createMailTransport();
 
-  const transportOptions: nodemailer.TransportOptions = {
-    host: process.env.SMTP_HOST!,
-    port: Number(process.env.SMTP_PORT!),
-    // Let nodemailer handle 'secure' automatically based on port.
-    // It will use STARTTLS for 587 and direct SSL for 465.
-  } as any;
-
-  // If credentials are provided in the environment, use them.
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      transportOptions.auth = {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-      };
+  // Verify connection configuration in development
+  if (process.env.NODE_ENV !== 'production') {
+      transporter.verify((error) => {
+        if (error) {
+          console.error("SMTP Connection Error:", error);
+        } else {
+          console.log("SMTP server is ready to take our messages");
+        }
+      });
   }
-
-  const transporter = nodemailer.createTransport(transportOptions);
-
-  // Verify connection configuration
-  transporter.verify((error) => {
-    if (error) {
-      console.error("SMTP Connection Error:", error);
-    } else {
-      console.log("SMTP server is ready to take our messages");
-    }
-  });
   
   const mailOptions = {
     from: process.env.SMTP_FROM,
