@@ -12,7 +12,9 @@ function createMailTransport(): Transporter {
   const transportOptions: SMTPTransport.Options = {
     host: process.env.SMTP_HOST || 'localhost',
     port: Number(process.env.SMTP_PORT || 587),
-    secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for others (STARTTLS)
+    // By not setting 'secure', nodemailer will auto-detect STARTTLS vs SSL.
+    // It defaults to `false` and upgrades the connection with STARTTLS if available on ports other than 465.
+    // If port is 465, it will use SSL automatically.
   };
 
   // Add auth block only if credentials are provided
