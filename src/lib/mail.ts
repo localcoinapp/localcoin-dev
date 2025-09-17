@@ -21,9 +21,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   const transportOptions: nodemailer.TransportOptions = {
     host: process.env.SMTP_HOST!,
     port: Number(process.env.SMTP_PORT!),
-    // Let nodemailer handle 'secure' automatically based on port.
-    // It will use STARTTLS for 587 and direct SSL for 465.
-  };
+  } as any;
 
   // If credentials are provided in the environment, use them.
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
