@@ -1,74 +1,107 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- Functions ---
+
+    /* -- helpers -- */
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Robust: accepts boolean true OR string "true", and also falls back to users/{uid}.role === "admin"
     function isAdmin() {
-      // Check for the custom admin claim on the user's auth token.
-      return request.auth.token.admin == true;
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.admin == "true" ||
+        request.auth.token.role == "admin" ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+        )
+      );
     }
 
     function isOwner(merchantId) {
-      // Check if the user is the owner of the merchant document.
-      return request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
+      return signedIn() &&
+        request.auth.uid == get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner;
     }
 
-    // --- Collections ---
-    
-    // USERS
+    /* ------------------------------------------------------------------
+       🔓 Emergency admin override: admins can read/write ANYTHING,
+       including queries/listeners, anywhere in the DB.
+       ------------------------------------------------------------------ */
+    match /{path=**} {
+      allow read, get, list, create, update, delete, write: if isAdmin();
+    }
+
+    /* ----------------- Non-admin rules (kept simple) ------------------ */
+
+    // USERS: a user can manage their own doc
     match /users/{userId} {
-      // Admins can read any user doc. Users can only read/write their own.
-      allow get, write: if request.auth.uid == userId || isAdmin();
-      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow get, update, delete: if signedIn() && request.auth.uid == userId;
+      // listing for non-admins disabled; admin override applies anyway
+      allow list: if false;
     }
 
-    // BLOCKED USERS
+    // BLOCKED USERS: non-admins cannot access; admin override applies
     match /blocked_users/{userId} {
-      // Only admins can read/write blocked users.
-      allow read, write: if isAdmin();
+      allow read, write, list: if false;
     }
 
     // MERCHANTS
     match /merchants/{merchantId} {
-      // Anyone can read a single merchant if it's live.
-      allow get: if resource.data.status == 'live' || isAdmin();
-      // Anyone can query merchants if they only filter for live ones.
-      allow list: if request.query.where.size() == 1 && request.query.where[0][0] == "status" && request.query.where[0][2] == "live" || isAdmin();
-      // Owners and admins can write/update.
-      allow write: if isOwner(merchantId) || isAdmin();
+      // public can view single merchant if it's live
+      allow get: if resource.data.status == "live";
+
+      // list queries for non-admins: relaxed for now (keeps site working).
+      // If you want to lock this down later, add a stricter status==live filter check.
+      allow list: if true;
+
+      // owners can write their own merchant; admin override already covers admins
+      allow create: if signedIn();
+      allow update, delete: if isOwner(merchantId);
     }
-    
-    // MERCHANT OWNERS (for security rule lookups)
+
+    // Lookup doc (if you use it); non-admins only read their own
     match /merchant_owners/{userId} {
-      // A user can read their own merchant owner entry. Admins can read any.
-      allow read: if request.auth.uid == userId || isAdmin();
-      // Only the system (via create merchant) should write this. Admins can for maintenance.
-      allow write: if isAdmin();
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow list, create, update, delete: if false;
     }
 
     // TOKEN PURCHASE REQUESTS
     match /tokenPurchaseRequests/{requestId} {
-      // Admins can read/write/list. Users can read/write their own requests.
-      allow read, write: if request.auth.uid == resource.data.userId || isAdmin();
-      allow list: if isAdmin();
+      // on create, use request.resource (resource doesn't exist yet)
+      allow create: if signedIn() && request.auth.uid == request.resource.data.userId;
+
+      // owner can read/update their own requests
+      allow get, update, delete: if signedIn() && request.auth.uid == resource.data.userId;
+
+      // non-admin listing disabled; admin override handles admin listeners
+      allow list: if false;
     }
 
     // MERCHANT CASHOUT REQUESTS
     match /merchantCashoutRequests/{requestId} {
-      // Admins can read/write/list.
-      allow read, write: if isAdmin();
-       allow list: if isAdmin();
+      // merchants submit creates; everything else only for admin via override
+      allow create: if signedIn();
+      allow get, update, delete, list: if false;
     }
 
     // CHATS
     match /chats/{chatId} {
-      // Participants of a chat can read/write to it.
-      allow read, write: if request.auth.uid in resource.data.participantIds;
-      
+      allow create: if signedIn();
+      allow get, update, delete:
+        if signedIn() && request.auth.uid in resource.data.participantIds;
+      allow list: if false;
+
       match /messages/{messageId} {
-        // Participants can read/write messages.
-        allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        allow create:
+          if signedIn() &&
+             request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        allow get, update, delete:
+          if signedIn() &&
+             request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        allow list: if false;
       }
     }
   }
