@@ -26,7 +26,6 @@ import * as z from 'zod';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { enhanceEmailBody } from '@/ai/flows/enhance-email-body';
-import { onAuthStateChanged } from 'firebase/auth';
 
 type HistorySortOption = 'date-desc' | 'date-asc' | 'user-asc' | 'user-desc' | 'amount-asc' | 'amount-desc' | 'status-asc' | 'status-desc';
 type HistoryStatusFilter = 'all' | 'approved' | 'denied';
@@ -61,7 +60,6 @@ export default function AdminPage() {
   const [allCashoutRequests, setAllCashoutRequests] = useState<MerchantCashoutRequest[]>([]);
   
   const [loading, setLoading] = useState(true);
-  const [isAllowed, setIsAllowed] = useState(false);
   
   const [viewingApp, setViewingApp] = useState<Merchant | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -87,91 +85,66 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        setIsAllowed(false);
-        setLoading(false);
+    if (authLoading) {
+      return; // Wait until auth state is confirmed
+    }
+
+    if (!user) {
         router.push('/login');
         return;
-      }
-  
-      try {
-        // Force a fresh token so we get the latest custom claims
-        await firebaseUser.getIdToken(true);
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-  
-        const claim = idTokenResult?.claims?.admin;
-        const hasAdminClaim = claim === true || claim === 'true';
-  
-        let allowed = hasAdminClaim;
-  
-        // Fallback: check your own user doc's role
-        if (!allowed) {
-          const meSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const role = meSnap.exists() ? (meSnap.data() as any).role : undefined;
-          if (role === 'admin') allowed = true;
-        }
-  
-        setIsAllowed(allowed);
-  
-        if (allowed) {
-          // --- set up listeners only for admins ---
-          const listeners: Array<() => void> = [];
-  
-          const collectionsToListen = [
-            { name: 'users', setter: setUsers },
-            { name: 'blocked_users', setter: setBlockedUsers },
-            { name: 'merchants', setter: setMerchants },
-            {
-              name: 'tokenPurchaseRequests',
-              setter: (data: TokenPurchaseRequest[]) => {
-                setAllTokenRequests(data);
-                setTokenRequests(data.filter((r) => r.status === 'pending'));
-              },
-            },
-            {
-              name: 'merchantCashoutRequests',
-              setter: (data: MerchantCashoutRequest[]) => {
-                setAllCashoutRequests(data);
-                setPendingCashoutRequests(data.filter((r) => r.status === 'pending'));
-                setHistoricalCashoutRequests(data.filter((r) => r.status !== 'pending'));
-              },
-            },
-          ];
-  
-          collectionsToListen.forEach((c) => {
-            const stop = onSnapshot(
-              collection(db, c.name),
-              (snapshot) => {
-                const data = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as any));
-                c.setter(data);
-              },
-              (error) => {
-                console.error(`[admin] ${c.name} listener error:`, error);
-                toast({
-                  title: `Error fetching ${c.name}`,
-                  description: error.message,
-                  variant: 'destructive',
-                });
-              }
-            );
-            listeners.push(stop);
+    }
+    
+    if (user.role !== 'admin') {
+        router.push('/');
+        return;
+    }
+
+    // --- set up listeners only for admins ---
+    const listeners: Array<() => void> = [];
+
+    const collectionsToListen = [
+      { name: 'users', setter: setUsers },
+      { name: 'blocked_users', setter: setBlockedUsers },
+      { name: 'merchants', setter: setMerchants },
+      {
+        name: 'tokenPurchaseRequests',
+        setter: (data: TokenPurchaseRequest[]) => {
+          setAllTokenRequests(data);
+          setTokenRequests(data.filter((r) => r.status === 'pending'));
+        },
+      },
+      {
+        name: 'merchantCashoutRequests',
+        setter: (data: MerchantCashoutRequest[]) => {
+          setAllCashoutRequests(data);
+          setPendingCashoutRequests(data.filter((r) => r.status === 'pending'));
+          setHistoricalCashoutRequests(data.filter((r) => r.status !== 'pending'));
+        },
+      },
+    ];
+
+    collectionsToListen.forEach((c) => {
+      const stop = onSnapshot(
+        collection(db, c.name),
+        (snapshot) => {
+          const data = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as any));
+          c.setter(data);
+        },
+        (error) => {
+          console.error(`[admin] ${c.name} listener error:`, error);
+          toast({
+            title: `Error fetching ${c.name}`,
+            description: error.message,
+            variant: 'destructive',
           });
-  
-          setLoading(false);
-          return () => listeners.forEach((u) => u());
-        } else {
-          setLoading(false);
         }
-      } catch (err) {
-        console.error('Error verifying admin status:', err);
-        setIsAllowed(false);
-        setLoading(false);
-      }
+      );
+      listeners.push(stop);
     });
-  
-    return () => unsubscribe();
-  }, [router, toast]);
+
+    setLoading(false);
+    return () => listeners.forEach((u) => u());
+  }, [user, authLoading, router, toast]);
   
   const handleProcessTokenRequest = async (requestId: string, action: 'approve' | 'deny') => {
     setProcessingRequest(requestId);
@@ -446,11 +419,11 @@ export default function AdminPage() {
   };
 
 
-  if (loading) {
+  if (loading || authLoading) {
     return <div className="container text-center p-8"><Loader2 className="h-12 w-12 animate-spin mx-auto" /></div>;
   }
   
-  if (!isAllowed) {
+  if (!user || user.role !== 'admin') {
     return (
       <div className="container text-center p-8">
         <Card className="max-w-md mx-auto">

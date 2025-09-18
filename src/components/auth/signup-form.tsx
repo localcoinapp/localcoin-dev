@@ -65,13 +65,14 @@ export function SignupForm() {
         email: values.email,
         country: values.country,
         role: role,
-        profileComplete: false,
+        profileComplete: role === 'admin', // Admins are complete by default
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       }, { merge: true });
 
       await sendEmailVerification(user);
       
+      // Sign the user out to force them to verify their email and log in properly
       await signOut(auth);
 
       toast({
@@ -98,24 +99,27 @@ export function SignupForm() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      const isNewUser = !userDoc.exists();
-      // Assign admin role if the email matches and it's a new user
-      const role = isNewUser && user.email === siteConfig.adminEmail ? 'admin' : userDoc.data()?.role || 'user';
+      // If user doc doesn't exist, it's a new user. Create their doc.
+      if (!userDoc.exists()) {
+        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          id: user.uid,
+          email: user.email,
+          name: user.displayName,
+          avatar: user.photoURL,
+          role: role,
+          profileComplete: role === 'admin', // Admins are complete by default
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+        });
+      } else {
+         // If they exist, just update their last login time
+         await setDoc(userDocRef, {
+            lastLoginAt: serverTimestamp(),
+         }, { merge: true });
+      }
 
-      const userData = {
-        uid: user.uid,
-        id: user.uid,
-        email: user.email,
-        name: user.displayName,
-        avatar: user.photoURL,
-        profileComplete: true,
-        lastLoginAt: serverTimestamp(),
-        role: role,
-        ...(isNewUser && { createdAt: serverTimestamp() })
-      };
-
-      await setDoc(userDocRef, userData, { merge: true });
-      
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {

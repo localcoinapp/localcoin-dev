@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -22,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "../logo"
 import { useToast } from "@/hooks/use-toast"
+import { siteConfig } from "@/config/site"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -49,10 +51,25 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
+      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
+      const blockedDocSnap = await getDoc(blockedUserDocRef);
+
+      if (blockedDocSnap.exists()) {
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support for assistance.",
+          duration: 9000,
+        });
+        return;
+      }
+
       // Ensure user document has a last login timestamp
       await setDoc(doc(db, 'users', user.uid), {
         lastLoginAt: serverTimestamp(),
       }, { merge: true });
+
 
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
@@ -72,14 +89,42 @@ export function LoginForm() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // Deterministic write: Create or merge the user document immediately.
-      // This will NOT overwrite the role of an existing admin/merchant.
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email ?? null,
-        name: user.displayName ?? null,
-        avatar: user.photoURL ?? null,
-        lastLoginAt: serverTimestamp(),
-      }, { merge: true });
+      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
+      const blockedDocSnap = await getDoc(blockedUserDocRef);
+      if (blockedDocSnap.exists()) {
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support for assistance.",
+          duration: 9000,
+        });
+        return;
+      }
+
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      // If user doc doesn't exist, it's a new user. Create their doc.
+      if (!userDoc.exists()) {
+        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          id: user.uid,
+          email: user.email,
+          name: user.displayName,
+          avatar: user.photoURL,
+          role: role,
+          profileComplete: role === 'admin', // Admins are complete by default
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+        });
+      } else {
+         // If they exist, just update their last login time
+         await setDoc(userDocRef, {
+            lastLoginAt: serverTimestamp(),
+         }, { merge: true });
+      }
 
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
@@ -88,7 +133,7 @@ export function LoginForm() {
       toast({
         variant: "destructive",
         title: "Sign-In Failed",
-        description: `Error: ${error.code} - ${error.message}`,
+        description: `Error: ${error.message}`,
         duration: 9000,
       });
     }
