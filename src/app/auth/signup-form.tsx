@@ -254,5 +254,3 @@ export function SignupForm() {
     </Card>
   )
 }
-
-    
