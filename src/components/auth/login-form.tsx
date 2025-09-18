@@ -51,6 +51,23 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
+      console.log("Email/Pass Sign-In user:", {
+        uid: user?.uid,
+        email: user?.email,
+        emailVerified: user?.emailVerified
+      });
+
+      if (!user?.uid) {
+          console.error("No uid available on email sign-in result — aborting further ops");
+          await auth.signOut();
+          toast({
+              variant: "destructive",
+              title: "Sign-In Failed",
+              description: "No user ID available. Please try again.",
+          });
+          return;
+      }
+      
       const blockedUserDocRef = doc(db, "blocked_users", user.uid);
       const blockedDocSnap = await getDoc(blockedUserDocRef);
 
@@ -65,14 +82,24 @@ export function LoginForm() {
         return;
       }
 
-      // Ensure user document has a last login timestamp
-      await setDoc(doc(db, 'users', user.uid), {
+      const userDocRef = doc(db, 'users', user.uid);
+      await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
       }, { merge: true });
 
+      const refreshedUserDoc = await getDoc(userDocRef);
+      const role = refreshedUserDoc.exists() ? refreshedUserDoc.data()?.role : 'user';
 
       toast({ title: "Success", description: "You have been logged in." });
-      router.push('/');
+      
+      if (role === 'admin') {
+          router.push('/admin');
+      } else if (role === 'merchant') {
+          router.push('/dashboard');
+      } else {
+          router.push('/');
+      }
+
     } catch (error: any) {
       console.error("Login Error:", error);
       toast({
@@ -88,7 +115,24 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      
+
+      console.log("Social Sign-In user:", {
+        uid: user?.uid,
+        email: user?.email,
+        emailVerified: user?.emailVerified
+      });
+
+      if (!user?.uid) {
+        console.error("No uid available on social sign-in result — aborting Firestore ops");
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: "No user ID available. Please try again.",
+        });
+        return;
+      }
+
       const blockedUserDocRef = doc(db, "blocked_users", user.uid);
       const blockedDocSnap = await getDoc(blockedUserDocRef);
       if (blockedDocSnap.exists()) {
@@ -96,38 +140,46 @@ export function LoginForm() {
         toast({
           variant: "destructive",
           title: "Account Blocked",
-          description: "Your account has been blocked. Please contact support for assistance.",
+          description: "Your account has been blocked. Please contact support.",
           duration: 9000,
         });
         return;
       }
 
       const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
+      const userDocSnap = await getDoc(userDocRef);
 
-      // If user doc doesn't exist, it's a new user. Create their doc.
-      if (!userDoc.exists()) {
-        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          id: user.uid,
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: role,
-          profileComplete: role === 'admin', // Admins are complete by default
+      const normalizedEmail = user.email?.toLowerCase() ?? "";
+      const isAdminEmail = normalizedEmail === siteConfig.adminEmail?.toLowerCase();
+
+      // Secure "upsert" operation
+      await setDoc(userDocRef, {
+        lastLoginAt: serverTimestamp(),
+        uid: user.uid,
+        id: user.uid,
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
+        // Set fields only if the document is new
+        ...(!userDocSnap.exists() && {
           createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-        });
-      } else {
-         // If they exist, just update their last login time
-         await setDoc(userDocRef, {
-            lastLoginAt: serverTimestamp(),
-         }, { merge: true });
-      }
+          role: isAdminEmail ? "admin" : "user",
+          profileComplete: isAdminEmail,
+        })
+      }, { merge: true });
+
+      const refreshed = await getDoc(userDocRef);
+      const role = refreshed.exists() ? refreshed.data()?.role : (isAdminEmail ? "admin" : "user");
 
       toast({ title: "Success", description: "You have been logged in." });
-      router.push('/');
+
+      if (role === "admin") {
+        router.push("/admin");
+      } else if (role === "merchant") {
+        router.push("/dashboard");
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       console.error("Social Sign-In Error:", error);
       toast({
@@ -137,7 +189,7 @@ export function LoginForm() {
         duration: 9000,
       });
     }
-  }
+  };
 
   const handleGoogleSignIn = () => {
     const provider = new GoogleAuthProvider();
@@ -220,3 +272,5 @@ export function LoginForm() {
     </Card>
   )
 }
+
+    
