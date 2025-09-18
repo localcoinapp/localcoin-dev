@@ -103,28 +103,21 @@ export function LoginForm() {
       }
 
       const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
+      
+      // Secure "upsert" operation
+      await setDoc(userDocRef, {
+        lastLoginAt: serverTimestamp(),
+        uid: user.uid,
+        id: user.uid,
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
+        // Set role and profile completeness only if the document is being created
+        role: user.email === siteConfig.adminEmail ? 'admin' : 'user',
+        profileComplete: user.email === siteConfig.adminEmail, // Admins are complete by default
+        createdAt: serverTimestamp(),
+      }, { merge: true });
 
-      if (!userDoc.exists()) {
-        // This is a new user, create their document with the correct role
-        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          id: user.uid,
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: role,
-          profileComplete: role === 'admin', // Admins are complete by default
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-        });
-      } else {
-         // If they exist, just update their last login time
-         await setDoc(userDocRef, {
-            lastLoginAt: serverTimestamp(),
-         }, { merge: true });
-      }
 
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');

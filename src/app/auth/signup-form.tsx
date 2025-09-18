@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { setDoc, doc, serverTimestamp } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -64,27 +64,19 @@ export function SignupForm() {
         email: values.email,
         country: values.country,
         role: role,
-        profileComplete: role === 'admin',
+        profileComplete: false, // Force profile completion for all new email signups
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
 
-      if (role !== 'admin') {
-        await sendEmailVerification(user);
-        await signOut(auth);
-        toast({
-          title: "Almost there!",
-          description: "Check your inbox and verify your email, then sign in.",
-          duration: 9000,
-        });
-        router.push("/login");
-      } else {
-        toast({
-          title: "Admin Account Created!",
-          description: "You have been logged in as an administrator.",
-        });
-        router.push('/');
-      }
+      await sendEmailVerification(user);
+      await signOut(auth);
+      toast({
+        title: "Almost there!",
+        description: "Check your inbox and verify your email, then sign in.",
+        duration: 9000,
+      });
+      router.push("/login");
     } catch (error: any) {
       console.error("Signup Error:", error);
       toast({
@@ -101,26 +93,20 @@ export function SignupForm() {
       const user = result.user;
       
       const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
 
-      if (!userDoc.exists()) {
-        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          id: user.uid,
-          email: user.email,
-          name: user.displayName,
-          avatar: user.photoURL,
-          role: role,
-          profileComplete: role === 'admin',
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-        });
-      } else {
-         await setDoc(userDocRef, {
-            lastLoginAt: serverTimestamp(),
-         }, { merge: true });
-      }
+      // Secure "upsert" operation
+      await setDoc(userDocRef, {
+        lastLoginAt: serverTimestamp(),
+        uid: user.uid,
+        id: user.uid,
+        email: user.email,
+        name: user.displayName,
+        avatar: user.photoURL,
+        // Set role and profile completeness only if the document is being created
+        role: user.email === siteConfig.adminEmail ? 'admin' : 'user',
+        profileComplete: user.email === siteConfig.adminEmail, // Admins are complete by default
+        createdAt: serverTimestamp(),
+      }, { merge: true });
 
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
@@ -129,7 +115,7 @@ export function SignupForm() {
       toast({
         variant: "destructive",
         title: "Sign-Up Failed",
-        description: `Error: ${error.code} - ${error.message}`,
+        description: `Error: ${error.message}`,
       });
     }
   }
