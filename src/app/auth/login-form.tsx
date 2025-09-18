@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "@/components/logo"
 import { useToast } from "@/hooks/use-toast"
+import { siteConfig } from "@/config/site"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -103,18 +104,22 @@ export function LoginForm() {
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      // This will NOT overwrite the role of an existing admin/merchant.
+      // If user doc doesn't exist, it's a new user. Create their doc.
       if (!userDoc.exists()) {
+        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
         await setDoc(userDocRef, {
+          uid: user.uid,
+          id: user.uid,
           email: user.email,
           name: user.displayName,
           avatar: user.photoURL,
-          role: 'user',
-          walletBalance: 0,
+          role: role,
+          profileComplete: false, // Set to false for new users
           createdAt: serverTimestamp(),
           lastLoginAt: serverTimestamp(),
         });
       } else {
+         // If they exist, just update their last login time
          await setDoc(userDocRef, {
             lastLoginAt: serverTimestamp(),
          }, { merge: true });

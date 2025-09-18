@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -18,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 const protectedRoutes = ['/wallet', '/dashboard', '/profile', '/settings', '/cart'];
 const adminRoutes = ['/admin'];
 const chatRoute = '/chat/';
+const publicOnlyRoutes = ['/login', '/signup'];
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -40,47 +40,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               name: data.name || firebaseUser.displayName,
               avatar: data.avatar || firebaseUser.photoURL,
               role: data.role || 'user',
+              profileComplete: data.profileComplete === true, // Ensure it's a boolean
             });
           } else {
+            // This case might happen briefly if a user is created but their doc isn't yet.
             setUser(null);
           }
-          setLoading(false); // Only stop loading after Firestore data is fetched/confirmed
+          setLoading(false); 
         }, (error) => {
           console.error("Error on user snapshot:", error);
           setUser(null);
           setLoading(false);
         });
-        return () => unsubscribeDoc(); // Cleanup Firestore listener
+        return () => unsubscribeDoc();
       } else {
-        // No Firebase user, so set user to null and finish loading.
         setUser(null);
         setLoading(false);
       }
     });
 
-    // Cleanup function for the auth state listener
     return () => unsubscribeAuth();
-  }, []); // Run only once on mount
+  }, []); 
 
 
   // Effect for handling redirects based on auth state
   useEffect(() => {
     if (loading) {
-      return; // Don't redirect until auth state is resolved
+      return; 
     }
 
     const isProtectedRoute = protectedRoutes.some(p => pathname.startsWith(p));
     const isAdminRoute = adminRoutes.some(p => pathname.startsWith(p));
     const isChatRoute = pathname.startsWith(chatRoute);
+    const isPublicOnlyRoute = publicOnlyRoutes.includes(pathname);
 
-    if (!user) {
-      // If user is not logged in, redirect from any protected route to login
-      if (isProtectedRoute || isAdminRoute || isChatRoute) {
-        router.push('/login');
-      }
-    } else if (user.role !== 'admin' && isAdminRoute) {
-      // If a non-admin user tries to access an admin route, redirect to home
-      router.push('/');
+    if (user) {
+        // User is logged in
+        if (isPublicOnlyRoute) {
+            // Redirect from login/signup if logged in
+            router.push('/');
+        } else if (user.profileComplete === false && pathname !== '/profile') {
+            // If profile is incomplete, force redirect to profile page
+            router.push('/profile');
+        } else if (user.role !== 'admin' && isAdminRoute) {
+            // If a non-admin tries to access an admin route, redirect to home
+            router.push('/');
+        }
+    } else {
+        // User is not logged in
+        if (isProtectedRoute || isAdminRoute || isChatRoute) {
+            router.push('/login');
+        }
     }
   }, [user, loading, pathname, router]);
 
