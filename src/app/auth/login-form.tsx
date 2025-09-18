@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Logo } from "@/components/logo"
+import { Logo } from "../logo"
 import { useToast } from "@/hooks/use-toast"
 import { siteConfig } from "@/config/site"
 
@@ -104,8 +105,8 @@ export function LoginForm() {
       const userDocRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      // If user doc doesn't exist, it's a new user. Create their doc.
       if (!userDoc.exists()) {
+        // This is a new user, create their document with the correct role
         const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
         await setDoc(userDocRef, {
           uid: user.uid,
@@ -219,3 +220,5 @@ export function LoginForm() {
     </Card>
   )
 }
+
+    

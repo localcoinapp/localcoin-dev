@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -22,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Logo } from "@/components/logo"
+import { Logo } from "../logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -55,7 +56,6 @@ export function SignupForm() {
     try {
       const { user } = await createUserWithEmailAndPassword(auth, values.email, values.password);
 
-      // Check if the signing up user is the designated admin
       const role = values.email === siteConfig.adminEmail ? 'admin' : 'user';
 
       await setDoc(doc(db, "users", user.uid), {
@@ -64,22 +64,27 @@ export function SignupForm() {
         email: values.email,
         country: values.country,
         role: role,
-        profileComplete: role === 'admin', // Admins are complete by default
+        profileComplete: role === 'admin',
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
-      }, { merge: true });
-
-      await sendEmailVerification(user);
-      
-      // Sign the user out to force them to verify their email and log in properly
-      await signOut(auth);
-
-      toast({
-        title: "Almost there!",
-        description: "Check your inbox and verify your email, then sign in.",
-        duration: 9000,
       });
-      router.push("/login");
+
+      if (role !== 'admin') {
+        await sendEmailVerification(user);
+        await signOut(auth);
+        toast({
+          title: "Almost there!",
+          description: "Check your inbox and verify your email, then sign in.",
+          duration: 9000,
+        });
+        router.push("/login");
+      } else {
+        toast({
+          title: "Admin Account Created!",
+          description: "You have been logged in as an administrator.",
+        });
+        router.push('/');
+      }
     } catch (error: any) {
       console.error("Signup Error:", error);
       toast({
@@ -98,25 +103,25 @@ export function SignupForm() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      const isNewUser = !userDoc.exists();
-      // Assign admin role if the email matches and it's a new user
-      const role = isNewUser && user.email === siteConfig.adminEmail ? 'admin' : userDoc.data()?.role || 'user';
-      const profileComplete = isNewUser ? (role === 'admin') : (userDoc.data()?.profileComplete ?? false);
+      if (!userDoc.exists()) {
+        const role = user.email === siteConfig.adminEmail ? 'admin' : 'user';
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          id: user.uid,
+          email: user.email,
+          name: user.displayName,
+          avatar: user.photoURL,
+          role: role,
+          profileComplete: role === 'admin',
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+        });
+      } else {
+         await setDoc(userDocRef, {
+            lastLoginAt: serverTimestamp(),
+         }, { merge: true });
+      }
 
-      const userData = {
-        uid: user.uid,
-        id: user.uid,
-        email: user.email,
-        name: user.displayName,
-        avatar: user.photoURL,
-        profileComplete: profileComplete,
-        lastLoginAt: serverTimestamp(),
-        role: role,
-        ...(isNewUser && { createdAt: serverTimestamp() })
-      };
-
-      await setDoc(userDocRef, userData, { merge: true });
-      
       toast({ title: "Success", description: "You have been logged in." });
       router.push('/');
     } catch (error: any) {
@@ -262,3 +267,5 @@ export function SignupForm() {
     </Card>
   )
 }
+
+    
