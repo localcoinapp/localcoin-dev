@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
-import { setDoc, doc, serverTimestamp } from "firebase/firestore"
+import { setDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -54,9 +54,26 @@ export function SignupForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const { user } = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
 
-      const role = values.email === siteConfig.adminEmail ? 'admin' : 'user';
+      console.log("Email/Pass Sign-Up user:", {
+        uid: user?.uid,
+        email: user?.email,
+      });
+
+      if (!user?.uid) {
+        console.error("No uid available on email sign-up result — aborting Firestore ops");
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Sign-Up Failed",
+          description: "No user ID available. Please try again.",
+        });
+        return;
+      }
+      
+      const role = values.email.toLowerCase() === siteConfig.adminEmail?.toLowerCase() ? 'admin' : 'user';
 
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
@@ -64,7 +81,7 @@ export function SignupForm() {
         email: values.email,
         country: values.country,
         role: role,
-        profileComplete: false, // Force profile completion for all new email signups
+        profileComplete: role === 'admin',
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
@@ -73,7 +90,7 @@ export function SignupForm() {
       await signOut(auth);
       toast({
         title: "Almost there!",
-        description: "Check your inbox and verify your email, then sign in.",
+        description: "Check your inbox to verify your email, then sign in.",
         duration: 9000,
       });
       router.push("/login");
@@ -91,35 +108,77 @@ export function SignupForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      
-      const userDocRef = doc(db, 'users', user.uid);
 
-      // Use setDoc with { merge: true } to create or update the user document.
-      // This is a secure "upsert" operation that complies with Firestore rules.
+      console.log("Social Sign-In user:", {
+        uid: user?.uid,
+        email: user?.email,
+        emailVerified: user?.emailVerified
+      });
+
+      if (!user?.uid) {
+        console.error("No uid available on social sign-in result — aborting Firestore ops");
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: "No user ID available. Please try again.",
+        });
+        return;
+      }
+
+      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
+      const blockedDocSnap = await getDoc(blockedUserDocRef);
+      if (blockedDocSnap.exists()) {
+        await auth.signOut();
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support.",
+          duration: 9000,
+        });
+        return;
+      }
+
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      const normalizedEmail = user.email?.toLowerCase() ?? "";
+      const isAdminEmail = normalizedEmail === siteConfig.adminEmail?.toLowerCase();
+
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
-        // Fields to set only when the document is created
         uid: user.uid,
         id: user.uid,
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        role: user.email === siteConfig.adminEmail ? 'admin' : 'user',
-        profileComplete: user.email === siteConfig.adminEmail, // Admins are complete by default
-        createdAt: serverTimestamp(),
+        createdAt: userDocSnap.exists() ? userDocSnap.data()?.createdAt || serverTimestamp() : serverTimestamp(),
+        role: userDocSnap.exists() ? (userDocSnap.data()?.role || (isAdminEmail ? "admin" : "user")) : (isAdminEmail ? "admin" : "user"),
+        profileComplete: userDocSnap.exists() ? (userDocSnap.data()?.profileComplete ?? isAdminEmail) : isAdminEmail
       }, { merge: true });
 
+      const refreshed = await getDoc(userDocRef);
+      const role = refreshed.exists() ? refreshed.data()?.role : (isAdminEmail ? "admin" : "user");
+
       toast({ title: "Success", description: "You have been logged in." });
-      router.push('/');
+
+      if (role === "admin") {
+        router.push("/admin");
+      } else if (role === "merchant") {
+        router.push("/dashboard");
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       console.error("Social Sign-Up Error:", error);
       toast({
         variant: "destructive",
         title: "Sign-Up Failed",
         description: `Error: ${error.message}`,
+        duration: 9000,
       });
     }
-  }
+  };
 
   const handleGoogleSignIn = () => {
     const provider = new GoogleAuthProvider();
