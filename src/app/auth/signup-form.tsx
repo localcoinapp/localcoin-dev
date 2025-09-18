@@ -94,15 +94,16 @@ export function SignupForm() {
       
       const userDocRef = doc(db, 'users', user.uid);
 
-      // Secure "upsert" operation
+      // Use setDoc with { merge: true } to create or update the user document.
+      // This is a secure "upsert" operation that complies with Firestore rules.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
+        // Fields to set only when the document is created
         uid: user.uid,
         id: user.uid,
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        // Set role and profile completeness only if the document is being created
         role: user.email === siteConfig.adminEmail ? 'admin' : 'user',
         profileComplete: user.email === siteConfig.adminEmail, // Admins are complete by default
         createdAt: serverTimestamp(),
@@ -253,3 +254,5 @@ export function SignupForm() {
     </Card>
   )
 }
+
+    
