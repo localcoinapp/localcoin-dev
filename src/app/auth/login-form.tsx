@@ -114,7 +114,7 @@ export function LoginForm() {
           name: user.displayName,
           avatar: user.photoURL,
           role: role,
-          profileComplete: false, // Set to false for new users
+          profileComplete: role === 'admin', // Admins are complete by default
           createdAt: serverTimestamp(),
           lastLoginAt: serverTimestamp(),
         });

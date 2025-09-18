@@ -64,7 +64,7 @@ export function SignupForm() {
         email: values.email,
         country: values.country,
         role: role,
-        profileComplete: false,
+        profileComplete: role === 'admin', // Admins are complete by default
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       }, { merge: true });
@@ -101,6 +101,7 @@ export function SignupForm() {
       const isNewUser = !userDoc.exists();
       // Assign admin role if the email matches and it's a new user
       const role = isNewUser && user.email === siteConfig.adminEmail ? 'admin' : userDoc.data()?.role || 'user';
+      const profileComplete = isNewUser ? (role === 'admin') : (userDoc.data()?.profileComplete ?? false);
 
       const userData = {
         uid: user.uid,
@@ -108,7 +109,7 @@ export function SignupForm() {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        profileComplete: true,
+        profileComplete: profileComplete,
         lastLoginAt: serverTimestamp(),
         role: role,
         ...(isNewUser && { createdAt: serverTimestamp() })
