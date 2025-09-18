@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -78,18 +77,18 @@ service cloud.firestore {
       allow get, update, delete: if signedIn() && request.auth.uid == resource.data.userId;
 
       // non-admin listing disabled; admin override handles admin listeners
-      allow list: if signedIn() && request.query.where.userId == request.auth.uid;
+      allow list: if false;
     }
 
     // MERCHANT CASHOUT REQUESTS
     match /merchantCashoutRequests/{requestId} {
       allow create: if signedIn();
       
-      // Allow a merchant to read requests where they are the owner
-      allow get, list: if signedIn() && request.query.where.merchantId == get(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)).data.merchantId;
-
-      // Only admins can modify or delete
-      allow update, delete: if false; 
+      // Allow a merchant to query their own cashout requests.
+      allow list: if signedIn() && request.query.where.find(field => field[0] == "merchantId" && field[2] == get(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)).data.merchantId) != null;
+      
+      // Deny single reads and all writes for non-admins.
+      allow get, update, delete: if false;
     }
 
     // CHATS
@@ -97,7 +96,7 @@ service cloud.firestore {
       allow create: if signedIn();
       allow get, update, delete:
         if signedIn() && request.auth.uid in resource.data.participantIds;
-      allow list: if signedIn() && request.auth.uid in request.query.where.participantIds;
+      allow list: if false;
 
       match /messages/{messageId} {
         allow create:
@@ -106,7 +105,7 @@ service cloud.firestore {
         allow get, update, delete:
           if signedIn() &&
              request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
-        allow list: if signedIn() && exists(/databases/$(database)/documents/chats/$(chatId)) && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        allow list: if false;
       }
     }
   }
