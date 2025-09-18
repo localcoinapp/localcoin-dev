@@ -84,11 +84,11 @@ service cloud.firestore {
     match /merchantCashoutRequests/{requestId} {
       allow create: if signedIn();
       
-      // Allow a merchant to LIST requests if they are querying for their own merchantId
-      allow list: if signedIn() && request.query.merchantId == get(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)).data.merchantId;
-      
-      // Deny single reads and writes for non-admins.
-      allow get, update, delete: if false;
+      // Allow a merchant to read requests where they are the owner
+      allow get, list: if signedIn() && request.auth.uid == get(/databases/$(database)/documents/merchants/$(resource.data.merchantId)).data.owner;
+
+      // Only admins can modify or delete
+      allow update, delete: if false; 
     }
 
     // CHATS
