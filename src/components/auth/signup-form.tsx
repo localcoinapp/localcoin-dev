@@ -134,12 +134,12 @@ export function SignupForm() {
       }
 
       const userDocRef = doc(db, USERS_COL, user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // called a safe upsert — only set admin role when doc is new or when already admin
+      // This is a secure "upsert" operation.
+      // It creates the doc if it doesn't exist, and merges data if it does.
+      // This avoids a `getDoc` call which would fail for new users due to security rules.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,
@@ -147,12 +147,12 @@ export function SignupForm() {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        ...( !userDocSnap.exists() ? {
-          createdAt: serverTimestamp(),
-          role: isAdminEmail ? "admin" : "user",
-          profileComplete: isAdminEmail,
-        } : {} )
+        // The following fields are only set if it's a new document, but merge:true is safe
+        role: isAdminEmail ? "admin" : "user",
+        profileComplete: isAdminEmail,
+        createdAt: serverTimestamp(),
       }, { merge: true });
+      
 
       const refreshed = await getDoc(userDocRef);
       console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);

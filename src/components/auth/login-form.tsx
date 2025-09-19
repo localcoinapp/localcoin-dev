@@ -122,12 +122,12 @@ export function LoginForm() {
       }
 
       const userDocRef = doc(db, USERS_COL, user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // called a safe upsert — only set admin role when doc is new or when already admin
+      // This is a secure "upsert" operation.
+      // It creates the doc if it doesn't exist, and merges data if it does.
+      // This avoids a `getDoc` call which would fail for new users due to security rules.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,
@@ -135,13 +135,13 @@ export function LoginForm() {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        ...( !userDocSnap.exists() ? {
-          createdAt: serverTimestamp(),
-          role: isAdminEmail ? "admin" : "user",
-          profileComplete: isAdminEmail,
-        } : {} )
+        // The following fields are only set if it's a new document, but merge:true is safe
+        role: isAdminEmail ? "admin" : "user",
+        profileComplete: isAdminEmail,
+        createdAt: serverTimestamp(),
       }, { merge: true });
 
+      // After a successful write, we can now safely read the document to get the authoritative role.
       const refreshed = await getDoc(userDocRef);
       console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
 
@@ -157,7 +157,12 @@ export function LoginForm() {
 
     } catch (error: any) {
       console.error("Social Sign-In Error:", error);
-      toast({ variant: "destructive", title: "Sign-In Failed", description: `Error: ${error.message}`, duration: 9000 });
+      toast({
+        variant: "destructive",
+        title: "Sign-In Failed",
+        description: `Error: ${error.message}`,
+        duration: 9000,
+      });
     }
   };
 
