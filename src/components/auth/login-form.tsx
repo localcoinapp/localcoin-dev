@@ -28,6 +28,7 @@ const USERS_COL = "users";
 const BLOCKED_COL = "blocked_users";
 function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
+
 const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
@@ -57,26 +58,37 @@ export function LoginForm() {
       console.log("Email/Pass Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
       console.log("Auth currentUser after sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
 
-      if (!user?.uid) {
-        console.error("No uid available on email sign-in result — aborting further ops");
-        await auth.signOut();
-        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
-        return;
-      }
 
+      if (!user?.uid) {
+          console.error("No uid available on email sign-in result — aborting further ops");
+          await auth.signOut();
+          toast({
+              variant: "destructive",
+              title: "Sign-In Failed",
+              description: "No user ID available. Please try again.",
+          });
+          return;
+      }
+      
       console.log(`Checking blocked users path: ${BLOCKED_COL}/${user.uid}`);
       const blockedUserDocRef = doc(db, BLOCKED_COL, user.uid);
       const blockedDocSnap = await getDoc(blockedUserDocRef);
 
       if (blockedDocSnap.exists()) {
         await auth.signOut();
-        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support for assistance.",
+          duration: 9000,
+        });
         return;
       }
 
       const userDocRef = doc(db, USERS_COL, user.uid);
-      // update last login timestamp but preserve existing role fields
-      await setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+      await setDoc(userDocRef, {
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
 
       const refreshedUserDoc = await getDoc(userDocRef);
       console.log("Refreshed user doc data:", refreshedUserDoc.exists() ? refreshedUserDoc.data() : null);
@@ -85,30 +97,49 @@ export function LoginForm() {
       const role = norm(roleRaw) || "user";
       console.log("Normalized role:", role);
 
-      toast({ title: "Success", description: "You have been logged in." });
 
-      if (role === "admin") router.push("/admin");
-      else if (role === "merchant") router.push("/dashboard");
-      else router.push("/");
+      toast({ title: "Success", description: "You have been logged in." });
+      
+      if (role === 'admin') {
+          router.push('/admin');
+      } else if (role === 'merchant') {
+          router.push('/dashboard');
+      } else {
+          router.push('/');
+      }
 
     } catch (error: any) {
       console.error("Login Error:", error);
-      toast({ variant: "destructive", title: "Login Failed", description: `Error: ${error.message}`, duration: 9000 });
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: `Error: ${error.message}`,
+        duration: 9000,
+      });
     }
-  };
+  }
 
   const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      console.log("Social Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
-      console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
+      console.log("Social Sign-In user:", {
+        uid: user?.uid,
+        email: user?.email,
+        emailVerified: user?.emailVerified
+      });
+       console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
+
 
       if (!user?.uid) {
         console.error("No uid available on social sign-in result — aborting Firestore ops");
         await auth.signOut();
-        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: "No user ID available. Please try again.",
+        });
         return;
       }
 
@@ -117,7 +148,12 @@ export function LoginForm() {
       const blockedDocSnap = await getDoc(blockedUserDocRef);
       if (blockedDocSnap.exists()) {
         await auth.signOut();
-        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support.",
+          duration: 9000,
+        });
         return;
       }
 
@@ -125,8 +161,8 @@ export function LoginForm() {
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // This is a secure "upsert" operation.
-      // It creates the doc if it doesn't exist, and merges data if it does.
+      // Perform a single, secure "upsert" operation.
+      // This creates the doc if it doesn't exist, and merges data if it does.
       // This avoids a `getDoc` call which would fail for new users due to security rules.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
@@ -140,7 +176,7 @@ export function LoginForm() {
         profileComplete: isAdminEmail,
         createdAt: serverTimestamp(),
       }, { merge: true });
-
+      
       // After a successful write, we can now safely read the document to get the authoritative role.
       const refreshed = await getDoc(userDocRef);
       console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
@@ -149,12 +185,16 @@ export function LoginForm() {
       const role = norm(roleRaw) || (isAdminEmail ? "admin" : "user");
       console.log("Normalized role after social sign-in:", role);
 
+
       toast({ title: "Success", description: "You have been logged in." });
 
-      if (role === "admin") router.push("/admin");
-      else if (role === "merchant") router.push("/dashboard");
-      else router.push("/");
-
+      if (role === "admin") {
+        router.push("/admin");
+      } else if (role === "merchant") {
+        router.push("/dashboard");
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       console.error("Social Sign-In Error:", error);
       toast({

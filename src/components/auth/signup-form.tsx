@@ -137,8 +137,8 @@ export function SignupForm() {
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // This is a secure "upsert" operation.
-      // It creates the doc if it doesn't exist, and merges data if it does.
+      // Perform a single, secure "upsert" operation.
+      // This creates the doc if it doesn't exist, and merges data if it does.
       // This avoids a `getDoc` call which would fail for new users due to security rules.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
@@ -153,7 +153,7 @@ export function SignupForm() {
         createdAt: serverTimestamp(),
       }, { merge: true });
       
-
+      // After a successful write, we can now safely read the document to get the authoritative role.
       const refreshed = await getDoc(userDocRef);
       console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
 
@@ -161,12 +161,16 @@ export function SignupForm() {
       const role = norm(roleRaw) || (isAdminEmail ? "admin" : "user");
       console.log("Normalized role after social sign-in:", role);
 
+
       toast({ title: "Success", description: "You have been logged in." });
 
-      if (role === "admin") router.push("/admin");
-      else if (role === "merchant") router.push("/dashboard");
-      else router.push("/");
-
+      if (role === "admin") {
+        router.push("/admin");
+      } else if (role === "merchant") {
+        router.push("/dashboard");
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       console.error("Social Sign-In Error:", error);
       toast({ variant: "destructive", title: "Sign-In Failed", description: `Error: ${error.message}`, duration: 9000 });
