@@ -137,9 +137,8 @@ export function SignupForm() {
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // Perform a single, secure "upsert" operation.
-      // This creates the doc if it doesn't exist, and merges data if it does.
-      // This avoids a `getDoc` call which would fail for new users due to security rules.
+      // This is a secure "upsert" operation.
+      // It uses `setDoc` with `merge: true` to avoid a `getDoc` call that would fail for new users.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,

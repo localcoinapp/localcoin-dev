@@ -28,7 +28,6 @@ const USERS_COL = "users";
 const BLOCKED_COL = "blocked_users";
 function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
-
 const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
@@ -57,7 +56,6 @@ export function LoginForm() {
 
       console.log("Email/Pass Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
       console.log("Auth currentUser after sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
-
 
       if (!user?.uid) {
           console.error("No uid available on email sign-in result — aborting further ops");
@@ -124,22 +122,13 @@ export function LoginForm() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      console.log("Social Sign-In user:", {
-        uid: user?.uid,
-        email: user?.email,
-        emailVerified: user?.emailVerified
-      });
-       console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
-
+      console.log("Social Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
+      console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
 
       if (!user?.uid) {
         console.error("No uid available on social sign-in result — aborting Firestore ops");
         await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Sign-In Failed",
-          description: "No user ID available. Please try again.",
-        });
+        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
         return;
       }
 
@@ -148,12 +137,7 @@ export function LoginForm() {
       const blockedDocSnap = await getDoc(blockedUserDocRef);
       if (blockedDocSnap.exists()) {
         await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Account Blocked",
-          description: "Your account has been blocked. Please contact support.",
-          duration: 9000,
-        });
+        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
         return;
       }
 
@@ -161,9 +145,8 @@ export function LoginForm() {
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // Perform a single, secure "upsert" operation.
-      // This creates the doc if it doesn't exist, and merges data if it does.
-      // This avoids a `getDoc` call which would fail for new users due to security rules.
+      // This is a secure "upsert" operation.
+      // It uses `setDoc` with `merge: true` to avoid a `getDoc` call that would fail for new users.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,
