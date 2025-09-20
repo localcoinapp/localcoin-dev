@@ -28,7 +28,6 @@ const USERS_COL = "users";
 const BLOCKED_COL = "blocked_users";
 function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
-
 const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
@@ -147,7 +146,8 @@ export function LoginForm() {
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
       // This is a secure "upsert" operation.
-      // It uses `setDoc` with `merge: true` to avoid a `getDoc` call that would fail for new users.
+      // It uses `setDoc` with `merge: true` to create a new doc or update an existing one.
+      // Crucially, it does NOT read the doc first, avoiding permission errors for new users.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,

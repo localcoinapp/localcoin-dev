@@ -138,7 +138,6 @@ export function SignupForm() {
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
       // This is a secure "upsert" operation.
-      // It uses `setDoc` with `merge: true` to avoid a `getDoc` call that would fail for new users.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,
