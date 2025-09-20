@@ -28,6 +28,7 @@ const USERS_COL = "users";
 const BLOCKED_COL = "blocked_users";
 function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
+
 const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",

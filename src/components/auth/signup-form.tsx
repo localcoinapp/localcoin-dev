@@ -171,8 +171,13 @@ export function SignupForm() {
         router.push("/");
       }
     } catch (error: any) {
-      console.error("Social Sign-In Error:", error);
-      toast({ variant: "destructive", title: "Sign-In Failed", description: `Error: ${error.message}`, duration: 9000 });
+      console.error("Social Sign-Up Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Sign-Up Failed",
+        description: `Error: ${error.message}`,
+        duration: 9000,
+      });
     }
   };
 
