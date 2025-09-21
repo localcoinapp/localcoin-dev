@@ -22,7 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Logo } from "../logo"
+import { Logo } from "@/components/logo"
 import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -59,11 +59,6 @@ export function SignupForm() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
-
-      console.log("Email/Pass Sign-Up user:", {
-        uid: user?.uid,
-        email: user?.email,
-      });
 
       if (!user?.uid) {
         console.error("No uid available on email sign-up result — aborting Firestore ops");
@@ -134,10 +129,11 @@ export function SignupForm() {
       }
 
       const userDocRef = doc(db, USERS_COL, user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
       const normalizedEmail = norm(user.email);
       const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
-      // This is a secure "upsert" operation.
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
         uid: user.uid,
@@ -145,13 +141,13 @@ export function SignupForm() {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        // The following fields are only set if it's a new document, but merge:true is safe
-        role: isAdminEmail ? "admin" : "user",
-        profileComplete: isAdminEmail,
-        createdAt: serverTimestamp(),
+        ...( !userDocSnap.exists() ? {
+          createdAt: serverTimestamp(),
+          role: isAdminEmail ? "admin" : "user",
+          profileComplete: isAdminEmail,
+        } : {} )
       }, { merge: true });
       
-      // After a successful write, we can now safely read the document to get the authoritative role.
       const refreshed = await getDoc(userDocRef);
       console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
 
