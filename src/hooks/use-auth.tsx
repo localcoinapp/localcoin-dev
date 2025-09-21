@@ -29,49 +29,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Use getDoc for a one-time fetch to prevent race conditions on login
+        // Force refresh the token to get custom claims
+        await firebaseUser.getIdToken(true);
+        
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const docSnap = await getDoc(userDocRef);
+        
+        // Setup a real-time listener for the user document
+        const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const appUser: User = {
+              ...data,
+              id: firebaseUser.uid,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: data.name || firebaseUser.displayName,
+              avatar: data.avatar || firebaseUser.photoURL,
+              role: data.role || 'user',
+              profileComplete: data.profileComplete === true,
+            };
+            setUser(appUser);
+          } else {
+            // This case might happen if the user doc creation is delayed or fails
+            setUser(null);
+          }
+          setLoading(false);
+        }, (error) => {
+            console.error("Error with user document snapshot:", error);
+            setUser(null);
+            setLoading(false);
+        });
 
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const appUser: User = {
-            ...data,
-            id: firebaseUser.uid,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            name: data.name || firebaseUser.displayName,
-            avatar: data.avatar || firebaseUser.photoURL,
-            role: data.role || 'user',
-            profileComplete: data.profileComplete === true,
-          };
-          setUser(appUser);
-          
-          // Now that we have the definite user state, set up a listener for real-time updates
-          const unsubscribeDoc = onSnapshot(userDocRef, (snap) => {
-            if (snap.exists()) {
-              const updatedData = snap.data();
-               setUser(prevUser => ({
-                ...prevUser,
-                ...updatedData,
-                id: firebaseUser.uid,
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: updatedData.name || firebaseUser.displayName,
-                avatar: updatedData.avatar || firebaseUser.photoURL,
-              } as User));
-            }
-          });
-          
-          // We need a way to clean up this inner listener, but onAuthStateChanged only returns one cleanup function.
-          // This is a common complexity with Firebase. For now, this is a reasonable approach.
-          // A more advanced solution might use a separate effect for the snapshot.
+        // This cleanup function for the document listener will be called when the auth state changes
+        return () => unsubscribeDoc();
 
-        } else {
-          // This can happen if the doc isn't created yet.
-          setUser(null);
-        }
-        setLoading(false);
       } else {
         setUser(null);
         setLoading(false);
