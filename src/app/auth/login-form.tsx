@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Logo } from "@/components/logo"
 import { useToast } from "@/hooks/use-toast"
 import { siteConfig } from "@/config/site"
+
+const USERS_COL = "users";
+const BLOCKED_COL = "blocked_users";
+function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
 const formSchema = z.object({
   email: z.string().email({
@@ -50,44 +55,35 @@ export function LoginForm() {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      console.log("Email/Pass Sign-In user:", {
-        uid: user?.uid,
-        email: user?.email,
-        emailVerified: user?.emailVerified
-      });
+      console.log("Email/Pass Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
+      console.log("Auth currentUser after sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
 
       if (!user?.uid) {
-          console.error("No uid available on email sign-in result — aborting further ops");
-          await auth.signOut();
-          toast({
-              variant: "destructive",
-              title: "Sign-In Failed",
-              description: "No user ID available. Please try again.",
-          });
-          return;
+        console.error("No uid available on email sign-in result — aborting further ops");
+        await auth.signOut();
+        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
+        return;
       }
       
-      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
-      const blockedDocSnap = await getDoc(blockedUserDocRef);
+      const functions = getFunctions();
+      const checkBlocked = httpsCallable(functions, 'checkBlocked');
+      const result: any = await checkBlocked();
 
-      if (blockedDocSnap.exists()) {
+      if (result.data.blocked) {
         await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Account Blocked",
-          description: "Your account has been blocked. Please contact support for assistance.",
-          duration: 9000,
-        });
+        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
         return;
       }
 
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, {
-        lastLoginAt: serverTimestamp(),
-      }, { merge: true });
+      const userDocRef = doc(db, USERS_COL, user.uid);
+      await setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
 
       const refreshedUserDoc = await getDoc(userDocRef);
-      const role = refreshedUserDoc.exists() ? refreshedUserDoc.data()?.role : 'user';
+      console.log("Refreshed user doc data:", refreshedUserDoc.exists() ? refreshedUserDoc.data() : null);
+
+      const roleRaw = refreshedUserDoc.exists() ? refreshedUserDoc.data()?.role : null;
+      const role = norm(roleRaw) || "user";
+      console.log("Normalized role:", role);
 
       toast({ title: "Success", description: "You have been logged in." });
       
@@ -101,12 +97,16 @@ export function LoginForm() {
 
     } catch (error: any) {
       console.error("Login Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: `Error: ${error.message}`,
-        duration: 9000,
-      });
+      if (error.code === 'functions/unauthenticated') {
+        toast({ variant: "destructive", title: "Login Failed", description: "Authentication check failed. Please try again.", duration: 9000 });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: `Error: ${error.message}`,
+          duration: 9000,
+        });
+      }
     }
   }
 
@@ -115,41 +115,31 @@ export function LoginForm() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      console.log("Social Sign-In user:", {
-        uid: user?.uid,
-        email: user?.email,
-        emailVerified: user?.emailVerified
-      });
+      console.log("Social Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
+      console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
 
       if (!user?.uid) {
         console.error("No uid available on social sign-in result — aborting Firestore ops");
         await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Sign-In Failed",
-          description: "No user ID available. Please try again.",
-        });
+        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
         return;
       }
+      
+      const functions = getFunctions();
+      const checkBlocked = httpsCallable(functions, 'checkBlocked');
+      const blockedResult: any = await checkBlocked();
 
-      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
-      const blockedDocSnap = await getDoc(blockedUserDocRef);
-      if (blockedDocSnap.exists()) {
+      if (blockedResult.data.blocked) {
         await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Account Blocked",
-          description: "Your account has been blocked. Please contact support.",
-          duration: 9000,
-        });
+        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
         return;
       }
 
-      const userDocRef = doc(db, "users", user.uid);
+      const userDocRef = doc(db, USERS_COL, user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-      const normalizedEmail = user.email?.toLowerCase() ?? "";
-      const isAdminEmail = normalizedEmail === siteConfig.adminEmail?.toLowerCase();
+      const normalizedEmail = norm(user.email);
+      const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
 
       await setDoc(userDocRef, {
         lastLoginAt: serverTimestamp(),
@@ -158,13 +148,19 @@ export function LoginForm() {
         email: user.email,
         name: user.displayName,
         avatar: user.photoURL,
-        createdAt: userDocSnap.exists() ? userDocSnap.data()?.createdAt || serverTimestamp() : serverTimestamp(),
-        role: userDocSnap.exists() ? (userDocSnap.data()?.role || (isAdminEmail ? "admin" : "user")) : (isAdminEmail ? "admin" : "user"),
-        profileComplete: userDocSnap.exists() ? (userDocSnap.data()?.profileComplete ?? isAdminEmail) : isAdminEmail
+        ...( !userDocSnap.exists() ? {
+          createdAt: serverTimestamp(),
+          role: isAdminEmail ? "admin" : "user",
+          profileComplete: isAdminEmail,
+        } : {} )
       }, { merge: true });
 
       const refreshed = await getDoc(userDocRef);
-      const role = refreshed.exists() ? refreshed.data()?.role : (isAdminEmail ? "admin" : "user");
+      console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
+
+      const roleRaw = refreshed.exists() ? refreshed.data()?.role : null;
+      const role = norm(roleRaw) || (isAdminEmail ? "admin" : "user");
+      console.log("Normalized role after social sign-in:", role);
 
       toast({ title: "Success", description: "You have been logged in." });
 
@@ -177,12 +173,16 @@ export function LoginForm() {
       }
     } catch (error: any) {
       console.error("Social Sign-In Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Sign-In Failed",
-        description: `Error: ${error.message}`,
-        duration: 9000,
-      });
+      if (error.code === 'functions/unauthenticated') {
+        toast({ variant: "destructive", title: "Login Failed", description: "Authentication check failed. Please try again.", duration: 9000 });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: `Error: ${error.message}`,
+          duration: 9000,
+        });
+      }
     }
   };
 

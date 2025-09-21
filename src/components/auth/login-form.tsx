@@ -7,7 +7,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -62,12 +64,12 @@ export function LoginForm() {
         toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
         return;
       }
+      
+      const functions = getFunctions();
+      const checkBlocked = httpsCallable(functions, 'checkBlocked');
+      const result: any = await checkBlocked();
 
-      console.log(`Checking blocked users path: ${BLOCKED_COL}/${user.uid}`);
-      const blockedUserDocRef = doc(db, BLOCKED_COL, user.uid);
-      const blockedDocSnap = await getDoc(blockedUserDocRef);
-
-      if (blockedDocSnap.exists()) {
+      if (result.data.blocked) {
         await auth.signOut();
         toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
         return;
@@ -84,16 +86,29 @@ export function LoginForm() {
       console.log("Normalized role:", role);
 
       toast({ title: "Success", description: "You have been logged in." });
-
-      if (role === "admin") router.push("/admin");
-      else if (role === "merchant") router.push("/dashboard");
-      else router.push("/");
+      
+      if (role === 'admin') {
+          router.push('/admin');
+      } else if (role === 'merchant') {
+          router.push('/dashboard');
+      } else {
+          router.push('/');
+      }
 
     } catch (error: any) {
       console.error("Login Error:", error);
-      toast({ variant: "destructive", title: "Login Failed", description: `Error: ${error.message}`, duration: 9000 });
+      if (error.code === 'functions/unauthenticated') {
+        toast({ variant: "destructive", title: "Login Failed", description: "Authentication check failed. Please try again.", duration: 9000 });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: `Error: ${error.message}`,
+          duration: 9000,
+        });
+      }
     }
-  };
+  }
 
   const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
@@ -109,11 +124,12 @@ export function LoginForm() {
         toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
         return;
       }
+      
+      const functions = getFunctions();
+      const checkBlocked = httpsCallable(functions, 'checkBlocked');
+      const blockedResult: any = await checkBlocked();
 
-      console.log(`Checking blocked users path: ${BLOCKED_COL}/${user.uid}`);
-      const blockedUserDocRef = doc(db, BLOCKED_COL, user.uid);
-      const blockedDocSnap = await getDoc(blockedUserDocRef);
-      if (blockedDocSnap.exists()) {
+      if (blockedResult.data.blocked) {
         await auth.signOut();
         toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
         return;
@@ -148,13 +164,25 @@ export function LoginForm() {
 
       toast({ title: "Success", description: "You have been logged in." });
 
-      if (role === "admin") router.push("/admin");
-      else if (role === "merchant") router.push("/dashboard");
-      else router.push("/");
-
+      if (role === "admin") {
+        router.push("/admin");
+      } else if (role === "merchant") {
+        router.push("/dashboard");
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       console.error("Social Sign-In Error:", error);
-      toast({ variant: "destructive", title: "Sign-In Failed", description: `Error: ${error.message}`, duration: 9000 });
+      if (error.code === 'functions/unauthenticated') {
+        toast({ variant: "destructive", title: "Login Failed", description: "Authentication check failed. Please try again.", duration: 9000 });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: `Error: ${error.message}`,
+          duration: 9000,
+        });
+      }
     }
   };
 

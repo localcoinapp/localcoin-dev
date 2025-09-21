@@ -54,6 +54,7 @@
     "encoding": "0.1.13",
     "firebase": "latest",
     "firebase-admin": "latest",
+    "firebase-functions": "^5.0.1",
     "genkit": "latest",
     "geofire-common": "^6.0.0",
     "leaflet": "^1.9.4",
