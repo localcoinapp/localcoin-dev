@@ -1,10 +1,27 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import cors from 'cors';
 
 admin.initializeApp();
 
-// Callable function that returns { blocked: boolean }
-// Uses context.auth.uid if available. Auth required.
+const corsHandler = cors({
+    origin: [
+      "https://studio--localcoin-marketplace.us-central1.hosted.app",
+      "https://9000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
+      "https://6000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
+      "https://3000-firebase-studio-1754307110114.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
+      "http://localhost:3000",
+      "http://localhost:9002",
+      "https://dev.localcoin.cloud",
+      "https://app.localcoin.cloud",
+      "https://app.discoverberlin.live",
+      "https://app.discovercuba.live",
+      "https://app.discoverbolivia.live",
+      "https://app.discoverflorida.live"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+});
+
 export const checkBlocked = functions.https.onCall(async (data, context) => {
   // Ensure the user is authenticated
   if (!context.auth || !context.auth.uid) {
