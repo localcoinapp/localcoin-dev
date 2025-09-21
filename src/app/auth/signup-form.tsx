@@ -5,9 +5,10 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
-import { auth, db } from "@/lib/firebase"
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
+import { auth, db, app } from "@/lib/firebase"
 import { setDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { getFunctions, httpsCallable } from "firebase/functions"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,10 @@ import { countries } from "@/data/countries"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { siteConfig } from "@/config/site"
+
+const USERS_COL = "users";
+const BLOCKED_COL = "blocked_users";
+function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -50,16 +55,24 @@ export function SignupForm() {
       terms: false,
     },
   });
+  
+  const functions = getFunctions(app);
+  const checkBlockedCallable = httpsCallable(functions, 'checkBlocked');
+
+  async function checkBlockedForCurrentUser(): Promise<boolean> {
+     try {
+        const resp = await checkBlockedCallable({});
+        return !!resp?.data?.blocked;
+    } catch (err) {
+        console.error("CRITICAL: checkBlocked callable failed:", err);
+        return true; 
+    }
+  }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
-
-      console.log("Email/Pass Sign-Up user:", {
-        uid: user?.uid,
-        email: user?.email,
-      });
 
       if (!user?.uid) {
         console.error("No uid available on email sign-up result — aborting Firestore ops");
@@ -72,18 +85,20 @@ export function SignupForm() {
         return;
       }
       
-      const role = values.email.toLowerCase() === siteConfig.adminEmail?.toLowerCase() ? 'admin' : 'user';
+      const isAdminEmail = norm(values.email) === norm(siteConfig.adminEmail);
 
-      await setDoc(doc(db, "users", user.uid), {
+      console.log("Creating user doc for:", user.uid, "isAdminEmail:", isAdminEmail);
+      await setDoc(doc(db, USERS_COL, user.uid), {
         uid: user.uid,
         id: user.uid,
         email: values.email,
         country: values.country,
-        role: role,
-        profileComplete: role === 'admin',
+        role: isAdminEmail ? "admin" : "user",
+        profileComplete: isAdminEmail,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
+      console.log("Created user doc at", `${USERS_COL}/${user.uid}`);
 
       await sendEmailVerification(user);
       await signOut(auth);
@@ -106,78 +121,87 @@ export function SignupForm() {
   const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      console.log("Social Sign-In user:", {
-        uid: user?.uid,
-        email: user?.email,
-        emailVerified: user?.emailVerified
-      });
-
-      if (!user?.uid) {
-        console.error("No uid available on social sign-in result — aborting Firestore ops");
-        await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Sign-In Failed",
-          description: "No user ID available. Please try again.",
-        });
-        return;
+      await afterSocialSignIn(result.user);
+    } catch (popupError: any) {
+      console.warn("signInWithPopup failed — falling back to redirect:", popupError?.message || popupError);
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectErr: any) {
+        console.error("signInWithRedirect also failed:", redirectErr);
+        toast({ variant: "destructive", title: "Sign-In Failed", description: `Social sign-in failed: ${redirectErr.message || redirectErr}`, duration: 9000 });
       }
-
-      const blockedUserDocRef = doc(db, "blocked_users", user.uid);
-      const blockedDocSnap = await getDoc(blockedUserDocRef);
-      if (blockedDocSnap.exists()) {
-        await auth.signOut();
-        toast({
-          variant: "destructive",
-          title: "Account Blocked",
-          description: "Your account has been blocked. Please contact support.",
-          duration: 9000,
-        });
-        return;
-      }
-
-      const userDocRef = doc(db, "users", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      const normalizedEmail = user.email?.toLowerCase() ?? "";
-      const isAdminEmail = normalizedEmail === siteConfig.adminEmail?.toLowerCase();
-
-      await setDoc(userDocRef, {
-        lastLoginAt: serverTimestamp(),
-        uid: user.uid,
-        id: user.uid,
-        email: user.email,
-        name: user.displayName,
-        avatar: user.photoURL,
-        createdAt: userDocSnap.exists() ? userDocSnap.data()?.createdAt || serverTimestamp() : serverTimestamp(),
-        role: userDocSnap.exists() ? (userDocSnap.data()?.role || (isAdminEmail ? "admin" : "user")) : (isAdminEmail ? "admin" : "user"),
-        profileComplete: userDocSnap.exists() ? (userDocSnap.data()?.profileComplete ?? isAdminEmail) : isAdminEmail
-      }, { merge: true });
-
-      const refreshed = await getDoc(userDocRef);
-      const role = refreshed.exists() ? refreshed.data()?.role : (isAdminEmail ? "admin" : "user");
-
-      toast({ title: "Success", description: "You have been logged in." });
-
-      if (role === "admin") {
-        router.push("/admin");
-      } else if (role === "merchant") {
-        router.push("/dashboard");
-      } else {
-        router.push("/");
-      }
-    } catch (error: any) {
-      console.error("Social Sign-Up Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Sign-Up Failed",
-        description: `Error: ${error.message}`,
-        duration: 9000,
-      });
     }
   };
+
+  const afterSocialSignIn = async (user: any) => {
+    if (!user?.uid) {
+      toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available." });
+      await auth.signOut();
+      return;
+    }
+    
+    console.log("Social Sign-In user:", { uid: user.uid, email: user.email, emailVerified: user.emailVerified });
+    console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
+
+    await user.getIdToken(true);
+
+    const isBlocked = await checkBlockedForCurrentUser();
+    if (isBlocked) {
+      await auth.signOut();
+      toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
+      return;
+    }
+
+    const userDocRef = doc(db, USERS_COL, user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    const normalizedEmail = norm(user.email);
+    const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
+
+    await setDoc(userDocRef, {
+      lastLoginAt: serverTimestamp(),
+      uid: user.uid,
+      id: user.uid,
+      email: user.email,
+      name: user.displayName,
+      avatar: user.photoURL,
+      ...( !userDocSnap.exists() ? {
+        createdAt: serverTimestamp(),
+        role: isAdminEmail ? "admin" : "user",
+        profileComplete: isAdminEmail,
+      } : {} )
+    }, { merge: true });
+
+    const refreshed = await getDoc(userDocRef);
+    console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
+
+    const roleRaw = refreshed.exists() ? refreshed.data()?.role : null;
+    const role = norm(roleRaw) || (isAdminEmail ? "admin" : "user");
+    console.log("Normalized role after social sign-in:", role);
+    
+    toast({ title: "Success", description: "You have been logged in." });
+
+    if (role === "admin") {
+      router.push("/admin");
+    } else if (role === "merchant") {
+      router.push("/dashboard");
+    } else {
+      router.push("/");
+    }
+  }
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const redirectResult = await getRedirectResult(auth);
+        if (redirectResult && redirectResult.user) {
+          await afterSocialSignIn(redirectResult.user);
+        }
+      } catch (err) {
+        console.warn("getRedirectResult error (this is okay if no redirect just happened):", err);
+      }
+    })();
+  }, []);
 
   const handleGoogleSignIn = () => {
     const provider = new GoogleAuthProvider();

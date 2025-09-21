@@ -5,10 +5,18 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, OAuthProvider } from "firebase/auth"
-import { auth, db } from "@/lib/firebase"
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  GoogleAuthProvider,
+  OAuthProvider
+} from "firebase/auth"
+import { auth, db, app } from "@/lib/firebase"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { getFunctions, httpsCallable } from "firebase/functions"
+import React from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -30,12 +38,8 @@ const BLOCKED_COL = "blocked_users";
 function norm(s: any) { return (typeof s === "string" ? s.trim().toLowerCase() : String(s ?? "")); }
 
 const formSchema = z.object({
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
-  password: z.string().min(8, {
-    message: "Password must be at least 8 characters.",
-  }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
 })
 
 export function LoginForm() {
@@ -44,11 +48,22 @@ export function LoginForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   });
+
+  const functions = getFunctions(app);
+  const checkBlockedCallable = httpsCallable(functions, 'checkBlocked');
+
+  async function checkBlockedForCurrentUser(): Promise<boolean> {
+    try {
+        const resp = await checkBlockedCallable({});
+        return !!resp?.data?.blocked;
+    } catch (err) {
+        console.error("CRITICAL: checkBlocked callable failed:", err);
+        // Fail closed for security
+        return true; 
+    }
+  }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -59,155 +74,138 @@ export function LoginForm() {
       console.log("Auth currentUser after sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
 
       if (!user?.uid) {
-        console.error("No uid available on email sign-in result — aborting further ops");
+        throw new Error("No user id returned from auth.");
+      }
+
+      await user.getIdToken(true); // Force refresh custom claims
+      
+      const isBlocked = await checkBlockedForCurrentUser();
+      if (isBlocked) {
         await auth.signOut();
-        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
+        toast({
+          variant: "destructive",
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support.",
+          duration: 9000,
+        });
         return;
       }
       
-      const functions = getFunctions();
-      const checkBlocked = httpsCallable(functions, 'checkBlocked');
-      const result: any = await checkBlocked();
-
-      if (result.data.blocked) {
-        await auth.signOut();
-        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
-        return;
-      }
-
       const userDocRef = doc(db, USERS_COL, user.uid);
       await setDoc(userDocRef, { lastLoginAt: serverTimestamp() }, { merge: true });
-
+      
       const refreshedUserDoc = await getDoc(userDocRef);
       console.log("Refreshed user doc data:", refreshedUserDoc.exists() ? refreshedUserDoc.data() : null);
 
       const roleRaw = refreshedUserDoc.exists() ? refreshedUserDoc.data()?.role : null;
       const role = norm(roleRaw) || "user";
       console.log("Normalized role:", role);
-
+      
       toast({ title: "Success", description: "You have been logged in." });
       
-      if (role === 'admin') {
-          router.push('/admin');
-      } else if (role === 'merchant') {
-          router.push('/dashboard');
-      } else {
-          router.push('/');
-      }
+      if (role === 'admin') router.push('/admin');
+      else if (role === 'merchant') router.push('/dashboard');
+      else router.push('/');
 
     } catch (error: any) {
       console.error("Login Error:", error);
-      if (error.code === 'functions/unauthenticated') {
-        toast({ variant: "destructive", title: "Login Failed", description: "Authentication check failed. Please try again.", duration: 9000 });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: `Error: ${error.message}`,
-          duration: 9000,
-        });
-      }
+      toast({ variant: "destructive", title: "Login Failed", description: `Error: ${error.message}`, duration: 9000 });
     }
   }
 
-  const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
+  const signInWithProvider = async (provider: GoogleAuthProvider | OAuthProvider) => {
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      console.log("Social Sign-In user:", { uid: user?.uid, email: user?.email, emailVerified: user?.emailVerified });
-      console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
-
-      if (!user?.uid) {
-        console.error("No uid available on social sign-in result — aborting Firestore ops");
-        await auth.signOut();
-        toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available. Please try again." });
-        return;
-      }
-      
-      const functions = getFunctions();
-      const checkBlocked = httpsCallable(functions, 'checkBlocked');
-      const blockedResult: any = await checkBlocked();
-
-      if (blockedResult.data.blocked) {
-        await auth.signOut();
-        toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
-        return;
-      }
-
-      const userDocRef = doc(db, USERS_COL, user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      const normalizedEmail = norm(user.email);
-      const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
-
-      await setDoc(userDocRef, {
-        lastLoginAt: serverTimestamp(),
-        uid: user.uid,
-        id: user.uid,
-        email: user.email,
-        name: user.displayName,
-        avatar: user.photoURL,
-        ...( !userDocSnap.exists() ? {
-          createdAt: serverTimestamp(),
-          role: isAdminEmail ? "admin" : "user",
-          profileComplete: isAdminEmail,
-        } : {} )
-      }, { merge: true });
-
-      const refreshed = await getDoc(userDocRef);
-      console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
-
-      const roleRaw = refreshed.exists() ? refreshed.data()?.role : null;
-      const role = norm(roleRaw) || (isAdminEmail ? "admin" : "user");
-      console.log("Normalized role after social sign-in:", role);
-
-      toast({ title: "Success", description: "You have been logged in." });
-
-      if (role === "admin") {
-        router.push("/admin");
-      } else if (role === "merchant") {
-        router.push("/dashboard");
-      } else {
-        router.push("/");
-      }
-    } catch (error: any) {
-      console.error("Social Sign-In Error:", error);
-      if (error.code === 'functions/unauthenticated') {
-        toast({ variant: "destructive", title: "Login Failed", description: "Authentication check failed. Please try again.", duration: 9000 });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Sign-In Failed",
-          description: `Error: ${error.message}`,
-          duration: 9000,
-        });
+      await signInWithPopup(auth, provider);
+    } catch (popupError: any) {
+      console.warn("signInWithPopup failed — falling back to redirect:", popupError?.message || popupError);
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectErr: any) {
+        console.error("signInWithRedirect also failed:", redirectErr);
+        toast({ variant: "destructive", title: "Sign-In Failed", description: `Social sign-in failed: ${redirectErr.message || redirectErr}`, duration: 9000 });
       }
     }
-  };
-
-  const handleGoogleSignIn = () => {
-    const provider = new GoogleAuthProvider();
-    handleSocialSignIn(provider);
   }
 
-  const handleAppleSignIn = () => {
-    const provider = new OAuthProvider('apple.com');
-    handleSocialSignIn(provider);
+  const afterSocialSignIn = async (user: any) => {
+    if (!user?.uid) {
+      toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available." });
+      await auth.signOut();
+      return;
+    }
+    
+    console.log("Social Sign-In user:", { uid: user.uid, email: user.email, emailVerified: user.emailVerified });
+    console.log("Auth currentUser after social sign-in:", auth.currentUser?.uid, auth.currentUser?.email);
+
+    await user.getIdToken(true);
+
+    const isBlocked = await checkBlockedForCurrentUser();
+    if (isBlocked) {
+      await auth.signOut();
+      toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
+      return;
+    }
+
+    const userDocRef = doc(db, USERS_COL, user.uid);
+    const userDocSnap = await getDoc(userDocRef); // Check if user is new
+
+    const normalizedEmail = norm(user.email);
+    const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
+
+    await setDoc(userDocRef, {
+      lastLoginAt: serverTimestamp(),
+      uid: user.uid,
+      id: user.uid,
+      email: user.email,
+      name: user.displayName,
+      avatar: user.photoURL,
+      ...( !userDocSnap.exists() ? {
+        createdAt: serverTimestamp(),
+        role: isAdminEmail ? "admin" : "user",
+        profileComplete: isAdminEmail,
+      } : {} )
+    }, { merge: true });
+
+    const refreshed = await getDoc(userDocRef);
+    console.log("Refreshed social user doc:", refreshed.exists() ? refreshed.data() : null);
+
+    const roleRaw = refreshed.exists() ? refreshed.data()?.role : null;
+    const role = norm(roleRaw) || (isAdminEmail ? "admin" : "user");
+    console.log("Normalized role after social sign-in:", role);
+    
+    toast({ title: "Success", description: "You have been logged in." });
+    
+    if (role === "admin") router.push("/admin");
+    else if (role === "merchant") router.push("/dashboard");
+    else router.push("/");
   }
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const redirectResult = await getRedirectResult(auth);
+        if (redirectResult && redirectResult.user) {
+          await afterSocialSignIn(redirectResult.user);
+        }
+      } catch (err) {
+        console.warn("getRedirectResult error (this is okay if no redirect just happened):", err);
+      }
+    })();
+  }, []);
+
+  const handleGoogleSignIn = () => signInWithProvider(new GoogleAuthProvider());
+  const handleAppleSignIn = () => signInWithProvider(new OAuthProvider('apple.com'));
 
   return (
     <Card className="w-full max-w-lg mx-auto shadow-xl">
       <CardHeader className="text-center">
-        <div className="flex justify-center mb-4">
-          <Logo />
-        </div>
+        <div className="flex justify-center mb-4"><Logo /></div>
         <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
         <CardDescription>Sign in to access your wallet and the marketplace.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+           <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 62.3l-68.6 68.6c-20.5-19.4-48-31.5-79.3-31.5-62.3 0-113.5 51.6-113.5 114.9s51.2 114.9 113.5 114.9c72.3 0 96.9-46.3 102.5-69.1H248v-85.3h236.1c2.3 12.7 3.9 26.9 3.9 41.4z"></path></svg>
             Sign in with Google
           </Button>
@@ -216,53 +214,33 @@ export function LoginForm() {
             Sign in with Apple
           </Button>
         </div>
+
         <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">
-              Or continue with
-            </span>
-          </div>
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or continue with</span></div>
         </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="********" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl><Input placeholder="name@example.com" {...field} /></FormControl>
+                <FormMessage/>
+              </FormItem>
+            )}/>
+            <FormField control={form.control} name="password" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl><Input type="password" placeholder="********" {...field} /></FormControl>
+                <FormMessage/>
+              </FormItem>
+            )}/>
             <Button type="submit" className="w-full">Sign In</Button>
           </form>
         </Form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="underline hover:text-primary">
-            Sign up
-          </Link>
-        </p>
+
+        <p className="mt-4 text-center text-sm text-muted-foreground">Don&apos;t have an account? <Link href="/signup" className="underline hover:text-primary">Sign up</Link></p>
       </CardContent>
     </Card>
   )
