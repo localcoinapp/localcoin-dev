@@ -1,5 +1,5 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Belanosima&family=Bitter:wght@400;700&family=DynaPuff&family=Exo+2:wght@700&family=Julius+Sans+One&family=Montserrat&family=Nerko+One&family=Open+Sans&family=Ubuntu&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Belanosima&family=Bitter:wght@400;700&family=DynaPuff&family=Exo+2:wght@700&family=Julius+Sans+One&family=Montserrat:wght@400;600&family=Nerko+One&family=Open+Sans&family=PT+Serif:wght@400;700&family=Ubuntu&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -266,4 +266,54 @@
     --input: 25 20% 18%;
     --ring: 45 90% 65%;
   }
+
+  /* =================================================================
+    Theme: Smart
+  ================================================================= */
+  .theme-smart {
+    --background: 0 0% 97%;      /* #f8f8f8 */
+    --foreground: 0 0% 4%;      /* #0b0b0b */
+    --card: 0 0% 100%;           /* #ffffff */
+    --card-foreground: 0 0% 9%;  /* #161616 */
+    --popover: 0 0% 100%;         /* #ffffff */
+    --popover-foreground: 0 0% 9%; /* #161616 */
+    --primary: 24 100% 51%;      /* #ff6606 */
+    --primary-foreground: 0 0% 100%; /* #ffffff */
+    --secondary: 0 0% 97%;       /* #f8f8f8 */
+    --secondary-foreground: 0 0% 9%; /* #161616 */
+    --muted: 0 0% 90%;           /* A bit darker than background for contrast */
+    --muted-foreground: 0 0% 48%;  /* #7b7b7b */
+    --accent: 24 100% 51%;       /* Same as primary */
+    --accent-foreground: 0 0% 100%; /* #ffffff */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 80%;          /* A bit darker than muted for inputs/borders */
+    --input: 0 0% 85%;
+    --ring: 24 100% 51%;
+    --radius: 0.5rem;
+    --hero-banner-image: none;
+    --gradient-hero: linear-gradient(135deg, hsl(24 100% 51%), hsl(34 100% 51%));
+  }
+  .dark.theme-smart {
+    --background: 0 0% 4%;       /* #0b0b0b */
+    --foreground: 0 0% 97%;       /* #f8f8f8 */
+    --card: 0 0% 9%;             /* #161616 */
+    --card-foreground: 0 0% 97%;   /* #f8f8f8 */
+    --popover: 0 0% 4%;           /* #0b0b0b */
+    --popover-foreground: 0 0% 97%; /* #f8f8f8 */
+    --primary: 24 100% 51%;       /* #ff6606 */
+    --primary-foreground: 0 0% 9%; /* #161616 */
+    --secondary: 0 0% 15%;        /* #272727 */
+    --secondary-foreground: 0 0% 97%; /* #f8f8f8 */
+    --muted: 0 0% 15%;            /* #272727 */
+    --muted-foreground: 0 0% 70%;   /* #b2b2b2 */
+    --accent: 24 100% 51%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 97%;
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 24 100% 51%;
+  }
+
 }

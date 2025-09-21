@@ -181,6 +181,7 @@ export default function SettingsPage() {
                                                     <SelectItem value="theme-tropic2">Tropic2</SelectItem>
                                                     <SelectItem value="theme-berlin">Berlin</SelectItem>
                                                     <SelectItem value="theme-andes">Andes</SelectItem>
+                                                    <SelectItem value="theme-smart">Smart</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <FormDescription>Select your color theme.</FormDescription>
