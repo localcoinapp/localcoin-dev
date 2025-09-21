@@ -316,4 +316,24 @@
     --ring: 353 100% 63%;
   }
 
+  /* Custom rule for Smart theme footer */
+  .theme-smart footer, .dark.theme-smart footer {
+    background-color: #ff4056; /* hsl(353 100% 63%) */
+    color: hsl(var(--primary-foreground)); /* Use primary-foreground for text */
+    border-color: transparent;
+  }
+
+  .theme-smart footer a, .dark.theme-smart footer a {
+    color: hsl(var(--primary-foreground));
+    opacity: 0.8;
+  }
+  .theme-smart footer a:hover, .dark.theme-smart footer a:hover {
+    opacity: 1;
+    text-decoration: underline;
+  }
+   .theme-smart footer .text-muted-foreground, .dark.theme-smart footer .text-muted-foreground {
+    color: hsl(var(--primary-foreground));
+    opacity: 0.8;
+  }
+
 }
