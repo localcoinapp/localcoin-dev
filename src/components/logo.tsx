@@ -1,16 +1,22 @@
-
 'use client';
 
 import { Wallet } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { useTheme } from "./theme-provider";
 import Image from "next/image";
+import { useState, useEffect } from "react";
 
 export function Logo({ name }: { name?: string }) {
   const { theme } = useTheme();
   const brandName = name || siteConfig.name;
+  const [isClient, setIsClient] = useState(false);
 
-  if (theme === 'theme-smart') {
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+
+  if (isClient && theme === 'theme-smart') {
     return (
       <a href="/" className="flex items-center space-x-2">
         <Image 
@@ -27,7 +33,7 @@ export function Logo({ name }: { name?: string }) {
   return (
     <a href="/" className="flex items-center space-x-2">
       <Wallet className="h-6 w-6 text-primary" />
-      <span className="font-bold text-lg font-headline">{brandName}</span>
+      <span className="font-bold text-lg font-headline">{isClient ? brandName : ''}</span>
     </a>
   );
 }
