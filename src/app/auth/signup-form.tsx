@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -6,9 +7,9 @@ import * as z from "zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut } from "firebase/auth"
-import { auth, db, app } from "@/lib/firebase"
+import { auth, db, functions } from "@/lib/firebase"
 import { setDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
-import { getFunctions, httpsCallable } from "firebase/functions"
+import { httpsCallable } from "firebase/functions"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -56,16 +57,23 @@ export function SignupForm() {
     },
   });
   
-  const functions = getFunctions(app);
-  const checkBlockedCallable = httpsCallable(functions, 'checkBlocked');
+  // typed callable: request type and response type
+  const checkBlockedCallableFn = functions
+    ? httpsCallable<{ uid?: string }, { blocked?: boolean }>(functions, "checkBlocked")
+    : null;
 
-  async function checkBlockedForCurrentUser(): Promise<boolean> {
-     try {
-        const resp = await checkBlockedCallable({});
-        return !!resp?.data?.blocked;
+  // call wrapper that returns boolean safely
+  async function checkBlockedForCurrentUser(uid?: string): Promise<boolean> {
+     if (!checkBlockedCallableFn) {
+      console.error("Firebase functions not initialized (checkBlocked)");
+      return true;
+    }
+    try {
+      const resp = await checkBlockedCallableFn({ uid });
+      return !!resp.data?.blocked;
     } catch (err) {
-        console.error("CRITICAL: checkBlocked callable failed:", err);
-        return true; 
+      console.error("checkBlocked callable failed:", err);
+      return true;
     }
   }
 
@@ -117,22 +125,7 @@ export function SignupForm() {
       });
     }
   }
-
-  const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
-    try {
-      const result = await signInWithPopup(auth, provider);
-      await afterSocialSignIn(result.user);
-    } catch (popupError: any) {
-      console.warn("signInWithPopup failed — falling back to redirect:", popupError?.message || popupError);
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (redirectErr: any) {
-        console.error("signInWithRedirect also failed:", redirectErr);
-        toast({ variant: "destructive", title: "Sign-In Failed", description: `Social sign-in failed: ${redirectErr.message || redirectErr}`, duration: 9000 });
-      }
-    }
-  };
-
+  
   const afterSocialSignIn = async (user: any) => {
     if (!user?.uid) {
       toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available." });
@@ -145,7 +138,7 @@ export function SignupForm() {
 
     await user.getIdToken(true);
 
-    const isBlocked = await checkBlockedForCurrentUser();
+    const isBlocked = await checkBlockedForCurrentUser(user.uid);
     if (isBlocked) {
       await auth.signOut();
       toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
@@ -189,6 +182,22 @@ export function SignupForm() {
       router.push("/");
     }
   }
+
+
+  const handleSocialSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await afterSocialSignIn(result.user);
+    } catch (popupError: any) {
+      console.warn("signInWithPopup failed — falling back to redirect:", popupError?.message || popupError);
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectErr: any) {
+        console.error("signInWithRedirect also failed:", redirectErr);
+        toast({ variant: "destructive", title: "Sign-In Failed", description: `Social sign-in failed: ${redirectErr.message || redirectErr}`, duration: 9000 });
+      }
+    }
+  };
 
   React.useEffect(() => {
     (async () => {

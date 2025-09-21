@@ -1,3 +1,4 @@
+
 'use client'
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -13,9 +14,9 @@ import {
   GoogleAuthProvider,
   OAuthProvider
 } from "firebase/auth"
-import { auth, db, app } from "@/lib/firebase"
+import { auth, db, app, functions } from "@/lib/firebase"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
-import { getFunctions, httpsCallable } from "firebase/functions"
+import { httpsCallable } from "firebase/functions"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -50,20 +51,30 @@ export function LoginForm() {
     resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "" },
   });
+  
+  // typed callable: request type and response type
+  const checkBlockedCallableFn = functions
+    ? httpsCallable<{ uid?: string }, { blocked?: boolean }>(functions, "checkBlocked")
+    : null;
 
-  const functions = getFunctions(app);
-  const checkBlockedCallable = httpsCallable(functions, 'checkBlocked');
-
-  async function checkBlockedForCurrentUser(): Promise<boolean> {
+  // call wrapper that returns boolean safely
+  async function checkBlockedForCurrentUser(uid?: string): Promise<boolean> {
+    if (!checkBlockedCallableFn) {
+      console.error("Firebase functions not initialized (checkBlocked)");
+      // fail closed — if we can't check blocked, treat as blocked for safety OR choose false if you prefer.
+      return true; // safer: block access until callable available. Change to `false` to be permissive.
+    }
     try {
-        const resp = await checkBlockedCallable({});
-        return !!resp?.data?.blocked;
+      const resp = await checkBlockedCallableFn({ uid });
+      // TypeScript now knows resp.data is { blocked?: boolean }
+      return !!resp.data?.blocked;
     } catch (err) {
-        console.error("CRITICAL: checkBlocked callable failed:", err);
-        // Fail closed for security
-        return true; 
+      console.error("checkBlocked callable failed:", err);
+      // Fail-closed for security: treat as blocked if callable fails.
+      return true;
     }
   }
+
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -79,7 +90,7 @@ export function LoginForm() {
 
       await user.getIdToken(true); // Force refresh custom claims
       
-      const isBlocked = await checkBlockedForCurrentUser();
+      const isBlocked = await checkBlockedForCurrentUser(user.uid);
       if (isBlocked) {
         await auth.signOut();
         toast({
@@ -113,20 +124,6 @@ export function LoginForm() {
     }
   }
 
-  const signInWithProvider = async (provider: GoogleAuthProvider | OAuthProvider) => {
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (popupError: any) {
-      console.warn("signInWithPopup failed — falling back to redirect:", popupError?.message || popupError);
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (redirectErr: any) {
-        console.error("signInWithRedirect also failed:", redirectErr);
-        toast({ variant: "destructive", title: "Sign-In Failed", description: `Social sign-in failed: ${redirectErr.message || redirectErr}`, duration: 9000 });
-      }
-    }
-  }
-
   const afterSocialSignIn = async (user: any) => {
     if (!user?.uid) {
       toast({ variant: "destructive", title: "Sign-In Failed", description: "No user ID available." });
@@ -139,7 +136,7 @@ export function LoginForm() {
 
     await user.getIdToken(true);
 
-    const isBlocked = await checkBlockedForCurrentUser();
+    const isBlocked = await checkBlockedForCurrentUser(user.uid);
     if (isBlocked) {
       await auth.signOut();
       toast({ variant: "destructive", title: "Account Blocked", description: "Your account has been blocked. Contact support.", duration: 9000 });
@@ -147,7 +144,7 @@ export function LoginForm() {
     }
 
     const userDocRef = doc(db, USERS_COL, user.uid);
-    const userDocSnap = await getDoc(userDocRef); // Check if user is new
+    const userDocSnap = await getDoc(userDocRef);
 
     const normalizedEmail = norm(user.email);
     const isAdminEmail = normalizedEmail && normalizedEmail === norm(siteConfig.adminEmail);
@@ -174,10 +171,29 @@ export function LoginForm() {
     console.log("Normalized role after social sign-in:", role);
     
     toast({ title: "Success", description: "You have been logged in." });
-    
-    if (role === "admin") router.push("/admin");
-    else if (role === "merchant") router.push("/dashboard");
-    else router.push("/");
+
+    if (role === "admin") {
+      router.push("/admin");
+    } else if (role === "merchant") {
+      router.push("/dashboard");
+    } else {
+      router.push("/");
+    }
+  }
+
+  const signInWithProvider = async (provider: GoogleAuthProvider | OAuthProvider) => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await afterSocialSignIn(result.user);
+    } catch (popupError: any) {
+      console.warn("signInWithPopup failed — falling back to redirect:", popupError?.message || popupError);
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectErr: any) {
+        console.error("signInWithRedirect also failed:", redirectErr);
+        toast({ variant: "destructive", title: "Sign-In Failed", description: `Social sign-in failed: ${redirectErr.message || redirectErr}`, duration: 9000 });
+      }
+    }
   }
 
   React.useEffect(() => {

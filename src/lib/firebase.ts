@@ -2,6 +2,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, updateProfile } from 'firebase/auth';
 import { getFirestore, getDoc } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
+
 
 // ==================================================================
 // == PASTE YOUR NEW FIREBASE CONFIGURATION OBJECT FROM STEP 1 HERE ==
@@ -20,10 +22,11 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 const db = getFirestore(app);
-
 const auth = getAuth(app);
+// THIS IS REQUIRED — export the functions instance bound to the same app
+const functions = getFunctions(app);
 
 // Set persistence to local. This is the crucial part for this environment.
 setPersistence(auth, browserLocalPersistence);
 
-export { app, auth, db, getDoc, updateProfile };
+export { app, auth, db, functions, getDoc, updateProfile };
