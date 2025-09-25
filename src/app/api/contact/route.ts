@@ -7,6 +7,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
+    // Correctly check for all possible 'to' address variables, including the public one.
     const to = process.env.CONTACT_EMAIL || process.env.SMTP_TO || process.env.NEXT_PUBLIC_CONTACT_EMAIL;
     if (!to) {
       console.error('CRITICAL: CONTACT_EMAIL / SMTP_TO / NEXT_PUBLIC_CONTACT_EMAIL not set.');
