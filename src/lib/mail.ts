@@ -1,3 +1,4 @@
+
 // mail.ts (improved)
 import nodemailer from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -56,8 +57,8 @@ function createMailTransport() {
     port: opts.port,
     secure: opts.secure,
     requireTLS: opts.requireTLS,
-    authUserPresent: !!(opts.auth && opts.auth.user),
-    authPassLength: opts.auth && opts.auth.pass ? (opts.auth.pass as string).length : 0,
+    authUserPresent: !!(opts.auth && 'user' in opts.auth && opts.auth.user),
+    authPassLength: opts.auth && 'pass' in opts.auth && opts.auth.pass ? String(opts.auth.pass).length : 0,
     tls: { rejectUnauthorized: opts.tls?.rejectUnauthorized, servername: opts.tls?.servername },
   });
 
