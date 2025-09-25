@@ -64,7 +64,6 @@ export default function KontaktPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // The `to` address is now handled by the server-side API route.
           subject: `Contact Form (${data.inquiryType}): ${data.subject}`,
           html: `
             <p><strong>Name:</strong> ${data.name}</p>
@@ -76,20 +75,24 @@ export default function KontaktPage() {
         }),
       });
 
+      // Check if the request was successful
       if (!response.ok) {
-        throw new Error('Failed to send message.');
+        // If not, parse the JSON error body to get details
+        const errorData = await response.json();
+        console.error("Contact form submission error:", errorData);
+        throw new Error(errorData.details || 'Failed to send message.');
       }
 
       toast({
         title: "Message Sent!",
         description: "Thank you for contacting us. We'll get back to you shortly.",
       });
-      form.reset({ name: "", email: "", subject: "", message: "" });
+      form.reset({ name: "", email: "", inquiryType: undefined, subject: "", message: "" });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "There was a problem sending your message. Please try again.",
+        title: "Error Sending Message",
+        description: (error as Error).message || "An unexpected error occurred. Please try again.",
       });
     } finally {
       setIsLoading(false);
