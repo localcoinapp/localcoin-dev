@@ -64,7 +64,7 @@ export default function KontaktPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: process.env.NEXT_PUBLIC_CONTACT_EMAIL, // This should be your support email
+          // The `to` address is now handled by the server-side API route.
           subject: `Contact Form (${data.inquiryType}): ${data.subject}`,
           html: `
             <p><strong>Name:</strong> ${data.name}</p>
