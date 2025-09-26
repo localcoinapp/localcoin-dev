@@ -1,4 +1,3 @@
-
 // app/api/contact/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/mail';
@@ -6,7 +5,7 @@ import { sendEmail } from '@/lib/mail';
 export async function POST(req: NextRequest) {
   try {
     // The recipient email address MUST be configured in the environment.
-    // Use SMTP_FROM as it's a guaranteed runtime variable and the intended recipient.
+    // Use SMTP_FROM as it's a guaranteed runtime variable and the intended recipient for contact form submissions.
     const to = process.env.SMTP_FROM;
 
     if (!to) {
