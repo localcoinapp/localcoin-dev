@@ -3,8 +3,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/mail';
 
-export const runtime = 'nodejs';
-
 export async function POST(req: NextRequest) {
   try {
     // The recipient email address MUST be configured in the environment.
