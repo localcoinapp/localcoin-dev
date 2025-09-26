@@ -63,7 +63,7 @@ export default function MarketplacePage() {
   const [filteredMerchants, setFilteredMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [radius, setRadius] = useState<number | 'all'>('all');
+  const [radius, setRadius] = useState<number>(5);
   const { toast } = useToast();
 
   // Fetch all merchants initially
@@ -109,7 +109,7 @@ export default function MarketplacePage() {
 
   // Filter merchants based on location and radius
   useEffect(() => {
-    if (!userLocation || radius === 'all') {
+    if (!userLocation) {
       setFilteredMerchants(merchants);
       return;
     }
@@ -120,7 +120,7 @@ export default function MarketplacePage() {
           [merchant.position.lat, merchant.position.lng],
           userLocation
         );
-        return distanceInKm <= (radius as number);
+        return distanceInKm <= radius;
       }
       return false;
     });
@@ -154,7 +154,7 @@ export default function MarketplacePage() {
               </Select>
                <Select 
                 value={radius.toString()} 
-                onValueChange={(value) => setRadius(value === 'all' ? 'all' : Number(value))}
+                onValueChange={(value) => setRadius(Number(value))}
                 disabled={!userLocation}
                >
                 <SelectTrigger className="w-full sm:w-[180px]">
@@ -162,7 +162,6 @@ export default function MarketplacePage() {
                   <SelectValue placeholder="Radius" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="5">5 km</SelectItem>
                     <SelectItem value="10">10 km</SelectItem>
                     <SelectItem value="25">25 km</SelectItem>
@@ -196,8 +195,8 @@ export default function MarketplacePage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No live merchants found{radius === 'all' ? '.' : ` within ${radius}km.`}</p>
-                {radius !== 'all' && <p className="text-sm text-muted-foreground">Try expanding your search radius.</p>}
+                <p className="text-muted-foreground mb-4">No live merchants found{radius === 5 && !userLocation ? '.' : ` within ${radius}km.`}</p>
+                <p className="text-sm text-muted-foreground">Try expanding your search radius.</p>
               </div>
             )}
         </TabsContent>
