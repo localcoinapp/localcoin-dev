@@ -44,6 +44,10 @@ env:
   - variable: FIREBASE_ADMIN_SERVICE_ACCOUNT
     secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
     availability: [RUNTIME]
+  
+  - variable: RECAPTCHA_SECRET_KEY
+    secret: RECAPTCHA_SECRET_KEY
+    availability: [RUNTIME]
 
   # safe to expose (public) – needed at build + runtime
   - variable: NEXT_PUBLIC_CONTACT_EMAIL
@@ -60,4 +64,8 @@ env:
 
   - variable: NEXT_PUBLIC_EURUSD_RATE
     secret: NEXT_PUBLIC_EURUSD_RATE
+    availability: [BUILD, RUNTIME]
+    
+  - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+    secret: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     availability: [BUILD, RUNTIME]

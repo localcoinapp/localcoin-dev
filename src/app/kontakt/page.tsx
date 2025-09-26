@@ -23,10 +23,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ReCAPTCHA from "react-google-recaptcha";
 
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -44,6 +45,8 @@ export default function KontaktPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -56,6 +59,14 @@ export default function KontaktPage() {
   });
 
   async function onSubmit(data: ContactFormValues) {
+    if (!recaptchaToken) {
+        toast({
+            title: "Verification Failed",
+            description: "Please complete the reCAPTCHA.",
+            variant: "destructive",
+        });
+        return;
+    }
     setIsLoading(true);
     try {
       const response = await fetch('/api/contact', {
@@ -72,15 +83,13 @@ export default function KontaktPage() {
             <hr />
             <p>${data.message.replace(/\n/g, '<br>')}</p>
           `,
+          recaptchaToken: recaptchaToken,
         }),
       });
 
-      // Check if the request was successful
+      const result = await response.json();
       if (!response.ok) {
-        // If not, parse the JSON error body to get details
-        const errorData = await response.json();
-        console.error("Contact form submission error:", errorData);
-        throw new Error(errorData.details || 'Failed to send message.');
+        throw new Error(result.details || 'Failed to send message.');
       }
 
       toast({
@@ -88,6 +97,8 @@ export default function KontaktPage() {
         description: "Thank you for contacting us. We'll get back to you shortly.",
       });
       form.reset({ name: "", email: "", inquiryType: undefined, subject: "", message: "" });
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
     } catch (error) {
       toast({
         variant: "destructive",
@@ -194,8 +205,19 @@ export default function KontaktPage() {
                   </FormItem>
                 )}
               />
+              
+              {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && (
+                <div className="flex justify-center">
+                    <ReCAPTCHA
+                        ref={recaptchaRef}
+                        sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                        onChange={(token) => setRecaptchaToken(token)}
+                    />
+                </div>
+              )}
+
               <div className="text-center pt-4">
-                <Button type="submit" size="lg" disabled={isLoading}>
+                <Button type="submit" size="lg" disabled={isLoading || !recaptchaToken}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Send Message
                 </Button>
