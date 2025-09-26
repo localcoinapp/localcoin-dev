@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Filter, Search, List, Map } from 'lucide-react';
+import { Filter, Search, List, Map, LocateFixed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,8 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { storeCategories } from '@/data/store-categories';
-import { cn } from '@/lib/utils';
-import { useTheme } from '@/components/theme-provider';
+import { distanceBetween } from 'geofire-common';
 
 const MapView = dynamic(() => import('@/components/map-view'), {
   ssr: false,
@@ -61,14 +60,17 @@ const HeroBanner = () => {
 
 export default function MarketplacePage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [filteredMerchants, setFilteredMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [radius, setRadius] = useState<number | 'all'>('all');
   const { toast } = useToast();
 
+  // Fetch all merchants initially
   useEffect(() => {
     const fetchMerchants = async () => {
       try {
         setLoading(true);
-        // This is the crucial fix: aligning the query with the security rules.
         const q = query(collection(db, 'merchants'), where("status", "==", "live"));
         const merchantSnapshot = await getDocs(q);
         const merchantList = merchantSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Merchant));
@@ -88,6 +90,45 @@ export default function MarketplacePage() {
     fetchMerchants();
   }, [toast]);
   
+  // Get user location
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation([position.coords.latitude, position.coords.longitude]);
+      },
+      (error) => {
+        console.warn("Could not get user location:", error.message);
+        toast({
+            variant: "default",
+            title: "Location Access Denied",
+            description: "Displaying all merchants. Allow location access to filter by distance.",
+        })
+      }
+    );
+  }, [toast]);
+
+  // Filter merchants based on location and radius
+  useEffect(() => {
+    if (!userLocation || radius === 'all') {
+      setFilteredMerchants(merchants);
+      return;
+    }
+
+    const merchantsInRadius = merchants.filter(merchant => {
+      if (merchant.position?.lat && merchant.position?.lng) {
+        const distanceInKm = distanceBetween(
+          [merchant.position.lat, merchant.position.lng],
+          userLocation
+        );
+        return distanceInKm <= (radius as number);
+      }
+      return false;
+    });
+
+    setFilteredMerchants(merchantsInRadius);
+  }, [merchants, userLocation, radius]);
+
+  
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <HeroBanner />
@@ -100,7 +141,7 @@ export default function MarketplacePage() {
               <Input placeholder="Search services, items, or merchants..." className="pl-10" />
             </div>
             <div className="flex gap-4">
-              <Select defaultValue="All">
+               <Select defaultValue="All">
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Category" />
@@ -109,6 +150,23 @@ export default function MarketplacePage() {
                   {storeCategories.map((cat) => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+               <Select 
+                value={radius.toString()} 
+                onValueChange={(value) => setRadius(value === 'all' ? 'all' : Number(value))}
+                disabled={!userLocation}
+               >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <LocateFixed className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Radius" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="5">5 km</SelectItem>
+                    <SelectItem value="10">10 km</SelectItem>
+                    <SelectItem value="25">25 km</SelectItem>
+                    <SelectItem value="50">50 km</SelectItem>
                 </SelectContent>
               </Select>
               <Button className="bg-accent hover:bg-accent/90">
@@ -130,16 +188,16 @@ export default function MarketplacePage() {
                 <Skeleton className="h-80 w-full" />
                 <Skeleton className="h-80 w-full" />
               </div>
-            ) : merchants.length > 0 ? (
+            ) : filteredMerchants.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {merchants.map((merchant) => (
+                {filteredMerchants.map((merchant) => (
                   <MerchantCard key={merchant.id} merchant={merchant} />
                 ))}
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No live merchants found.</p>
-                <p className="text-sm text-muted-foreground">Merchants will appear here once they go live.</p>
+                <p className="text-muted-foreground mb-4">No live merchants found{radius === 'all' ? '.' : ` within ${radius}km.`}</p>
+                {radius !== 'all' && <p className="text-sm text-muted-foreground">Try expanding your search radius.</p>}
               </div>
             )}
         </TabsContent>
