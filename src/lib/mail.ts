@@ -58,7 +58,7 @@ function createMailTransport() {
     secure: opts.secure,
     requireTLS: opts.requireTLS,
     authUserPresent: !!(opts.auth && 'user' in opts.auth && opts.auth.user),
-    authPassLength: (opts.auth && 'pass' in opts.auth && typeof (opts.auth as any).pass === 'string') ? String((opts.auth as any).pass).length : 0,
+    authPassLength: (opts.auth && 'pass' in (opts.auth as any) && typeof (opts.auth as any).pass === 'string') ? String((opts.auth as any).pass).length : 0,
     tls: { rejectUnauthorized: opts.tls?.rejectUnauthorized, servername: opts.tls?.servername },
   });
 
