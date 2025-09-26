@@ -6,13 +6,14 @@ import { sendEmail } from '@/lib/mail';
 export async function POST(req: NextRequest) {
   try {
     // The recipient email address MUST be configured in the environment.
-    const to = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+    // Use SMTP_FROM as it's a guaranteed runtime variable and the intended recipient.
+    const to = process.env.SMTP_FROM;
 
     if (!to) {
-      console.error('CRITICAL: NEXT_PUBLIC_CONTACT_EMAIL environment variable is not set on the server.');
+      console.error('CRITICAL: SMTP_FROM environment variable is not set on the server.');
       // Return a 500 status code because this is a server configuration issue.
       return NextResponse.json(
-        { error: 'Server not configured to receive contact emails', details: 'The recipient email address is not set.' }, 
+        { error: 'Server not configured to receive contact emails', details: 'The recipient email address (SMTP_FROM) is not set.' }, 
         { status: 500 }
       );
     }
