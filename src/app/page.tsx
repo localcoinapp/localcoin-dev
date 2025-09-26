@@ -134,7 +134,7 @@ export default function MarketplacePage() {
       <HeroBanner />
 
       <Tabs defaultValue="list" className="w-full">
-        <div className="bg-card p-4 rounded-lg shadow-md sticky top-[65px] z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="bg-card p-4 rounded-lg shadow-md sticky top-[65px] z-20 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="w-full sm:w-auto flex-grow flex flex-col sm:flex-row gap-4">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -201,7 +201,7 @@ export default function MarketplacePage() {
             )}
         </TabsContent>
         <TabsContent value="map" className="pt-8">
-          <div className="w-full h-[600px] rounded-lg overflow-hidden">
+          <div className="w-full h-[600px] rounded-lg overflow-hidden relative z-10">
             <MapView merchants={merchants} />
           </div>
         </TabsContent>
