@@ -58,7 +58,7 @@ function createMailTransport() {
     secure: opts.secure,
     requireTLS: opts.requireTLS,
     authUserPresent: !!(opts.auth && 'user' in opts.auth && opts.auth.user),
-    authPassLength: (opts.auth && 'pass' in opts.auth && opts.auth.pass) ? String(opts.auth.pass).length : 0,
+    authPassLength: (opts.auth && 'pass' in opts.auth && typeof (opts.auth as any).pass === 'string') ? String((opts.auth as any).pass).length : 0,
     tls: { rejectUnauthorized: opts.tls?.rejectUnauthorized, servername: opts.tls?.servername },
   });
 
@@ -75,7 +75,7 @@ export async function sendEmail({ to, subject, html }: {
   html: string;
 }) {
   // Treat empty strings as missing
-  const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASS'];
+  const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
   const missingEnv = requiredEnv.filter(key => {
     const v = process.env[key];
     return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
@@ -84,13 +84,13 @@ export async function sendEmail({ to, subject, html }: {
     const errorMsg = `Email sending is not configured. Missing environment variables: ${missingEnv.join(', ')}`;
     console.error('CRITICAL:', errorMsg);
     const e = new Error(errorMsg) as any;
-    e.status = 400;
+    e.status = 500;
     throw e;
   }
 
   const transporter = createMailTransport();
 
-  const from = trimAll(process.env.SMTP_FROM) || trimAll(process.env.SMTP_USER)!;
+  const from = 'admin@localcoin.cloud';
 
   // Verify connection/auth early to fail fast and return a clear error code
   try {
