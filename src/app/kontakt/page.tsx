@@ -23,11 +23,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef } from "react";
+import { useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import ReCAPTCHA from "react-google-recaptcha";
+import {
+  GoogleReCaptchaProvider,
+  useGoogleReCaptcha
+} from 'react-google-recaptcha-v3';
 
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -41,12 +44,11 @@ const contactFormSchema = z.object({
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
-export default function KontaktPage() {
+function ContactForm() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -58,16 +60,28 @@ export default function KontaktPage() {
     },
   });
 
-  async function onSubmit(data: ContactFormValues) {
-    if (!recaptchaToken) {
-        toast({
-            title: "Verification Failed",
-            description: "Please complete the reCAPTCHA.",
-            variant: "destructive",
-        });
-        return;
+  const handleReCaptchaVerify = useCallback(async () => {
+    if (!executeRecaptcha) {
+      console.log('executeRecaptcha not yet available');
+      return null;
     }
+    return await executeRecaptcha('contactForm');
+  }, [executeRecaptcha]);
+
+  async function onSubmit(data: ContactFormValues) {
     setIsLoading(true);
+
+    const token = await handleReCaptchaVerify();
+    if (!token) {
+      toast({
+        title: "Verification Failed",
+        description: "Could not verify reCAPTCHA. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
@@ -83,7 +97,7 @@ export default function KontaktPage() {
             <hr />
             <p>${data.message.replace(/\n/g, '<br>')}</p>
           `,
-          recaptchaToken: recaptchaToken,
+          recaptchaToken: token,
         }),
       });
 
@@ -97,8 +111,6 @@ export default function KontaktPage() {
         description: "Thank you for contacting us. We'll get back to you shortly.",
       });
       form.reset({ name: "", email: "", inquiryType: undefined, subject: "", message: "" });
-      recaptchaRef.current?.reset();
-      setRecaptchaToken(null);
     } catch (error) {
       toast({
         variant: "destructive",
@@ -205,19 +217,9 @@ export default function KontaktPage() {
                   </FormItem>
                 )}
               />
-              
-              {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && (
-                <div className="flex justify-center">
-                    <ReCAPTCHA
-                        ref={recaptchaRef}
-                        sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
-                        onChange={(token) => setRecaptchaToken(token)}
-                    />
-                </div>
-              )}
 
               <div className="text-center pt-4">
-                <Button type="submit" size="lg" disabled={isLoading || !recaptchaToken}>
+                <Button type="submit" size="lg" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Send Message
                 </Button>
@@ -227,5 +229,23 @@ export default function KontaktPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function KontaktPage() {
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
+  if (!siteKey) {
+    return (
+      <div className="container mx-auto p-8 text-center">
+        <p className="text-destructive">reCAPTCHA is not configured. Please set the NEXT_PUBLIC_RECAPTCHA_SITE_KEY environment variable.</p>
+      </div>
+    );
+  }
+
+  return (
+    <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
+      <ContactForm />
+    </GoogleReCaptchaProvider>
   );
 }
