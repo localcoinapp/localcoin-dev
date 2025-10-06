@@ -31,8 +31,8 @@ const MapView = ({ merchants }: MapViewProps) => {
     
     if (mapRef.current && !mapInstance.current) {
       
-      // Initialize map
-      mapInstance.current = L.map(mapRef.current).setView([40.7128, -74.0060], 12); // Default to NYC
+      // Initialize map to default coordinates (Berlin)
+      mapInstance.current = L.map(mapRef.current).setView([52.52167, 13.41333], 12); 
 
       // Add tile layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
