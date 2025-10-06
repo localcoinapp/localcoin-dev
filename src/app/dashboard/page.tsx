@@ -343,18 +343,10 @@ export default function DashboardPage() {
     toast({ title: "Processing Redemption...", description: "Please wait while we transfer the tokens." });
   
     try {
-      if (!order.userId || !order.merchantId || !order.orderId) {
-        throw new Error("Missing critical order information for redemption.");
-      }
-  
       const response = await fetch('/api/merchant/redeem-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: order.userId,
-          merchantId: order.merchantId,
-          orderId: order.orderId,
-        }),
+        body: JSON.stringify({ order: order }),
       });
   
       const result = await response.json();

@@ -15,7 +15,7 @@ import {
   getAccount,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
-import { firestore } from '@/lib/firebase-admin'; // Use Admin SDK
+import { adminDB } from '@/lib/firebaseAdmin'; // Correct Admin SDK import
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
@@ -34,15 +34,17 @@ function getRpcUrl() {
 }
 
 export async function POST(req: NextRequest) {
+  const firestore = adminDB(); // Initialize Admin Firestore
   console.log('--- Received POST /api/merchant/redeem-order ---');
 
-  const { userId, merchantId, orderId } = await req.json();
-
-  if (!userId || !merchantId || !orderId) {
-    return NextResponse.json({ error: 'Missing critical order data (userId, merchantId, or orderId)' }, { status: 400 });
-  }
-
   try {
+    const { order: clientOrder } = await req.json();
+    const { userId, merchantId, orderId } = clientOrder;
+
+    if (!userId || !merchantId || !orderId) {
+      return NextResponse.json({ error: 'Missing critical order data (userId, merchantId, or orderId)' }, { status: 400 });
+    }
+
     // --- Phase 1: Data Validation (outside transaction) ---
     const userDocRef = firestore.collection('users').doc(userId);
     const merchantDocRef = firestore.collection('merchants').doc(merchantId);
