@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,7 +32,7 @@ service cloud.firestore {
 
     /* --- USERS --- */
     match /users/{userId} {
-      allow create: if request.auth.uid == userId;
+      allow create: if true;
       allow get, update, delete: if signedIn() && request.auth.uid == userId;
       allow list: if false;
     }
@@ -85,7 +86,9 @@ service cloud.firestore {
         allow get, update, delete:
           if signedIn() &&
              request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
-        allow list: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+        allow list:
+          if signedIn() &&
+             request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
       }
     }
   }
