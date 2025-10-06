@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,7 +32,8 @@ service cloud.firestore {
 
     /* --- USERS --- */
     match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId;
+      // Allow a user to create their own document during signup.
+      allow create: if request.auth.uid == userId;
       allow get, update, delete: if signedIn() && request.auth.uid == userId;
       allow list: if false;
     }
@@ -83,7 +85,7 @@ service cloud.firestore {
           if signedIn() &&
              request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
         allow get, update, delete:
-          if signedIn() &&
+          if signed-in() &&
              request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
         allow list: if false;
       }
