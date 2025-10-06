@@ -37,7 +37,7 @@ Input Body:
 "{{body}}"
 
 Return only the JSON object with the enhanced body.`,
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-2.5-flash',
 });
 
 const enhanceEmailBodyFlow = ai.defineFlow(

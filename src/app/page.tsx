@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 import { storeCategories } from '@/data/store-categories';
 import { distanceBetween } from 'geofire-common';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const MapView = dynamic(() => import('@/components/map-view'), {
   ssr: false,
@@ -65,6 +66,9 @@ export default function MarketplacePage() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [radius, setRadius] = useState<number>(5);
   const { toast } = useToast();
+  const [showingDefaultLocation, setShowingDefaultLocation] = useState(false);
+  
+  const defaultLocation: [number, number] = [52.52167, 13.41333];
 
   // Fetch all merchants initially
   useEffect(() => {
@@ -101,7 +105,7 @@ export default function MarketplacePage() {
         toast({
             variant: "default",
             title: "Location Access Denied",
-            description: "Displaying all merchants. Allow location access to filter by distance.",
+            description: "Displaying merchants from our default area. Allow location access to see what's near you.",
         })
       }
     );
@@ -109,23 +113,44 @@ export default function MarketplacePage() {
 
   // Filter merchants based on location and radius
   useEffect(() => {
-    if (!userLocation) {
-      setFilteredMerchants(merchants);
-      return;
-    }
-
-    const merchantsInRadius = merchants.filter(merchant => {
-      if (merchant.position?.lat && merchant.position?.lng) {
-        const distanceInKm = distanceBetween(
-          [merchant.position.lat, merchant.position.lng],
-          userLocation
-        );
-        return distanceInKm <= radius;
-      }
-      return false;
+    setShowingDefaultLocation(false);
+    
+    // Determine the center for filtering: user's location or default
+    const filterCenter = userLocation || defaultLocation;
+    
+    const merchantsInPrimaryRadius = merchants.filter(merchant => {
+        if (merchant.position?.lat && merchant.position?.lng) {
+            const distanceInKm = distanceBetween(
+                [merchant.position.lat, merchant.position.lng],
+                filterCenter
+            );
+            return distanceInKm <= radius;
+        }
+        return false;
     });
 
-    setFilteredMerchants(merchantsInRadius);
+    if (merchantsInPrimaryRadius.length > 0) {
+        setFilteredMerchants(merchantsInPrimaryRadius);
+    } else {
+        // If no merchants found, fallback to default location with 5km radius
+        const merchantsInDefaultRadius = merchants.filter(merchant => {
+            if (merchant.position?.lat && merchant.position?.lng) {
+                const distanceInKm = distanceBetween(
+                    [merchant.position.lat, merchant.position.lng],
+                    defaultLocation
+                );
+                return distanceInKm <= 5; // Fixed 5km for default
+            }
+            return false;
+        });
+        setFilteredMerchants(merchantsInDefaultRadius);
+        
+        // Show a notification if we fell back to the default location
+        if (userLocation && merchantsInDefaultRadius.length > 0) {
+             setShowingDefaultLocation(true);
+        }
+    }
+
   }, [merchants, userLocation, radius]);
 
   
@@ -180,6 +205,13 @@ export default function MarketplacePage() {
         </div>
         
         <TabsContent value="list" className="pt-8">
+            {showingDefaultLocation && (
+                <Alert className="mb-6">
+                    <AlertDescription>
+                        No merchants were found in your area. Showing results from our main hub in Berlin.
+                    </AlertDescription>
+                </Alert>
+            )}
             {loading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <Skeleton className="h-80 w-full" />
@@ -195,8 +227,8 @@ export default function MarketplacePage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No live merchants found{radius === 5 && !userLocation ? '.' : ` within ${radius}km.`}</p>
-                <p className="text-sm text-muted-foreground">Try expanding your search radius.</p>
+                <p className="text-muted-foreground mb-4">No merchants found.</p>
+                <p className="text-sm text-muted-foreground">Try expanding your search radius or check back later.</p>
               </div>
             )}
         </TabsContent>

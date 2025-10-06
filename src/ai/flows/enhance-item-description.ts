@@ -37,7 +37,7 @@ Input Description:
 "{{description}}"
 
 Return only the JSON object with the enhanced description.`,
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-2.5-flash',
 });
 
 const enhanceItemDescriptionFlow = ai.defineFlow(

@@ -39,7 +39,7 @@ const generateImageFlow = ai.defineFlow(
   },
   async ({ prompt }) => {
     const result = await ai.generate({
-      model: 'googleai/imagen-4.0-fast-generate-001',
+      model: 'googleai/gemini-2.5-flash-image',
       prompt: `A professional, clean, modern logo or banner for a small business. The prompt is: "${prompt}". The image should be visually appealing and suitable for a company profile.`,
     });
 
