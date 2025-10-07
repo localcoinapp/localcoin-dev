@@ -42,7 +42,7 @@ service cloud.firestore {
 
     /* --- MERCHANTS --- */
     match /merchants/{merchantId} {
-      allow get: if resource.data.status == "live" || isOwner(merchantId);
+      allow get: if resource.data.status == "live" || (signedIn() && isOwner(merchantId));
       allow list: if true;
       allow create: if signedIn();
       allow update, delete: if isOwner(merchantId);
@@ -64,10 +64,10 @@ service cloud.firestore {
 
     /* --- MERCHANT CASHOUT REQUESTS --- */
     match /merchantCashoutRequests/{requestId} {
-      allow create: if signedIn();
-      allow get: if signedIn() &&
-        request.auth.uid == get(/databases/$(database)/documents/merchants/$(resource.data.merchantId)).data.owner;
-      allow list: if false;
+      allow create: if signedIn() && isOwner(request.resource.data.merchantId);
+      allow get: if signedIn() && isOwner(resource.data.merchantId);
+      // Allow a merchant to list their OWN requests.
+      allow list: if signedIn() && request.query.merchantId == get(/databases/$(database)/documents/merchant_owners/$(request.auth.uid)).data.merchantId;
       allow update, delete: if false;
     }
 
@@ -76,7 +76,7 @@ service cloud.firestore {
       allow create: if signedIn();
       allow get, update, delete:
         if signedIn() && request.auth.uid in resource.data.participantIds;
-      allow list: if signedIn() && request.auth.uid in resource.data.participantIds;
+      allow list: if signedIn() && request.auth.uid in request.query.participantIds;
 
       match /messages/{messageId} {
         allow create:
