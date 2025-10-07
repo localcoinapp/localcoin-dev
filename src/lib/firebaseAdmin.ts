@@ -4,29 +4,33 @@ import { getApps, initializeApp, applicationDefault, cert } from 'firebase-admin
 import { getFirestore } from 'firebase-admin/firestore';
 
 function initAdmin() {
-  if (getApps().length) return;
+  // Prevent re-initialization
+  if (getApps().length) {
+    return;
+  }
   
-  const svcJson = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
+  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   
-  if (svcJson) {
-    try {
-      const serviceAccount = JSON.parse(svcJson);
-      initializeApp({ credential: cert(serviceAccount) });
-      console.log('Firebase Admin SDK initialized with Service Account from environment variable.');
-    } catch (e) {
-      console.error('CRITICAL: Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT. Ensure it is a valid JSON string.', e);
-      throw new Error('Server configuration error: Could not initialize Firebase Admin SDK.');
-    }
-  } else {
-    // In environments like local emulator or Google Cloud with Application Default Credentials
-    // This will try to find credentials automatically. If it fails, it will throw.
-    try {
-        initializeApp({ credential: applicationDefault() });
-        console.log('Firebase Admin SDK initialized with Application Default Credentials.');
-    } catch(e) {
-        console.error('CRITICAL: FIREBASE_ADMIN_SERVICE_ACCOUNT is not set, and Application Default Credentials could not be found.', e);
-        throw new Error('Server configuration error: Firebase Admin credentials are not configured.');
-    }
+  // 1. Explicitly check if the environment variable exists
+  if (!serviceAccountEnv) {
+    const errorMsg = 'CRITICAL: The FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. The server cannot authenticate with admin privileges.';
+    console.error(errorMsg);
+    // Throw an error to crash the server process on startup, making the problem obvious.
+    throw new Error(errorMsg);
+  }
+
+  // 2. Try to parse the environment variable as JSON
+  try {
+    const serviceAccount = JSON.parse(serviceAccountEnv);
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+    console.log('Firebase Admin SDK initialized successfully with Service Account from environment variable.');
+  } catch (e) {
+    const errorMsg = 'CRITICAL: Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT. Ensure it is a valid, single-line JSON string without extra quotes or characters.';
+    console.error(errorMsg, e);
+    // Also crash here so the problem is immediately visible in server logs.
+    throw new Error(errorMsg);
   }
 }
 
