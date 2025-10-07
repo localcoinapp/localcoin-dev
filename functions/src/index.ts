@@ -1,3 +1,4 @@
+
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import cors from 'cors';
@@ -23,7 +24,7 @@ const corsHandler = cors({
 });
 
 export const checkBlocked = functions.https.onCall(async (data, context) => {
-  // Ensure the user is authenticated
+  // Ensure the user is authenticated before checking their status.
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError(
       'unauthenticated',
