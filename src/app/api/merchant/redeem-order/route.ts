@@ -77,7 +77,6 @@ export async function POST(req: NextRequest) {
     const connection = new Connection(getRpcUrl(), 'confirmed');
     const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
     
-    // Key derivation is the most likely point of environmental conflict.
     const userKeypair = keypairFromMnemonic(userData.seedPhrase);
     
     const merchantPublicKey = new PublicKey(merchantData.walletAddress);
@@ -133,7 +132,7 @@ export async function POST(req: NextRequest) {
         const completedOrder: CartItem = {
             ...order,
             status: 'completed',
-            redeemedAt: Timestamp.now(),
+            redeemedAt: new Date(), // Use standard Date object
             transactionSignature: txSignature,
         };
 
