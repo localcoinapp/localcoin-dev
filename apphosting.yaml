@@ -50,6 +50,10 @@ env:
     availability: [RUNTIME]
 
   # safe to expose (public) – needed at build + runtime
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    availability: [BUILD, RUNTIME]
+
   - variable: NEXT_PUBLIC_CONTACT_EMAIL
     secret: NEXT_PUBLIC_CONTACT_EMAIL
     availability: [BUILD, RUNTIME]
