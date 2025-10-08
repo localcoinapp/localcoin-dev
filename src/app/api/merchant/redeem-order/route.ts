@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/config/site';
 import { adminDB } from '@/lib/firebaseAdmin';
@@ -125,7 +126,9 @@ export async function POST(req: NextRequest) {
 
     // normalize amount to BigInt for comparison (fromAtaInfo.amount could be bigint or string)
     const fromAmountBigInt =
-      typeof fromAtaInfo.amount === 'bigint' ? fromAtaInfo.amount : BigInt(fromAtaInfo.amount.toString());
+      typeof fromAtaInfo.amount === 'bigint'
+        ? fromAtaInfo.amount
+        : BigInt(String((fromAtaInfo.amount as any)));
 
     if (fromAmountBigInt < rawAmount) {
       throw new Error(
