@@ -1,5 +1,5 @@
-
-'use server';
+// NOTE: removed `'use server'` directive because this is a Next.js API route.
+// This file uses dynamic imports for Solana libraries to avoid WebSocket bundling issues.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/config/site';
@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
 
   const firestore = adminDB();
   console.log('--- Received POST /api/merchant/redeem-order ---');
-
 
   try {
     // platform mnemonic (server-controlled) -> platformKeypair
