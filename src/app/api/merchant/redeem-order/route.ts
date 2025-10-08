@@ -18,6 +18,13 @@ function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 }
 
+// Standardized keypair derivation to match other working API routes
+function keypairFromMnemonic(mnemonic: string, passphrase = ''): any {
+    const { Keypair } = require('@solana/web3.js');
+    const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
+    return Keypair.fromSeed(seed.slice(0, 32));
+}
+
 export async function POST(req: NextRequest) {
   // 1) Ensure Node Buffer + WebSocket are present globally BEFORE importing Solana libs.
   try {
@@ -38,10 +45,8 @@ export async function POST(req: NextRequest) {
 
   const {
     Connection,
-    Keypair,
     PublicKey,
     Transaction,
-    sendAndConfirmTransaction,
   } = solana;
   const {
     getOrCreateAssociatedTokenAccount,
@@ -53,11 +58,6 @@ export async function POST(req: NextRequest) {
   const firestore = adminDB();
   console.log('--- Received POST /api/merchant/redeem-order ---');
 
-  // Standardized keypair derivation
-  function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
-      const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
-      return Keypair.fromSeed(seed.slice(0, 32));
-  }
 
   try {
     // platform mnemonic (server-controlled) -> platformKeypair
@@ -121,12 +121,8 @@ export async function POST(req: NextRequest) {
     );
 
     const fromAtaInfo = await getAccount(connection, fromAta.address);
-
-    // normalize amount to BigInt for comparison (fromAtaInfo.amount could be bigint or string)
-    const fromAmountBigInt =
-      typeof fromAtaInfo.amount === 'bigint'
-        ? fromAtaInfo.amount
-        : BigInt(String((fromAtaInfo.amount as any)));
+    
+    const fromAmountBigInt = typeof fromAtaInfo.amount === 'bigint' ? fromAtaInfo.amount : BigInt(String(fromAtaInfo.amount));
 
     if (fromAmountBigInt < rawAmount) {
       throw new Error(
@@ -151,9 +147,23 @@ export async function POST(req: NextRequest) {
     );
 
     const tx = new Transaction().add(ix);
-
+    tx.feePayer = platformKeypair.publicKey;
+    const { blockhash } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    
+    // Partially sign with the platform keypair (as fee payer)
+    tx.partialSign(platformKeypair);
     // The user's keypair signs to authorize transfer from their token account
-    const txSignature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
+    tx.partialSign(userKeypair);
+
+    const txSignature = await connection.sendRawTransaction(tx.serialize());
+
+    await connection.confirmTransaction({
+        signature: txSignature,
+        blockhash: blockhash,
+        lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
+    }, 'confirmed');
+
     console.log('Redemption Transfer Signature:', txSignature);
 
     // --- Phase 3: Firestore Atomic Updates (inside transaction) ---
