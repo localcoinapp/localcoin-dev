@@ -1,16 +1,18 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { siteConfig } from '@/config/site';
 import { adminDB } from '@/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
-import { derivePath } from 'ed25519-hd-key';
+
+// IMPORTANT: This file uses dynamic imports for Solana libraries
+// to work around a WebSocket environment issue in Node.js.
+// Globals for Buffer and WebSocket are set before these are imported.
 
 export const runtime = 'nodejs';
-
-// NOTE: We do NOT import @solana/web3.js or @solana/spl-token at top-level.
-// They are imported dynamically inside the handler AFTER we set global Buffer/WebSocket.
 
 function getRpcUrl() {
   return process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
@@ -40,7 +42,6 @@ export async function POST(req: NextRequest) {
     PublicKey,
     Transaction,
     sendAndConfirmTransaction,
-    clusterApiUrl,
   } = solana;
   const {
     getOrCreateAssociatedTokenAccount,
@@ -52,12 +53,10 @@ export async function POST(req: NextRequest) {
   const firestore = adminDB();
   console.log('--- Received POST /api/merchant/redeem-order ---');
 
-  // helper: derive a 32-byte seed for Keypair.fromSeed using bip39 + ed25519-hd-key
-  function deriveSeedFromMnemonic(mnemonic: string, path = "m/44'/501'/0'/0'") {
-    const seedBuffer = bip39.mnemonicToSeedSync(mnemonic); // Buffer
-    const derived = derivePath(path, seedBuffer.toString('hex'));
-    // derived.key is a Buffer (32 bytes) suitable for Keypair.fromSeed
-    return derived.key;
+  // Standardized keypair derivation
+  function keypairFromMnemonic(mnemonic: string, passphrase = ''): Keypair {
+      const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
+      return Keypair.fromSeed(seed.slice(0, 32));
   }
 
   try {
@@ -65,8 +64,8 @@ export async function POST(req: NextRequest) {
     if (!process.env.LOCALCOIN_MNEMONIC) {
       throw new Error('CRITICAL: The LOCALCOIN_MNEMONIC environment variable is not configured.');
     }
-    const platformSeed = deriveSeedFromMnemonic(process.env.LOCALCOIN_MNEMONIC);
-    const platformKeypair = Keypair.fromSeed(platformSeed);
+    const platformKeypair = keypairFromMnemonic(process.env.LOCALCOIN_MNEMONIC);
+
 
     const { order: clientOrder } = await req.json();
     const { userId, merchantId, orderId } = clientOrder || {};
@@ -105,8 +104,7 @@ export async function POST(req: NextRequest) {
     const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
 
     // Derive user keypair from user's seedPhrase (server-side secret)
-    const userSeed = deriveSeedFromMnemonic(userData.seedPhrase);
-    const userKeypair = Keypair.fromSeed(userSeed);
+    const userKeypair = keypairFromMnemonic(userData.seedPhrase);
 
     const merchantPublicKey = new PublicKey(merchantData.walletAddress);
 
