@@ -5,7 +5,6 @@ import {
   Keypair,
   PublicKey,
   Transaction,
-  sendAndConfirmTransaction,
   clusterApiUrl,
 } from '@solana/web3.js';
 import {
@@ -93,7 +92,19 @@ export async function POST(req: NextRequest) {
     const ix = createTransferCheckedInstruction(fromAta.address, tokenMintPublicKey, toAta.address, userKeypair.publicKey, rawAmount, decimals);
 
     const tx = new Transaction().add(ix);
-    const txSignature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
+    tx.feePayer = userKeypair.publicKey;
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.sign(userKeypair);
+
+    const txSignature = await connection.sendRawTransaction(tx.serialize());
+    
+    // **REPLACEMENT LOGIC**: Manually confirm the transaction instead of using sendAndConfirmTransaction
+    await connection.confirmTransaction({
+        signature: txSignature,
+        blockhash: tx.recentBlockhash,
+        lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
+    }, 'confirmed');
+
     console.log('Redemption Transfer Signature:', txSignature);
 
     // --- Phase 3: Firestore Atomic Updates (inside transaction) ---
