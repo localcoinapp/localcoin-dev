@@ -5,26 +5,30 @@ import {
   Keypair,
   PublicKey,
   Transaction,
-  clusterApiUrl,
   sendAndConfirmTransaction,
+  clusterApiUrl,
 } from '@solana/web3.js';
 import {
   getOrCreateAssociatedTokenAccount,
-  createTransferInstruction, // Using the more basic transfer instruction
-  TOKEN_PROGRAM_ID,
+  createTransferCheckedInstruction,
+  getMint,
+  getAccount,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { adminDB } from '@/lib/firebaseAdmin'; // Correct Admin SDK import
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
+import {derivePath} from 'ed25519-hd-key';
 
 export const runtime = 'nodejs';
 
 // Derive a keypair from a mnemonic for signing transactions.
+// Using a specific derivation path for consistency.
 function keypairFromMnemonic(mnemonic: string): Keypair {
   const seed = bip39.mnemonicToSeedSync(mnemonic);
-  return Keypair.fromSeed(seed.slice(0, 32));
+  const derivedSeed = derivePath("m/44'/501'/0'/0'", seed.toString('hex')).key;
+  return Keypair.fromSeed(derivedSeed);
 }
 
 // Choose RPC URL (defaults to devnet).
@@ -72,11 +76,15 @@ export async function POST(req: NextRequest) {
     // --- Phase 2: Solana Blockchain Transfer ---
     const connection = new Connection(getRpcUrl(), 'confirmed');
     const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
+    
+    // Key derivation is the most likely point of environmental conflict.
     const userKeypair = keypairFromMnemonic(userData.seedPhrase);
+    
     const merchantPublicKey = new PublicKey(merchantData.walletAddress);
     
-    // Amount in the smallest unit (lamports for this token, which has 0 decimals)
-    const rawAmount = order.price; 
+    const mintInfo = await getMint(connection, tokenMintPublicKey);
+    const decimals = mintInfo.decimals;
+    const rawAmount = BigInt(Math.round(order.price * Math.pow(10, decimals)));
 
     // Get or create the user's token account
     const fromAta = await getOrCreateAssociatedTokenAccount(
@@ -86,6 +94,12 @@ export async function POST(req: NextRequest) {
         userKeypair.publicKey
     );
     
+    // Check user's token balance
+    const fromAtaInfo = await getAccount(connection, fromAta.address);
+    if (fromAtaInfo.amount < rawAmount) {
+        throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / Math.pow(10, decimals)}, but requires ${order.price}.`);
+    }
+
     // Get or create the merchant's token account
     const toAta = await getOrCreateAssociatedTokenAccount(
         connection,
@@ -94,18 +108,17 @@ export async function POST(req: NextRequest) {
         merchantPublicKey
     );
 
-    const transaction = new Transaction().add(
-      createTransferInstruction(
+    const ix = createTransferCheckedInstruction(
         fromAta.address,
+        tokenMintPublicKey,
         toAta.address,
         userKeypair.publicKey,
         rawAmount,
-        [],
-        TOKEN_PROGRAM_ID
-      )
+        decimals
     );
+    const tx = new Transaction().add(ix);
 
-    const txSignature = await sendAndConfirmTransaction(connection, transaction, [userKeypair]);
+    const txSignature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
     
     console.log('Redemption Transfer Signature:', txSignature);
 
