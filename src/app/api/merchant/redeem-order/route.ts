@@ -16,17 +16,17 @@ import {
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { adminDB } from '@/lib/firebaseAdmin'; // Correct Admin SDK import
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { User, Merchant, CartItem } from '@/types';
 import * as bip39 from 'bip39';
 import {derivePath} from 'ed25519-hd-key';
 
 export const runtime = 'nodejs';
 
-// Derive a keypair from a mnemonic for signing transactions.
-// Using a specific derivation path for consistency.
+// Derive a keypair from a mnemonic.
 function keypairFromMnemonic(mnemonic: string): Keypair {
   const seed = bip39.mnemonicToSeedSync(mnemonic);
+  // Using a standard derivation path for consistency.
   const derivedSeed = derivePath("m/44'/501'/0'/0'", seed.toString('hex')).key;
   return Keypair.fromSeed(derivedSeed);
 }
@@ -39,6 +39,12 @@ function getRpcUrl() {
 export async function POST(req: NextRequest) {
   const firestore = adminDB(); // Initialize Admin Firestore
   console.log('--- Received POST /api/merchant/redeem-order ---');
+
+  if (!process.env.LOCALCOIN_MNEMONIC) {
+    throw new Error('CRITICAL: The LOCALCOIN_MNEMONIC environment variable is not configured.');
+  }
+  const platformKeypair = keypairFromMnemonic(process.env.LOCALCOIN_MNEMONIC);
+
 
   try {
     const { order: clientOrder } = await req.json();
@@ -85,10 +91,10 @@ export async function POST(req: NextRequest) {
     const decimals = mintInfo.decimals;
     const rawAmount = BigInt(Math.round(order.price * Math.pow(10, decimals)));
 
-    // Get or create the user's token account
+    // Get the user's token account. Platform pays for creation if needed.
     const fromAta = await getOrCreateAssociatedTokenAccount(
         connection,
-        userKeypair,
+        platformKeypair, // Use platform as payer
         tokenMintPublicKey,
         userKeypair.publicKey
     );
@@ -99,10 +105,10 @@ export async function POST(req: NextRequest) {
         throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / Math.pow(10, decimals)}, but requires ${order.price}.`);
     }
 
-    // Get or create the merchant's token account
+    // Get the merchant's token account. Platform pays for creation if needed.
     const toAta = await getOrCreateAssociatedTokenAccount(
         connection,
-        userKeypair, // User pays for ATA creation if needed
+        platformKeypair, // Use platform as payer
         tokenMintPublicKey,
         merchantPublicKey
     );
@@ -111,12 +117,13 @@ export async function POST(req: NextRequest) {
         fromAta.address,
         tokenMintPublicKey,
         toAta.address,
-        userKeypair.publicKey,
+        userKeypair.publicKey, // User is the owner of the source account and must sign
         rawAmount,
         decimals
     );
     const tx = new Transaction().add(ix);
 
+    // User signs the transaction to authorize the transfer from their account.
     const txSignature = await sendAndConfirmTransaction(connection, tx, [userKeypair]);
     
     console.log('Redemption Transfer Signature:', txSignature);
