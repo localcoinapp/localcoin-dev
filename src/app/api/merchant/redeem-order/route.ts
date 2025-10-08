@@ -6,12 +6,12 @@ import {
   PublicKey,
   Transaction,
   clusterApiUrl,
+  sendAndConfirmTransaction,
 } from '@solana/web3.js';
 import {
   getOrCreateAssociatedTokenAccount,
-  createTransferCheckedInstruction,
-  getMint,
-  getAccount,
+  createTransferInstruction, // Using the more basic transfer instruction
+  TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { siteConfig } from '@/config/site';
 import { adminDB } from '@/lib/firebaseAdmin'; // Correct Admin SDK import
@@ -74,37 +74,39 @@ export async function POST(req: NextRequest) {
     const tokenMintPublicKey = new PublicKey(siteConfig.token.mintAddress);
     const userKeypair = keypairFromMnemonic(userData.seedPhrase);
     const merchantPublicKey = new PublicKey(merchantData.walletAddress);
-
-    const mintInfo = await getMint(connection, tokenMintPublicKey);
-    const decimals = mintInfo.decimals;
-    const rawAmount = BigInt(Math.round(order.price * Math.pow(10, decimals)));
-
-    const userSolBalance = await connection.getBalance(userKeypair.publicKey);
-    if (userSolBalance < 5000) throw new Error('Insufficient SOL balance for transaction fees.');
-
-    const fromAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, userKeypair.publicKey);
-    const fromAtaInfo = await getAccount(connection, fromAta.address);
-    if (fromAtaInfo.amount < rawAmount) {
-      throw new Error(`Insufficient funds. User has ${Number(fromAtaInfo.amount) / Math.pow(10, decimals)}, but requires ${order.price}.`);
-    }
-
-    const toAta = await getOrCreateAssociatedTokenAccount(connection, userKeypair, tokenMintPublicKey, merchantPublicKey);
-    const ix = createTransferCheckedInstruction(fromAta.address, tokenMintPublicKey, toAta.address, userKeypair.publicKey, rawAmount, decimals);
-
-    const tx = new Transaction().add(ix);
-    tx.feePayer = userKeypair.publicKey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-    tx.sign(userKeypair);
-
-    const txSignature = await connection.sendRawTransaction(tx.serialize());
     
-    // **REPLACEMENT LOGIC**: Manually confirm the transaction instead of using sendAndConfirmTransaction
-    await connection.confirmTransaction({
-        signature: txSignature,
-        blockhash: tx.recentBlockhash,
-        lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
-    }, 'confirmed');
+    // Amount in the smallest unit (lamports for this token, which has 0 decimals)
+    const rawAmount = order.price; 
 
+    // Get or create the user's token account
+    const fromAta = await getOrCreateAssociatedTokenAccount(
+        connection,
+        userKeypair,
+        tokenMintPublicKey,
+        userKeypair.publicKey
+    );
+    
+    // Get or create the merchant's token account
+    const toAta = await getOrCreateAssociatedTokenAccount(
+        connection,
+        userKeypair, // User pays for ATA creation if needed
+        tokenMintPublicKey,
+        merchantPublicKey
+    );
+
+    const transaction = new Transaction().add(
+      createTransferInstruction(
+        fromAta.address,
+        toAta.address,
+        userKeypair.publicKey,
+        rawAmount,
+        [],
+        TOKEN_PROGRAM_ID
+      )
+    );
+
+    const txSignature = await sendAndConfirmTransaction(connection, transaction, [userKeypair]);
+    
     console.log('Redemption Transfer Signature:', txSignature);
 
     // --- Phase 3: Firestore Atomic Updates (inside transaction) ---
