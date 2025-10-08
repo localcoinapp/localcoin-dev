@@ -50,10 +50,6 @@ env:
     availability: [RUNTIME]
 
   # safe to expose (public) – needed at build + runtime
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    availability: [BUILD, RUNTIME]
-
   - variable: NEXT_PUBLIC_CONTACT_EMAIL
     secret: NEXT_PUBLIC_CONTACT_EMAIL
     availability: [BUILD, RUNTIME]
@@ -72,4 +68,9 @@ env:
     
   - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     secret: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+    availability: [BUILD, RUNTIME]
+  
+  # The storage bucket is public, not a secret. It needs to be set directly.
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "localcoin-marketplace.appspot.com"
     availability: [BUILD, RUNTIME]
