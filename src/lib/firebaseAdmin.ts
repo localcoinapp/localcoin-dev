@@ -20,13 +20,15 @@ function initAdmin() {
   try {
     // This is a more robust way to parse the JSON, which might be wrapped in quotes
     // or have other small inconsistencies from being in an .env file.
-    const serviceAccount = JSON.parse(serviceAccountEnv);
+    const serviceAccountString = serviceAccountEnv.trim();
+    const serviceAccount = JSON.parse(serviceAccountString);
+
     initializeApp({
       credential: cert(serviceAccount),
     });
     console.log('Firebase Admin SDK initialized successfully with Service Account from environment variable.');
-  } catch (e) {
-    const errorMsg = 'CRITICAL: Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT. Ensure it is a valid, single-line JSON string.';
+  } catch (e: any) {
+    const errorMsg = `CRITICAL: Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT. Ensure it is a valid, single-line JSON string. Error: ${e.message}`;
     console.error(errorMsg, e);
     // Crash the server so the problem is immediately visible in server logs.
     throw new Error(errorMsg);
